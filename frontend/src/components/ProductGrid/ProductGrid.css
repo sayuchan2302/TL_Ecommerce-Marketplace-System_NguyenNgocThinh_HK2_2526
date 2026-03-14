@@ -87,13 +87,13 @@
 }
 
 .page-number:hover {
-  border-color: var(--co-black);
+  border-color: var(--co-blue);
 }
 
 .page-number.active {
-  background-color: var(--co-black);
+  background-color: var(--co-blue);
   color: var(--co-white);
-  border-color: var(--co-black);
+  border-color: var(--co-blue);
 }
 
 .page-dots {
@@ -108,8 +108,8 @@
 .pagination-btn {
   padding: 10px 20px;
   background-color: var(--co-white);
-  border: 1px solid var(--co-black);
-  color: var(--co-black);
+  border: 1px solid var(--co-blue);
+  color: var(--co-blue);
   font-weight: 600;
   border-radius: var(--radius-full);
   cursor: pointer;
@@ -117,7 +117,7 @@
 }
 
 .pagination-btn:hover:not(.disabled) {
-  background-color: var(--co-black);
+  background-color: var(--co-blue);
   color: var(--co-white);
 }
 

@@ -159,11 +159,9 @@ const Header = () => {
             </li>
             <li>
               <Link to="/category/sale" className="nav-link nav-sale">
-                <span className="sale-badge">-50%</span>
-                <span className="sale-text">SALE</span>
+                <span className="sale-badge">-50%</span> SALE
               </Link>
             </li>
-            <li><a href="#" className="nav-link">CỬA HÀNG</a></li>
           </ul>
         </nav>
 

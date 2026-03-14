@@ -24,7 +24,7 @@
 }
 
 .tab-btn.active {
-  background-color: var(--co-black);
+  background-color: var(--co-blue);
   color: var(--co-white);
 }
 

@@ -78,7 +78,7 @@
   height: 18px;
   border: 1px solid var(--co-gray-300);
   border-radius: 4px;
-  accent-color: var(--co-black);
+  accent-color: var(--co-blue);
   cursor: pointer;
 }
 

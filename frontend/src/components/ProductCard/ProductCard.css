@@ -126,8 +126,8 @@
 }
 
 .quick-size-btn.added {
-  background-color: #10B981;
-  border-color: #10B981;
+  background-color: var(--co-blue);
+  border-color: var(--co-blue);
   color: #fff;
   transform: scale(1.05);
 }

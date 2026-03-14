@@ -52,7 +52,8 @@
   /* Hide scrollbar */
   -ms-overflow-style: none;
   scrollbar-width: none;
-  padding-bottom: var(--space-2);
+  padding: 12px 4px 24px 4px;
+  margin: -12px -4px -24px -4px; /* Counter margin to keep visual alignment */
 }
 
 .product-grid.slider-view::-webkit-scrollbar {
@@ -85,7 +86,7 @@
 }
 
 .slider-nav:hover {
-  background-color: var(--co-black);
+  background-color: var(--co-blue);
   color: var(--co-white);
 }
 

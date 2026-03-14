@@ -259,7 +259,7 @@
 
 .strength-bar.weak { background-color: #EF4444; }
 .strength-bar.medium { background-color: #F59E0B; }
-.strength-bar.strong { background-color: #10B981; }
+.strength-bar.strong { background-color: var(--co-blue); }
 
 .strength-label {
   font-size: 11px;
@@ -269,7 +269,7 @@
 
 .strength-bar.weak ~ .strength-label { color: #EF4444; }
 .strength-bar.medium ~ .strength-label { color: #F59E0B; }
-.strength-bar.strong ~ .strength-label { color: #10B981; }
+.strength-bar.strong ~ .strength-label { color: var(--co-blue); }
 
 /* Confirm password match indicator */
 .match-indicator {
@@ -279,7 +279,7 @@
   font-weight: 500;
 }
 
-.match-indicator.match { color: #10B981; }
+.match-indicator.match { color: var(--co-blue); }
 .match-indicator.no-match { color: #EF4444; }
 
 .password-input-wrapper {

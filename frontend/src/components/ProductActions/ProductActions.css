@@ -92,9 +92,9 @@
 
 /* Success "added" state */
 .btn-add-to-cart.added {
-  background-color: #10B981;
+  background-color: var(--co-blue);
   color: var(--co-white);
-  border-color: #10B981;
+  border-color: var(--co-blue);
 }
 
 .btn-buy-now {

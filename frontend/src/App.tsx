@@ -8,6 +8,7 @@ import ProductListing from './pages/ProductListing/ProductListing';
 import ProductDetail from './pages/ProductDetail/ProductDetail';
 import Cart from './pages/Cart/Cart';
 import Checkout from './pages/Checkout/Checkout';
+import Profile from './pages/Profile/Profile';
 import ScrollToTop from './components/ScrollToTop/ScrollToTop';
 
 const MainLayout = () => {
@@ -34,6 +35,7 @@ function App() {
             <Route path="/product/:id" element={<ProductDetail />} />
             <Route path="/cart" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
+            <Route path="/account" element={<Profile />} />
           </Route>
         </Routes>
       </div>
