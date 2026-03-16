@@ -1,0 +1,117 @@
+/* Container positioning */
+.toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none; /* Let clicks pass through container */
+}
+
+/* Individual Toast */
+.toast-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 14px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 300px;
+  max-width: 400px;
+  pointer-events: auto; /* Re-enable clicks on the toast itself */
+  overflow: hidden;
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast-message {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--co-black);
+  flex: 1;
+}
+
+/* Icons */
+.toast-icon.success { color: #10b981; }
+.toast-icon.error { color: #ef4444; }
+.toast-icon.info { color: var(--co-blue); }
+
+/* Close Button */
+.toast-close {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.toast-close:hover {
+  color: var(--co-black);
+}
+
+/* Progress Bar */
+.toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--co-blue);
+  animation: toastProgress 3s linear forwards;
+}
+
+.toast-progress-success { background: #10b981; }
+.toast-progress-error { background: #ef4444; }
+.toast-progress-info { background: var(--co-blue); }
+
+/* Animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastProgress {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .toast-container {
+    bottom: auto;
+    top: 24px;
+    right: 16px;
+    left: 16px;
+    align-items: center;
+  }
+  
+  .toast-item {
+    width: 100%;
+    max-width: 100%;
+    animation: slideInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

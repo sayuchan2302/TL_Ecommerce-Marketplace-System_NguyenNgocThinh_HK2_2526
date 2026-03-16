@@ -3,6 +3,7 @@ import {
   ChevronRight, Package, Truck, CheckCircle2, XCircle, Clock,
   MapPin, Phone, CreditCard, ArrowLeft, RotateCcw, Copy
 } from 'lucide-react';
+import { useToast } from '../../contexts/ToastContext';
 import './OrderDetail.css';
 
 interface OrderItem {
@@ -106,6 +107,7 @@ const statusColorMap: Record<string, string> = {
 
 const OrderDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const { addToast } = useToast();
   const order = id ? MOCK_ORDERS[id] : null;
 
   if (!order) {
@@ -126,7 +128,7 @@ const OrderDetail = () => {
   const handleCopyTracking = () => {
     if (order.trackingCode) {
       navigator.clipboard.writeText(order.trackingCode);
-      alert('Đã sao chép mã vận đơn!');
+      addToast('Đã sao chép mã vận đơn!', 'success');
     }
   };
 

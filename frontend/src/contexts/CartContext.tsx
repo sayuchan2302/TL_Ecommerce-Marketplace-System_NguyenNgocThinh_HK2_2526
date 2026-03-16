@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useToast } from './ToastContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-export interface CartItem {
+export type CartItem = {
   cartId: string;     // unique key = `${productId}-${color}-${size}`
   id: number | string;
   name: string;
@@ -38,6 +39,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       return [];
     }
   });
+  const { addToast } = useToast();
 
   // Persist to localStorage whenever cart changes
   useEffect(() => {
@@ -50,22 +52,26 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const cartId = `${newItem.id}-${newItem.color}-${newItem.size}`;
     const qty = newItem.quantity ?? 1;
 
-    setItems(prev => {
-      const existing = prev.find(i => i.cartId === cartId);
-      if (existing) {
-        // Increase quantity if already in cart
-        return prev.map(i =>
-          i.cartId === cartId
-            ? { ...i, quantity: Math.min(i.quantity + qty, 10) }
-            : i
-        );
-      }
-      return [...prev, { ...newItem, cartId, quantity: qty }];
-    });
+    const existing = items.find(i => i.cartId === cartId);
+    if (existing) {
+      setItems(prev => prev.map(i =>
+        i.cartId === cartId
+          ? { ...i, quantity: Math.min(i.quantity + qty, 10) }
+          : i
+      ));
+      addToast(`Đã cập nhật số lượng của ${newItem.name} trong giỏ hàng`, 'info');
+    } else {
+      setItems(prev => [...prev, { ...newItem, cartId, quantity: qty }]);
+      addToast(`Đã thêm ${newItem.name} vào giỏ hàng`, 'success');
+    }
   };
 
   const removeFromCart = (cartId: string) => {
-    setItems(prev => prev.filter(i => i.cartId !== cartId));
+    const existing = items.find(i => i.cartId === cartId);
+    if (existing) {
+      setItems(prev => prev.filter(i => i.cartId !== cartId));
+      addToast('Đã xoá sản phẩm khỏi giỏ', 'info');
+    }
   };
 
   const updateQuantity = (cartId: string, quantity: number) => {

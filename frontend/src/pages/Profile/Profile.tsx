@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   User,
   ShoppingBag,
@@ -17,13 +17,17 @@ import {
   Trash2
 } from 'lucide-react';
 import AddressModal, { type AddressData } from './AddressModal';
+import { useToast } from '../../contexts/ToastContext';
 import './Profile.css';
 
 // Type definition for tabs
 type TabId = 'account' | 'orders' | 'vouchers' | 'addresses' | 'reviews';
 
 const Profile = () => {
-  const [activeTab, setActiveTab] = useState<TabId>('account');
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+
+  const [activeTab, setActiveTab] = useState<TabId>('orders');
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [height, setHeight] = useState('163');
@@ -57,8 +61,8 @@ const Profile = () => {
   ];
 
   const handleLogout = () => {
-    // Implement logout logic here later
-    alert("Đăng xuất thành công");
+    addToast("Đăng xuất thành công", "info");
+    navigate('/');
   };
 
   const renderContent = () => {

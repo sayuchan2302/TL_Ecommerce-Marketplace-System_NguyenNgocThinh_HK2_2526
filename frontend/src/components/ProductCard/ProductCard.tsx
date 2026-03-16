@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { Plus, Heart } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useCartAnimation } from '../../context/CartAnimationContext';
+import { useWishlist } from '../../contexts/WishlistContext';
 import './ProductCard.css';
 
 interface ProductCardProps {
@@ -22,8 +23,11 @@ const ProductCard = ({ id, name, price, originalPrice, image, badge, colors, siz
   const discount = originalPrice ? Math.round((1 - price / originalPrice) * 100) : 0;
   const { addToCart } = useCart();
   const { triggerAnimation } = useCartAnimation();
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const [addedSize, setAddedSize] = useState<string | null>(null);
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
+
+  const isWished = isInWishlist(String(id));
 
   const availableSizes = sizes ?? DEFAULT_SIZES;
   const selectedColorValue = colors?.[selectedColorIdx] ?? '';
@@ -54,9 +58,35 @@ const ProductCard = ({ id, name, price, originalPrice, image, badge, colors, siz
     setSelectedColorIdx(idx);
   };
 
+  const handleToggleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isWished) {
+      removeFromWishlist(String(id));
+    } else {
+      addToWishlist({
+        id: String(id),
+        name,
+        price,
+        originalPrice,
+        image,
+      });
+    }
+  };
+
   return (
     <div className="product-card">
       <div className="product-image-container">
+        {/* Wishlist Icon */}
+        <button 
+          className={`product-wishlist-btn ${isWished ? 'wished' : ''}`}
+          onClick={handleToggleWishlist}
+          title={isWished ? 'Bỏ yêu thích' : 'Thêm yêu thích'}
+          aria-label="Wishlist"
+        >
+          <Heart size={20} fill={isWished ? "currentColor" : "none"} strokeWidth={isWished ? 1 : 1.5} />
+        </button>
+
         <Link to={`/product/${id}`}>
           <img src={image} alt={name} className="product-image" loading="lazy" />
           {badge && <span className={`product-badge ${badge === 'SALE' ? 'badge-sale' : ''}`}>{badge}</span>}

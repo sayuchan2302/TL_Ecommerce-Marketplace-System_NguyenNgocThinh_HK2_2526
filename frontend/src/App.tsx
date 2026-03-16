@@ -18,8 +18,10 @@ import About from './pages/About/About';
 import Contact from './pages/Contact/Contact';
 import OrderDetail from './pages/OrderDetail/OrderDetail';
 import ScrollToTop from './components/ScrollToTop/ScrollToTop';
+import { ToastProvider } from './contexts/ToastContext';
 import { CartAnimationProvider } from './context/CartAnimationContext';
 import { WishlistProvider } from './contexts/WishlistContext';
+import { CartProvider } from './contexts/CartContext';
 
 const MainLayout = () => {
   const location = useLocation();
@@ -37,8 +39,10 @@ const MainLayout = () => {
 
 function App() {
   return (
-    <CartAnimationProvider>
-      <WishlistProvider>
+    <ToastProvider>
+      <CartProvider>
+        <CartAnimationProvider>
+          <WishlistProvider>
         <Router>
           <ScrollToTop />
           <div className="app-container">
@@ -63,8 +67,10 @@ function App() {
             </Routes>
           </div>
         </Router>
-      </WishlistProvider>
-    </CartAnimationProvider>
+        </WishlistProvider>
+      </CartAnimationProvider>
+      </CartProvider>
+    </ToastProvider>
   );
 }
 

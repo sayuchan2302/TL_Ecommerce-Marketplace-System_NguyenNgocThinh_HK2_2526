@@ -1,8 +1,11 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, Phone, Mail, MapPin, Clock, Send } from 'lucide-react';
+import { MapPin, Phone, Mail, Clock, Send, ChevronRight } from 'lucide-react';
+import { useToast } from '../../contexts/ToastContext';
 import './Contact.css';
 
 const Contact = () => {
+  const { addToast } = useToast();
+
   return (
     <div className="contact-page">
       <div className="contact-container">
@@ -62,10 +65,10 @@ const Contact = () => {
 
           {/* Contact Form */}
           <div className="contact-form-col">
-            <div className="contact-form-card">
-              <h2>Gửi tin nhắn cho chúng tôi</h2>
-              <form className="contact-form" onSubmit={(e) => { e.preventDefault(); alert('Cảm ơn bạn! Tin nhắn đã được gửi.'); }}>
-                <div className="cf-row">
+            <div className="contact-form-container">
+              <h2 className="contact-title">Gửi tin nhắn cho chúng tôi</h2>
+              <form className="contact-form" onSubmit={(e) => { e.preventDefault(); addToast('Cảm ơn bạn! Tin nhắn đã được gửi.', 'success'); e.currentTarget.reset(); }}>
+                <div className="form-group">
                   <div className="cf-group">
                     <label>Họ và tên</label>
                     <input type="text" placeholder="Nhập họ và tên" required />

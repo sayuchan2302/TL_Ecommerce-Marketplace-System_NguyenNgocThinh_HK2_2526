@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
+import { useToast } from './ToastContext';
 
 interface WishlistItem {
   id: string;
@@ -20,16 +21,22 @@ const WishlistContext = createContext<WishlistContextType | undefined>(undefined
 
 export const WishlistProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<WishlistItem[]>([]);
+  const { addToast } = useToast();
 
   const addToWishlist = (item: WishlistItem) => {
-    setItems(prev => {
-      if (prev.find(i => i.id === item.id)) return prev;
-      return [...prev, item];
-    });
+    const existing = items.find(i => i.id === item.id);
+    if (!existing) {
+      setItems(prev => [...prev, item]);
+      addToast('Đã thêm vào danh sách yêu thích', 'success');
+    }
   };
 
   const removeFromWishlist = (id: string) => {
-    setItems(prev => prev.filter(i => i.id !== id));
+    const existing = items.find(i => i.id === id);
+    if (existing) {
+      setItems(prev => prev.filter(item => item.id !== id));
+      addToast('Đã xoá khỏi danh sách yêu thích', 'info');
+    }
   };
 
   const isInWishlist = (id: string) => items.some(i => i.id === id);

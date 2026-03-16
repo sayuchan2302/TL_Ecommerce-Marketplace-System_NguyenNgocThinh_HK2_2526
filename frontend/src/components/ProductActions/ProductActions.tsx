@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Minus, Plus, ShoppingCart, Check } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, Check, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useCart } from '../../contexts/CartContext';
 import { useCartAnimation } from '../../context/CartAnimationContext';
+import { useWishlist } from '../../contexts/WishlistContext';
+import { useCart } from '../../contexts/CartContext';
 import './ProductActions.css';
 
 interface ProductActionsProps {
@@ -22,7 +23,9 @@ const ProductActions = ({ product, selectedColor, selectedSize }: ProductActions
   const [added, setAdded] = useState(false);
   const { addToCart } = useCart();
   const { triggerAnimation } = useCartAnimation();
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const navigate = useNavigate();
+  const isWished = isInWishlist(String(product.id));
 
   const handleAddToCart = (e: React.MouseEvent) => {
     addToCart({
@@ -56,6 +59,21 @@ const ProductActions = ({ product, selectedColor, selectedSize }: ProductActions
     });
     triggerAnimation(e, product.image);
     navigate('/cart');
+  };
+
+  const handleToggleWishlist = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isWished) {
+      removeFromWishlist(String(product.id));
+    } else {
+      addToWishlist({
+        id: String(product.id),
+        name: product.name,
+        price: product.price,
+        originalPrice: product.originalPrice,
+        image: product.image,
+      });
+    }
   };
 
   return (
@@ -103,6 +121,14 @@ const ProductActions = ({ product, selectedColor, selectedSize }: ProductActions
         {/* Buy Now Button */}
         <button className="btn-buy-now" onClick={handleBuyNow}>
           MUA NGAY
+        </button>
+        {/* Wishlist Button */}
+        <button 
+          className={`btn-wishlist-action ${isWished ? 'wished' : ''}`}
+          onClick={handleToggleWishlist}
+          title={isWished ? "Xoá khỏi yêu thích" : "Thêm vào yêu thích"}
+        >
+          <Heart size={24} fill={isWished ? 'currentColor' : 'none'} />
         </button>
       </div>
 
