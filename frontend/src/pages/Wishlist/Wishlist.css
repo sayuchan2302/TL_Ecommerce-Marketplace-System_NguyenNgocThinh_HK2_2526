@@ -145,6 +145,7 @@
   text-decoration: none;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin-bottom: 8px;
@@ -198,4 +199,161 @@
   .wishlist-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+/* ===== Variant Modal ===== */
+.wl-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .wl-modal-overlay {
+    align-items: center;
+  }
+}
+
+.wl-modal {
+  background: white;
+  border-radius: 20px 20px 0 0;
+  padding: 28px 24px 36px;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  animation: slideUp 0.25s ease;
+}
+
+@media (min-width: 640px) {
+  .wl-modal {
+    border-radius: 16px;
+  }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.wl-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: #f3f4f6;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #374151;
+  transition: background 0.2s;
+}
+
+.wl-modal-close:hover {
+  background: #e5e7eb;
+}
+
+.wl-modal-product {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.wl-modal-img {
+  width: 72px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.wl-modal-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--co-black);
+  line-height: 1.4;
+  margin: 0 0 6px;
+}
+
+.wl-modal-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--co-blue);
+  margin: 0;
+}
+
+.wl-variant-section {
+  margin-bottom: 20px;
+}
+
+.wl-variant-label {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0 0 10px;
+}
+
+.wl-variant-label strong {
+  color: var(--co-black);
+}
+
+.wl-option-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wl-option-btn {
+  padding: 7px 16px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wl-option-btn:hover {
+  border-color: var(--co-black);
+}
+
+.wl-option-btn.active {
+  border-color: var(--co-black);
+  background: var(--co-black);
+  color: white;
+}
+
+.wl-confirm-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--co-black);
+  color: white;
+  border: none;
+  padding: 14px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.wl-confirm-btn:hover {
+  opacity: 0.85;
 }

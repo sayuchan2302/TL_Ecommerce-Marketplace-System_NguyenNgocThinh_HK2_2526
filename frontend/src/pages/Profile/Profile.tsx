@@ -492,8 +492,6 @@ const Profile = () => {
     }
   };
 
-  console.log("Profile render state:", { activeTab });
-
   return (
     <div className="profile-page">
       <div className="container">

@@ -15,11 +15,13 @@ const About = () => {
 
         {/* Hero */}
         <div className="about-hero">
-          <h1 className="about-hero-title">Câu chuyện Coolmate</h1>
-          <p className="about-hero-desc">
-            Coolmate ra đời với sứ mệnh mang đến trải nghiệm mua sắm thời trang nam giản đơn, tiện lợi 
-            và chất lượng nhất cho cộng đồng người Việt.
-          </p>
+          <div className="about-hero-content">
+            <h1 className="about-hero-title">Câu chuyện Coolmate</h1>
+            <p className="about-hero-desc">
+              Coolmate ra đời với sứ mệnh mang đến trải nghiệm mua sắm thời trang nam giản đơn, tiện lợi 
+              và chất lượng nhất cho cộng đồng người Việt.
+            </p>
+          </div>
         </div>
 
         {/* Stats */}
@@ -72,33 +74,40 @@ const About = () => {
         {/* Story */}
         <div className="about-story">
           <h2 className="about-section-title">Hành trình phát triển</h2>
-          <div className="about-timeline">
-            <div className="timeline-item">
-              <div className="timeline-year">2019</div>
-              <div className="timeline-content">
-                <h4>Thành lập Coolmate</h4>
-                <p>Bắt đầu với sứ mệnh đơn giản hóa việc mua sắm thời trang nam.</p>
+          <div className="about-story-wrapper">
+            <img 
+              src="https://media.coolmate.me/cdn-cgi/image/width=1000,quality=80,format=auto/uploads/November2023/IMG_8203_1.jpg" 
+              alt="Coolmate Team" 
+              className="about-story-img"
+            />
+            <div className="about-timeline">
+              <div className="timeline-item">
+                <div className="timeline-year">2019</div>
+                <div className="timeline-content">
+                  <h4>Thành lập Coolmate</h4>
+                  <p>Bắt đầu với sứ mệnh đơn giản hóa việc mua sắm thời trang nam.</p>
+                </div>
               </div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-year">2020</div>
-              <div className="timeline-content">
-                <h4>Mở rộng quy mô</h4>
-                <p>Đạt mốc 100.000 khách hàng, ra mắt ứng dụng di động.</p>
+              <div className="timeline-item">
+                <div className="timeline-year">2020</div>
+                <div className="timeline-content">
+                  <h4>Mở rộng quy mô</h4>
+                  <p>Đạt mốc 100.000 khách hàng, ra mắt ứng dụng di động.</p>
+                </div>
               </div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-year">2022</div>
-              <div className="timeline-content">
-                <h4>Gọi vốn thành công</h4>
-                <p>Nhận đầu tư từ Shark Tank Việt Nam, mở rộng dòng sản phẩm.</p>
+              <div className="timeline-item">
+                <div className="timeline-year">2022</div>
+                <div className="timeline-content">
+                  <h4>Gọi vốn thành công</h4>
+                  <p>Nhận đầu tư từ Shark Tank Việt Nam, mở rộng dòng sản phẩm.</p>
+                </div>
               </div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-year">2024</div>
-              <div className="timeline-content">
-                <h4>Vươn tầm khu vực</h4>
-                <p>Hơn 1 triệu khách hàng, mở rộng sang thị trường Đông Nam Á.</p>
+              <div className="timeline-item">
+                <div className="timeline-year">2024</div>
+                <div className="timeline-content">
+                  <h4>Vươn tầm khu vực</h4>
+                  <p>Hơn 1 triệu khách hàng, mở rộng sang thị trường Đông Nam Á.</p>
+                </div>
               </div>
             </div>
           </div>

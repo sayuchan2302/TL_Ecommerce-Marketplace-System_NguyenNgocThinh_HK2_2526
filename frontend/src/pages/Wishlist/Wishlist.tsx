@@ -1,26 +1,50 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Heart, ShoppingCart, Trash2, ChevronRight } from 'lucide-react';
+import { Heart, ShoppingCart, Trash2, ChevronRight, X } from 'lucide-react';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useCart } from '../../contexts/CartContext';
 import './Wishlist.css';
+
+const AVAILABLE_SIZES = ['S', 'M', 'L', 'XL', '2XL'];
+const AVAILABLE_COLORS = ['Đen', 'Trắng', 'Xanh Navy', 'Xám'];
+
+interface PendingItem {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  image: string;
+}
 
 const Wishlist = () => {
   const { items, removeFromWishlist } = useWishlist();
   const { addToCart } = useCart();
 
+  const [pendingItem, setPendingItem] = useState<PendingItem | null>(null);
+  const [selectedSize, setSelectedSize] = useState('M');
+  const [selectedColor, setSelectedColor] = useState('Đen');
+
   const formatPrice = (price: number) =>
     price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.') + 'đ';
 
-  const handleAddToCart = (item: typeof items[0]) => {
+  const openVariantModal = (item: typeof items[0]) => {
+    setPendingItem(item);
+    setSelectedSize('M');
+    setSelectedColor('Đen');
+  };
+
+  const handleConfirmAddToCart = () => {
+    if (!pendingItem) return;
     addToCart({
-      id: item.id,
-      name: item.name,
-      price: item.price,
-      image: item.image,
-      color: 'Mặc định',
-      size: 'M',
+      id: pendingItem.id,
+      name: pendingItem.name,
+      price: pendingItem.price,
+      image: pendingItem.image,
+      color: selectedColor,
+      size: selectedSize,
     });
-    removeFromWishlist(item.id);
+    removeFromWishlist(pendingItem.id);
+    setPendingItem(null);
   };
 
   return (
@@ -65,7 +89,7 @@ const Wishlist = () => {
                       <span className="wishlist-orig-price">{formatPrice(item.originalPrice)}</span>
                     )}
                   </div>
-                  <button className="wishlist-add-cart-btn" onClick={() => handleAddToCart(item)}>
+                  <button className="wishlist-add-cart-btn" onClick={() => openVariantModal(item)}>
                     <ShoppingCart size={16} />
                     Thêm vào giỏ
                   </button>
@@ -75,6 +99,60 @@ const Wishlist = () => {
           </div>
         )}
       </div>
+
+      {/* Variant Selection Modal */}
+      {pendingItem && (
+        <div className="wl-modal-overlay" onClick={() => setPendingItem(null)}>
+          <div className="wl-modal" onClick={e => e.stopPropagation()}>
+            <button className="wl-modal-close" onClick={() => setPendingItem(null)}>
+              <X size={20} />
+            </button>
+
+            <div className="wl-modal-product">
+              <img src={pendingItem.image} alt={pendingItem.name} className="wl-modal-img" />
+              <div>
+                <p className="wl-modal-name">{pendingItem.name}</p>
+                <p className="wl-modal-price">{formatPrice(pendingItem.price)}</p>
+              </div>
+            </div>
+
+            <div className="wl-variant-section">
+              <p className="wl-variant-label">Màu sắc: <strong>{selectedColor}</strong></p>
+              <div className="wl-option-group">
+                {AVAILABLE_COLORS.map(color => (
+                  <button
+                    key={color}
+                    className={`wl-option-btn ${selectedColor === color ? 'active' : ''}`}
+                    onClick={() => setSelectedColor(color)}
+                  >
+                    {color}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="wl-variant-section">
+              <p className="wl-variant-label">Kích thước: <strong>{selectedSize}</strong></p>
+              <div className="wl-option-group">
+                {AVAILABLE_SIZES.map(size => (
+                  <button
+                    key={size}
+                    className={`wl-option-btn ${selectedSize === size ? 'active' : ''}`}
+                    onClick={() => setSelectedSize(size)}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button className="wl-confirm-btn" onClick={handleConfirmAddToCart}>
+              <ShoppingCart size={18} />
+              Thêm vào giỏ hàng
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

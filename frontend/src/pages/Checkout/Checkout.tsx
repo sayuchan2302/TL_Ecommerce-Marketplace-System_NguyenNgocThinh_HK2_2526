@@ -431,7 +431,7 @@ const Checkout = () => {
                   ) : (
                     items.map(item => (
                       <div className="unified-cart-item" key={item.cartId}>
-                        <img src="https://vi.saigontourist.net/vsgt-images/17/202111/bai-viet-c8205f25-cecb-4467-9bb3-55914fa6443c.jpeg"
+                        <img src={item.image}
                           alt={item.name} className="unified-item-img" />
 
                         <div className="unified-item-info">
