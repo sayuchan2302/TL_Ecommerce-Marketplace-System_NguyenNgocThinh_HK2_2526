@@ -38,27 +38,122 @@ const slides = [
 const AUTO_DELAY = 5500;
 
 const HeroSlider = () => {
-  const [index, setIndex] = useState(0);
+  const loopSlides = [slides[slides.length - 1], ...slides, slides[0]];
+  const [position, setPosition] = useState(1); // index in loopSlides (offset by 1)
+  const [isTransitioning, setIsTransitioning] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const startXRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
 
-  const next = () => setIndex((prev) => (prev + 1) % slides.length);
-  const prev = () => setIndex((prev) => (prev - 1 + slides.length) % slides.length);
+  const restartTimer = () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setIsTransitioning(true);
+      setPosition((prev) => prev + 1);
+    }, AUTO_DELAY);
+  };
 
   useEffect(() => {
-    timerRef.current && clearInterval(timerRef.current);
-    timerRef.current = setInterval(next, AUTO_DELAY);
+    restartTimer();
     return () => { timerRef.current && clearInterval(timerRef.current); };
-  }, [index]);
+  }, [position]);
+
+  const next = () => {
+    setIsTransitioning(true);
+    setPosition((prev) => prev + 1);
+    restartTimer();
+  };
+
+  const prev = () => {
+    setIsTransitioning(true);
+    setPosition((prev) => prev - 1);
+    restartTimer();
+  };
+
+  const handleTransitionEnd = () => {
+    if (position === slides.length + 1) {
+      setIsTransitioning(false);
+      setPosition(1);
+    } else if (position === 0) {
+      setIsTransitioning(false);
+      setPosition(slides.length);
+    }
+  };
+
+  const handlePointerDown = (clientX: number) => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setIsDragging(true);
+    startXRef.current = clientX;
+    setDragOffset(0);
+    setIsTransitioning(false);
+  };
+
+  const handlePointerMove = (clientX: number) => {
+    if (!isDragging) return;
+    setDragOffset(clientX - startXRef.current);
+  };
+
+  const handlePointerUp = (clientX: number) => {
+    if (!isDragging) return;
+    const delta = clientX - startXRef.current;
+    const threshold = 50;
+    setIsDragging(false);
+    setDragOffset(0);
+    if (delta > threshold) {
+      prev();
+    } else if (delta < -threshold) {
+      next();
+    } else {
+      setIsTransitioning(true);
+      restartTimer();
+    }
+  };
+
+  const handlePointerLeave = () => {
+    if (isDragging) {
+      setIsDragging(false);
+      setDragOffset(0);
+      setIsTransitioning(true);
+      restartTimer();
+    }
+  };
+
+  const dragOffsetPercent = (() => {
+    if (!isDragging || !trackRef.current) return 0;
+    const width = trackRef.current.clientWidth;
+    if (!width) return 0;
+    return (dragOffset / width) * 100;
+  })();
 
   return (
     <section className="hero-slider">
       <div
         className="hero-track"
-        style={{ transform: `translateX(-${index * 100}%)` }}
+        ref={trackRef}
+        style={{
+          transform: `translateX(calc(-${position * 100}% + ${dragOffsetPercent}%))`,
+          transition: isTransitioning ? 'transform 0.7s ease' : 'none',
+        }}
+        onPointerDown={(e) => handlePointerDown(e.clientX)}
+        onPointerMove={(e) => handlePointerMove(e.clientX)}
+        onPointerUp={(e) => handlePointerUp(e.clientX)}
+        onPointerLeave={handlePointerLeave}
+        onPointerCancel={handlePointerLeave}
+        onTouchStart={(e) => handlePointerDown(e.touches[0].clientX)}
+        onTouchMove={(e) => handlePointerMove(e.touches[0].clientX)}
+        onTouchEnd={(e) => handlePointerUp(e.changedTouches[0].clientX)}
+        onTransitionEnd={handleTransitionEnd}
       >
-        {slides.map((slide, i) => (
-          <div key={slide.title} className="hero-slide">
-            <img src={slide.image} alt={slide.title} className="hero-image" loading={i === index ? 'eager' : 'lazy'} />
+        {loopSlides.map((slide, i) => (
+          <div key={`${slide.title}-${i}`} className="hero-slide">
+            <img
+              src={slide.image}
+              alt={slide.title}
+              className="hero-image"
+              loading={i === position ? 'eager' : 'lazy'}
+            />
             <div className="hero-overlay" />
             <div className="hero-content">
               <h1 className="hero-title">{slide.title}</h1>
