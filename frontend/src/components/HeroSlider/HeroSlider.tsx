@@ -47,11 +47,13 @@ const HeroSlider = () => {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
 
+  const maxPos = slides.length + 1;
+
   const restartTimer = () => {
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
       setIsTransitioning(true);
-      setPosition((prev) => prev + 1);
+      setPosition((prev) => Math.min(maxPos, prev + 1));
     }, AUTO_DELAY);
   };
 
@@ -62,13 +64,13 @@ const HeroSlider = () => {
 
   const next = () => {
     setIsTransitioning(true);
-    setPosition((prev) => prev + 1);
+    setPosition((prev) => Math.min(maxPos, prev + 1));
     restartTimer();
   };
 
   const prev = () => {
     setIsTransitioning(true);
-    setPosition((prev) => prev - 1);
+    setPosition((prev) => Math.max(0, prev - 1));
     restartTimer();
   };
 
@@ -79,8 +81,22 @@ const HeroSlider = () => {
     } else if (position === 0) {
       setIsTransitioning(false);
       setPosition(slides.length);
+    } else if (position > slides.length + 1) {
+      setIsTransitioning(false);
+      setPosition(slides.length + 1);
+    } else if (position < 0) {
+      setIsTransitioning(false);
+      setPosition(0);
     }
   };
+
+  // Re-enable transition on the next frame after snapping to a loop position
+  useEffect(() => {
+    if (!isTransitioning) {
+      const id = requestAnimationFrame(() => setIsTransitioning(true));
+      return () => cancelAnimationFrame(id);
+    }
+  }, [isTransitioning]);
 
   const handlePointerDown = (clientX: number) => {
     if (timerRef.current) clearInterval(timerRef.current);
