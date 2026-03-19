@@ -35,6 +35,7 @@ const Footer = () => {
             <li><Link to="/policy/giao-hang">Chính sách giao hàng</Link></li>
             <li><Link to="/order-tracking">Theo dõi đơn hàng</Link></li>
             <li><Link to="/returns">Đổi/Trả hàng</Link></li>
+            <li><Link to="/payment-result?status=pending">Kết quả thanh toán</Link></li>
           </ul>
         </div>
 
@@ -43,6 +44,8 @@ const Footer = () => {
           <ul className="footer-links">
             <li><Link to="/about">Câu chuyện Coolmate</Link></li>
             <li><Link to="/contact">Liên hệ</Link></li>
+            <li><Link to="/size-guide">Bảng size</Link></li>
+            <li><Link to="/faq">FAQ</Link></li>
           </ul>
         </div>
 

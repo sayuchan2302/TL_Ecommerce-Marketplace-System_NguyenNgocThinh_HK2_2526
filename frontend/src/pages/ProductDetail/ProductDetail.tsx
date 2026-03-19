@@ -141,6 +141,13 @@ const ProductDetail = () => {
               selectedColor={selectedColor}
               selectedSize={selectedSize}
             />
+            <div className="pd-size-help">
+              <p className="pd-size-text">Phân vân size? Xem bảng size hoặc nhờ CSKH tư vấn.</p>
+              <div className="pd-size-links">
+                <Link to="/size-guide" className="pd-size-link">Bảng size</Link>
+                <Link to="/contact" className="pd-size-link">Nhờ tư vấn</Link>
+              </div>
+            </div>
           </div>
         </div>
 

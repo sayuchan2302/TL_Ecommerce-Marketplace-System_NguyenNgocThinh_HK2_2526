@@ -60,6 +60,36 @@
   top: 120px; /* Stick while scrolling gallery if it's long */
 }
 
+.pd-size-help {
+  margin-top: 10px;
+  border: 1px solid var(--co-gray-200);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--co-gray-50);
+}
+
+.pd-size-text {
+  margin: 0 0 8px;
+  color: var(--co-gray-700);
+}
+
+.pd-size-links {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pd-size-link {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--co-gray-300);
+  background: white;
+  text-decoration: none;
+  font-weight: 700;
+  color: var(--co-black);
+  font-size: 13px;
+}
+
 /* Temporary placeholders */
 .placeholder-box {
   background-color: var(--co-gray-100);
