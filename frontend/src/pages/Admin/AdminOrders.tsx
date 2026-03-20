@@ -1,6 +1,6 @@
 import './Admin.css';
 import { Link } from 'react-router-dom';
-import { Filter, Search, Truck, Eye, Printer, Link2 } from 'lucide-react';
+import { Filter, Search, Truck, Eye, Printer, Link2, CheckCircle2 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { useState, useCallback, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -13,7 +13,7 @@ import {
 } from './orderWorkflow';
 import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
 import { useAdminListState } from './useAdminListState';
-import { bulkTransitionToPacking, listAdminOrders, subscribeAdminOrders, type AdminOrderRecord } from './adminOrderService';
+import { bulkTransitionToPacking, listAdminOrders, subscribeAdminOrders, transitionAdminOrder, type AdminOrderRecord } from './adminOrderService';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
@@ -24,6 +24,7 @@ import { ADMIN_TEXT } from './adminText';
 interface AdminOrderRow {
   code: string;
   customer: string;
+  email: string;
   avatar: string;
   total: string;
   paymentStatus: PaymentStatus;
@@ -35,6 +36,7 @@ interface AdminOrderRow {
 const mapOrderRecordToRow = (order: AdminOrderRecord): AdminOrderRow => ({
   code: order.code,
   customer: order.customer,
+  email: order.customerInfo.email,
   avatar: order.avatar,
   total: order.total,
   paymentStatus: order.paymentStatus,
@@ -202,6 +204,20 @@ const AdminOrders = () => {
     pushToast(ADMIN_TOAST_MESSAGES.orders.preparingPrint(selected.size));
   };
 
+  const handleApproveOrder = (code: string) => {
+    const result = transitionAdminOrder({
+      code,
+      nextFulfillment: 'packing',
+      actor: 'Admin',
+      source: 'orders_list',
+    });
+    if (!result.ok) {
+      pushToast(result.error || 'Không thể duyệt đơn hàng.');
+      return;
+    }
+    pushToast(result.message || 'Đã duyệt đơn hàng.');
+  };
+
   useEffect(() => {
     const syncOrders = () => {
       setRows(listAdminOrders().map(mapOrderRecordToRow));
@@ -264,8 +280,8 @@ const AdminOrders = () => {
               onAction={resetCurrentView}
             />
           ) : (
-          <div className="admin-table" role="table" aria-label={t.tableAria}>
-            <div className="admin-table-row admin-table-head wide" role="row">
+            <div className="admin-table" role="table" aria-label={t.tableAria}>
+            <div className="admin-table-row admin-table-head orders" role="row">
               <div role="columnheader">
                 <input
                   type="checkbox"
@@ -276,15 +292,15 @@ const AdminOrders = () => {
               </div>
               <div role="columnheader">{t.columns.orderCode}</div>
               <div role="columnheader">{t.columns.customer}</div>
-              <div role="columnheader">{t.columns.total}</div>
+              <div role="columnheader" className="text-center">{t.columns.total}</div>
               <div role="columnheader">{t.columns.payment}</div>
               <div role="columnheader">{t.columns.shipping}</div>
               <div role="columnheader">{t.columns.createdAt}</div>
-              <div role="columnheader">{t.columns.actions}</div>
+              <div role="columnheader" className="text-right pr-12">{t.columns.actions}</div>
             </div>
             {pagedOrders.map((order, idx) => (
               <motion.div
-                className="admin-table-row wide"
+                className="admin-table-row orders"
                 role="row"
                 key={order.code}
                 initial={{ opacity: 0, y: 8 }}
@@ -301,28 +317,41 @@ const AdminOrders = () => {
                   />
                 </div>
                 <div role="cell" className="admin-bold">#{order.code}</div>
-                <div role="cell">
-                  <div className="admin-customer">
-                    <img src={order.avatar} alt={order.customer} />
-                    <span>{order.customer}</span>
+                <div role="cell" className="customer-info-cell">
+                  <img src={order.avatar} alt={order.customer} className="customer-avatar" />
+                  <div className="customer-text">
+                    <p className="admin-bold customer-name">{order.customer}</p>
+                    <p className="admin-muted customer-email">{order.email}</p>
                   </div>
                 </div>
-                <div role="cell">{order.total}</div>
+                <div role="cell" className="admin-bold order-total">{order.total}</div>
                 <div role="cell"><span className={`admin-pill ${tone(paymentLabel(order.paymentStatus))}`}>{paymentLabel(order.paymentStatus)}</span></div>
                 <div role="cell">
                   <div className="admin-ship">
                     <span className={`admin-pill ${tone(shipLabel(order.fulfillment))}`}><Truck size={14} /> {shipLabel(order.fulfillment)}</span>
-                    <span className="admin-muted">{order.shipMethod}</span>
+                    <span className="admin-muted order-ship-method">{order.shipMethod}</span>
                   </div>
                 </div>
-                <div role="cell" className="admin-muted">{formatDateTime(order.date)}</div>
+                <div role="cell" className="admin-muted order-date">{formatDateTime(order.date)}</div>
                 <div role="cell" className="admin-actions">
                   <Link to={`/admin/orders/${order.code}`} className="admin-icon-btn subtle" aria-label={ADMIN_ACTION_TITLES.viewDetail}>
                     <Eye size={16} />
                   </Link>
-                  <button className="admin-icon-btn subtle" type="button" aria-label={ADMIN_ACTION_TITLES.printInvoice}>
-                    <Printer size={16} />
-                  </button>
+                  {order.fulfillment === 'pending' ? (
+                    <button
+                      className="admin-icon-btn subtle"
+                      type="button"
+                      aria-label={ADMIN_ACTION_TITLES.approveOrder}
+                      title={ADMIN_ACTION_TITLES.approveOrder}
+                      onClick={() => handleApproveOrder(order.code)}
+                    >
+                      <CheckCircle2 size={16} />
+                    </button>
+                  ) : (
+                    <button className="admin-icon-btn subtle" type="button" aria-label={ADMIN_ACTION_TITLES.printInvoice}>
+                      <Printer size={16} />
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ))}

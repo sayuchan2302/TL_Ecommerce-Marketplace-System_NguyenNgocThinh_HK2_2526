@@ -14,7 +14,7 @@ const recentOrders = [
   { code: 'ORD-10234', customer: 'Nguyễn Văn A', total: '1.250.000 đ', status: 'Đang xử lý', waitTime: '58 phút', priority: 'high', thumb: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=120&h=140&q=80' },
   { code: 'ORD-10233', customer: 'Trần Thu B', total: '780.000 đ', status: 'Đang đóng gói', waitTime: '24 phút', priority: 'medium', thumb: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?auto=format&fit=crop&w=120&h=140&q=80' },
   { code: 'ORD-10232', customer: 'Lê Hữu C', total: '2.150.000 đ', status: 'Chờ giao', waitTime: '1 giờ 12 phút', priority: 'high', thumb: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=120&h=140&q=80' },
-  { code: 'ORD-10231', customer: 'Phạm Hương', total: '560.000 đ', status: 'Hoàn tất', waitTime: '6 phút', priority: 'low', thumb: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=120&h=140&q=80' },
+  { code: 'ORD-DEMO-001', customer: 'Nguyễn Ngọc Thịnh', total: '690.000 đ', status: 'Chờ xác nhận', waitTime: '12 phút', priority: 'low', thumb: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=120&h=140&q=80' },
 ];
 
 const topProducts = [

@@ -18,4 +18,5 @@ export const ADMIN_ACTION_TITLES = {
   exportCustomerData: 'Xuất dữ liệu khách hàng',
   copyTracking: 'Sao chép mã vận đơn',
   printInvoice: 'In hóa đơn',
+  approveOrder: 'Duyệt đơn',
 } as const;

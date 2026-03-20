@@ -167,9 +167,13 @@
 .admin-panel-head h2 { margin: 0; font-size: 16px; font-weight: 800; }
 .admin-panel-head a { font-size: 13px; color: var(--co-blue); text-decoration: none; font-weight: 700; }
 
-.admin-table { border: 1px solid var(--co-gray-200); border-radius: 10px; overflow: hidden; }
-.admin-table-row { display: grid; grid-template-columns: 0.6fr 1.1fr 1.5fr 1fr 1fr 1.4fr 1.2fr 1fr; padding: 10px 12px; align-items: center; gap: 8px; font-size: 14px; border-bottom: 1px solid var(--co-gray-200); }
+.admin-table { border: 1px solid var(--co-gray-200); border-radius: 10px; overflow-x: auto; overflow-y: hidden; }
+.admin-table-row { display: grid; grid-template-columns: 0.6fr 1.1fr 1.5fr 1fr 1fr 1.4fr 1.2fr 1fr; padding: 10px 12px; align-items: center; gap: 8px; font-size: 14px; border-bottom: 1px solid var(--co-gray-200); min-width: 1000px; }
 .admin-table-row.wide { grid-template-columns: 0.6fr 1.1fr 1.5fr 1fr 1fr 1.4fr 1.2fr 1fr; }
+.admin-table-row.orders { grid-template-columns: 48px minmax(100px, 0.8fr) minmax(240px, 2.2fr) minmax(110px, 0.9fr) minmax(130px, 1fr) minmax(160px, 1.4fr) minmax(150px, 1.2fr) minmax(100px, 0.8fr); }
+.admin-table-row.orders .admin-actions { justify-content: flex-end; justify-self: end; }
+.admin-table-row.orders .order-total { justify-self: center; text-align: center; }
+.admin-table-row.wide .admin-actions { justify-content: flex-end; }
 .admin-table-row.recent { grid-template-columns: 1fr 1.5fr 1fr 1fr; }
 .admin-table-row.recent-v2 { grid-template-columns: 1.8fr 0.8fr 1fr 0.9fr 1fr; }
 .admin-table-row.products { grid-template-columns: 0.5fr 2.4fr 1.2fr 1fr 0.9fr 1.1fr 1fr; }
@@ -197,6 +201,11 @@
 .alert-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 8px; }
 .alert-pill { padding: 10px 12px; border-radius: 12px; border: 1px solid transparent; font-weight: 800; font-size: 13px; cursor: pointer; text-align: left; display: inline-flex; align-items: center; gap: 8px; }
 .alert-pill.danger { background: #fef2f2; color: #dc2626; border-color: #fecdd3; }
+
+.text-right { text-align: right; justify-self: end; width: 100%; }
+.text-center { text-align: center; justify-self: center; width: 100%; }
+.pr-12 { padding-right: 12px; }
+.order-total { text-align: center; font-variant-numeric: tabular-nums; }
 .alert-pill.warning { background: #fffbeb; color: #d97706; border-color: #fef08a; }
 .alert-pill.info { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 .alert-pill svg { color: currentColor; }
@@ -279,6 +288,10 @@
   }
 }
 .admin-ship { display: flex; flex-direction: column; gap: 4px; }
+.order-customer-name { white-space: nowrap; }
+.order-total { white-space: nowrap; color: #0f172a; font-variant-numeric: tabular-nums; }
+.order-ship-method { font-size: 12px; line-height: 1.2; }
+.order-date { white-space: nowrap; font-weight: 600; }
 .admin-status-group { display: inline-flex; flex-direction: row; align-items: center; gap: 8px; margin-right: 12px; }
 .admin-label { font-size: 12px; font-weight: 700; color: var(--co-gray-600); }
 .od-title-row { display: flex; align-items: center; gap: 10px; font-size: 24px; font-weight: 800; }
@@ -833,7 +846,7 @@ input:disabled, .disabled-input { background: var(--co-gray-100); color: var(--c
 }
 
 .admin-table-row.customers {
-  grid-template-columns: 44px minmax(240px, 2.5fr) minmax(132px, 1.2fr) minmax(116px, 1fr) minmax(72px, 0.75fr) minmax(132px, 1.15fr) minmax(148px, 1.15fr) minmax(126px, 1fr) minmax(122px, 1fr);
+  grid-template-columns: 44px minmax(240px, 2.45fr) minmax(132px, 1.1fr) minmax(112px, 0.9fr) minmax(72px, 0.7fr) minmax(132px, 1.05fr) minmax(152px, 1.1fr) minmax(126px, 0.9fr) minmax(132px, 0.95fr);
 }
 
 .admin-table-row.customers > [role='cell'],
@@ -916,6 +929,13 @@ input:disabled, .disabled-input { background: var(--co-gray-100); color: var(--c
 
 .admin-table-row.customers .admin-actions {
   justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.admin-table-row.customers .admin-actions .admin-icon-btn {
+  flex: 0 0 32px;
 }
 
 .admin-pill.tier-bronze {
@@ -1171,7 +1191,7 @@ input:disabled, .disabled-input { background: var(--co-gray-100); color: var(--c
 
 @media (max-width: 1300px) {
   .admin-table-row.customers {
-    grid-template-columns: 40px minmax(220px, 2.2fr) minmax(120px, 1.1fr) minmax(108px, 1fr) minmax(64px, 0.7fr) minmax(120px, 1.05fr) minmax(132px, 1.05fr) minmax(116px, 0.95fr) minmax(112px, 0.9fr);
+    grid-template-columns: 40px minmax(220px, 2.15fr) minmax(120px, 1fr) minmax(104px, 0.85fr) minmax(64px, 0.6fr) minmax(120px, 0.95fr) minmax(140px, 1.08fr) minmax(114px, 0.85fr) minmax(124px, 0.9fr);
     font-size: 13px;
   }
 }

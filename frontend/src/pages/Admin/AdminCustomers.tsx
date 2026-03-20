@@ -1,7 +1,7 @@
 import './Admin.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Eye, Pencil, Ban, X, Mail, Download, Gift, ChevronDown, Sparkles, Link2, Trash2 } from 'lucide-react';
+import { Search, Eye, Ban, X, Mail, Download, Gift, ChevronDown, Sparkles, Link2, Trash2 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
 import AdminConfirmDialog from './AdminConfirmDialog';
@@ -628,7 +628,7 @@ const AdminCustomers = () => {
               <div role="columnheader">{t.columns.totalSpent}</div>
               <div role="columnheader">{t.columns.status}</div>
               <div role="columnheader">{t.columns.lastOrder}</div>
-              <div role="columnheader">{t.columns.actions}</div>
+              <div role="columnheader" style={{ textAlign: 'right', paddingRight: '12px' }}>{t.columns.actions}</div>
             </div>
 
             {pagedCustomers.map((customer, idx) => (
@@ -657,7 +657,6 @@ const AdminCustomers = () => {
                 <div role="cell" className="admin-muted customer-last-order">{formatDate(customer.lastOrder)}</div>
                 <div role="cell" className="admin-actions">
                   <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.viewDetail} aria-label={ADMIN_ACTION_TITLES.viewDetail} onClick={() => openDrawer(customer, 'activity')}><Eye size={16} /></button>
-                  <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.editNote} aria-label={ADMIN_ACTION_TITLES.editNote} onClick={() => openDrawer(customer, 'notes')}><Pencil size={16} /></button>
                   <button className="admin-icon-btn subtle" title={customer.status === 'active' ? ADMIN_ACTION_TITLES.lockAccount : ADMIN_ACTION_TITLES.unlockAccount} aria-label={customer.status === 'active' ? ADMIN_ACTION_TITLES.lockAccount : ADMIN_ACTION_TITLES.unlockAccount} onClick={() => toggleBanStatus(customer.id)}><Ban size={16} /></button>
                   <button className="admin-icon-btn subtle danger-icon" title={ADMIN_ACTION_TITLES.delete} aria-label={ADMIN_ACTION_TITLES.delete} onClick={() => requestDeleteCustomer(customer)}><Trash2 size={16} /></button>
                 </div>

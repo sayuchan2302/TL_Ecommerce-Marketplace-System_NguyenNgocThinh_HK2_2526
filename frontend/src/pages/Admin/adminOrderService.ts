@@ -95,6 +95,9 @@ let orderRecords: AdminOrderRecord[] = adminOrdersData.map((order, index) => ({
 
 const listeners = new Set<() => void>();
 
+const AUTO_CANCEL_PENDING_MS = 3 * 24 * 60 * 60 * 1000;
+const AUTO_CANCEL_NOTE = 'Tự động hủy sau 3 ngày chờ xác nhận.';
+
 const emitChange = () => {
   listeners.forEach((listener) => listener());
 };
@@ -156,9 +159,46 @@ const applyTransitionOnRecord = (
   };
 };
 
-export const listAdminOrders = () => orderRecords.map(cloneOrder);
+const enforceAutoCancelPendingOrders = () => {
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  let hasChanged = false;
+
+  orderRecords = orderRecords.map((order) => {
+    if (order.fulfillment !== 'pending') return order;
+
+    const placedAt = new Date(order.date).getTime();
+    if (Number.isNaN(placedAt)) return order;
+    if (now - placedAt < AUTO_CANCEL_PENDING_MS) return order;
+    if (!canTransitionFulfillment(order.fulfillment, 'canceled', order.paymentStatus)) return order;
+
+    hasChanged = true;
+    return applyTransitionOnRecord(
+      order,
+      {
+        code: order.code,
+        nextFulfillment: 'canceled',
+        actor: 'system',
+        source: 'orders_list',
+        reasonCode: 'payment_timeout',
+        reasonNote: AUTO_CANCEL_NOTE,
+      },
+      nowIso,
+    );
+  });
+
+  if (hasChanged) {
+    emitChange();
+  }
+};
+
+export const listAdminOrders = () => {
+  enforceAutoCancelPendingOrders();
+  return orderRecords.map(cloneOrder);
+};
 
 export const getAdminOrderByCode = (code: string) => {
+  enforceAutoCancelPendingOrders();
   const found = orderRecords.find((item) => item.code === code);
   return found ? cloneOrder(found) : null;
 };
@@ -171,6 +211,7 @@ export const subscribeAdminOrders = (listener: () => void) => {
 };
 
 export const transitionAdminOrder = (input: TransitionInput): TransitionResult => {
+  enforceAutoCancelPendingOrders();
   const index = orderRecords.findIndex((item) => item.code === input.code);
   if (index < 0) return { ok: false, error: 'Không tìm thấy đơn hàng.' };
 
@@ -205,6 +246,7 @@ export const transitionAdminOrder = (input: TransitionInput): TransitionResult =
 };
 
 export const bulkTransitionToPacking = (codes: string[], actor: string): BulkTransitionResult => {
+  enforceAutoCancelPendingOrders();
   const uniqueCodes = Array.from(new Set(codes));
   if (uniqueCodes.length === 0) return { updatedCodes: [], skippedCodes: [] };
 
