@@ -1,6 +1,7 @@
 import './Admin.css';
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import AdminLayout from './AdminLayout';
 import { Printer, XCircle, RotateCcw, Truck, User, Copy, Download } from 'lucide-react';
 import {
@@ -152,7 +153,12 @@ const AdminOrderDetail = () => {
         </div>
       )}
     >
-      <div className="order-detail-grid">
+      <motion.div
+        className="order-detail-grid"
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+      >
         <div className="od-left">
           <section className="od-section">
             <div className="od-section-head">
@@ -191,7 +197,7 @@ const AdminOrderDetail = () => {
                 <span className="od-label">Mã vận đơn</span>
                 <div className="tracking-value">
                   <strong>{order.tracking}</strong>
-                  <button className="admin-icon-btn" aria-label={ADMIN_ACTION_TITLES.copyTracking} onClick={() => navigator.clipboard?.writeText(order.tracking)}>
+                  <button className="admin-icon-btn subtle" aria-label={ADMIN_ACTION_TITLES.copyTracking} onClick={() => navigator.clipboard?.writeText(order.tracking)}>
                     <Copy size={14} />
                   </button>
                 </div>
@@ -235,7 +241,7 @@ const AdminOrderDetail = () => {
             </div>
           </section>
         </div>
-      </div>
+      </motion.div>
 
       {showTransitionModal && pendingTransition && (
         <>

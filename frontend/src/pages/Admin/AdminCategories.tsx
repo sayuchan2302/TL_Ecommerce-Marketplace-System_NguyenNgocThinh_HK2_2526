@@ -28,6 +28,8 @@ interface Category {
 
 interface DeleteConfirmState {
   ids: string[];
+  selectedItems: string[];
+  selectedNoun: string;
   title: string;
   description: string;
   confirmLabel: string;
@@ -153,6 +155,7 @@ const AdminCategories = () => {
 
   const resetCurrentView = () => {
     setSelected(new Set());
+    setDeleteConfirm(null);
     view.resetCurrentView();
     pushToast(ADMIN_TOAST_MESSAGES.categories.resetView);
   };
@@ -294,8 +297,10 @@ const AdminCategories = () => {
     }
     setDeleteConfirm({
       ids: deletable.map((item) => item.id),
+      selectedItems: deletable.map((item) => item.name),
+      selectedNoun: t.selectedNoun,
       title: 'Xóa danh mục đã chọn',
-      description: `Bạn có chắc chắn muốn xóa ${deletable.length} danh mục đã chọn?`,
+      description: 'Bạn có chắc chắn muốn xóa các danh mục đã chọn? Hành động này không thể hoàn tác.',
       confirmLabel: 'Xóa danh mục',
       undoMessage: `Đã xóa ${deletable.length} danh mục`,
       blockedCount: blocked.length,
@@ -489,26 +494,6 @@ const AdminCategories = () => {
                   <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.edit} aria-label={ADMIN_ACTION_TITLES.edit} onClick={() => openEditCategory(cat.id)}><Pencil size={16} /></button>
                   <button
                     className="admin-icon-btn subtle"
-                    title={ADMIN_ACTION_TITLES.delete}
-                    aria-label={ADMIN_ACTION_TITLES.delete}
-                    onClick={() => {
-                      const blockReason = getCategoryDeleteBlockReason(cat);
-                      if (blockReason) {
-                        pushToast(blockReason);
-                        return;
-                      }
-                      setDeleteConfirm({
-                        ids: [cat.id],
-                        title: 'Xóa danh mục',
-                        description: `Bạn có chắc chắn muốn xóa danh mục "${cat.name}"?`,
-                        confirmLabel: 'Xóa danh mục',
-                        undoMessage: `Đã xóa danh mục ${cat.name}`,
-                      });
-                    }}
-                    style={{ color: '#dc2626', borderColor: '#fecdd3' }}
-                  ><Trash2 size={16} /></button>
-                  <button
-                    className="admin-icon-btn subtle"
                     title={cat.status === 'visible' ? 'Ẩn danh mục' : 'Hiện danh mục'}
                     aria-label={cat.status === 'visible' ? 'Ẩn danh mục' : 'Hiện danh mục'}
                     onClick={() => {
@@ -522,6 +507,27 @@ const AdminCategories = () => {
                       );
                     }}
                   ><Layers size={16} /></button>
+                  <button
+                    className="admin-icon-btn subtle danger-icon"
+                    title={ADMIN_ACTION_TITLES.delete}
+                    aria-label={ADMIN_ACTION_TITLES.delete}
+                    onClick={() => {
+                      const blockReason = getCategoryDeleteBlockReason(cat);
+                      if (blockReason) {
+                        pushToast(blockReason);
+                        return;
+                      }
+                      setDeleteConfirm({
+                        ids: [cat.id],
+                        selectedItems: [cat.name],
+                        selectedNoun: t.selectedNoun,
+                        title: 'Xóa danh mục',
+                        description: 'Bạn có chắc chắn muốn xóa danh mục này? Hành động này không thể hoàn tác.',
+                        confirmLabel: 'Xóa danh mục',
+                        undoMessage: `Đã xóa danh mục ${cat.name}`,
+                      });
+                    }}
+                  ><Trash2 size={16} /></button>
                 </div>
               </motion.div>
             ))}
@@ -587,6 +593,8 @@ const AdminCategories = () => {
         open={Boolean(deleteConfirm)}
         title={deleteConfirm?.title || 'Xác nhận xóa'}
         description={deleteConfirm?.description || ''}
+        selectedItems={deleteConfirm?.selectedItems}
+        selectedNoun={deleteConfirm?.selectedNoun}
         confirmLabel={deleteConfirm?.confirmLabel || 'Xóa'}
         danger
         onCancel={() => setDeleteConfirm(null)}

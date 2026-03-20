@@ -13,7 +13,6 @@ export const ADMIN_ACTION_TITLES = {
   lockAccount: 'Khóa tài khoản',
   unlockAccount: 'Mở khóa tài khoản',
   manageVariants: 'Quản lý biến thể',
-  duplicateCampaign: 'Nhân bản chiến dịch',
   resumeCampaign: 'Kích hoạt lại',
   pauseCampaign: 'Tạm dừng',
   exportCustomerData: 'Xuất dữ liệu khách hàng',

@@ -35,6 +35,7 @@ export const ADMIN_TOAST_MESSAGES = {
     bulkLocked: (count: number) => `Đã khóa ${count} tài khoản.`,
     emailsSent: (count: number) => `Đã gửi email đến ${count} khách hàng.`,
     exportRequested: (count: number) => `Đã tạo yêu cầu xuất dữ liệu ${count} khách hàng.`,
+    deleted: (count: number) => `Đã xóa ${count} khách hàng.`,
   },
   categories: {
     resetView: 'Đã đặt lại view danh mục về mặc định.',
@@ -49,7 +50,5 @@ export const ADMIN_TOAST_MESSAGES = {
     noEligiblePauseBulk: 'Không có chiến dịch hợp lệ để tạm dừng.',
     bulkPaused: (count: number) => `Đã tạm dừng ${count} chiến dịch.`,
     bulkDeleted: (count: number) => `Đã xóa ${count} chiến dịch đã chọn.`,
-    duplicated: (sourceCode: string, duplicateCode: string) =>
-      `Đã nhân bản voucher ${sourceCode} thành ${duplicateCode}.`,
   },
 } as const;

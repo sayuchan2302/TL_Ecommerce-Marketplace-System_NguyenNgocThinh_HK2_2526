@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import AdminVariantModal from './AdminVariantModal';
 import type { VariantRow } from './AdminVariantModal';
 import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
+import AdminReasonDialog from './AdminReasonDialog';
 import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
@@ -27,6 +28,13 @@ import { ADMIN_TOAST_MESSAGES } from './adminMessages';
 import { ADMIN_TEXT } from './adminText';
 
 const MANAGED_PRODUCT_SKU = 'POLO-001';
+
+interface PendingStockAdjustment {
+  sku: string;
+  before: number;
+  after: number;
+  suggestedReason: string;
+}
 
 const tabs = [
   { key: 'all', label: ADMIN_TEXT.products.tabs.all },
@@ -57,6 +65,7 @@ const AdminProducts = () => {
   const [showDrawer, setShowDrawer] = useState(false);
   const { toast, pushToast } = useAdminToast(1800);
   const [showVariants, setShowVariants] = useState(false);
+  const [pendingStockAdjustment, setPendingStockAdjustment] = useState<PendingStockAdjustment | null>(null);
   const [variantRows, setVariantRows] = useState<VariantRow[]>(() => getProductVariantMatrix(MANAGED_PRODUCT_SKU));
   const [inventoryLogs, setInventoryLogs] = useState(() => getProductInventoryLedger(MANAGED_PRODUCT_SKU, 6));
   const [price, setPrice] = useState('359.000');
@@ -212,18 +221,20 @@ const AdminProducts = () => {
       return;
     }
 
-    const reason = window.prompt(
-      `Nhập lý do điều chỉnh tồn kho cho ${editingStock.sku}:`,
-      value > current.stock ? 'Nhập kho bổ sung' : 'Điều chỉnh hao hụt tồn kho',
-    );
-    if (reason === null) {
-      setEditingStock(null);
-      return;
-    }
-
-    const result = adjustProductStock({
+    setEditingStock(null);
+    setPendingStockAdjustment({
       sku: editingStock.sku,
-      nextStock: value,
+      before: current.stock,
+      after: value,
+      suggestedReason: value > current.stock ? 'Nhập kho bổ sung' : 'Điều chỉnh hao hụt tồn kho',
+    });
+  };
+
+  const confirmStockAdjustment = (reason: string) => {
+    if (!pendingStockAdjustment) return;
+    const result = adjustProductStock({
+      sku: pendingStockAdjustment.sku,
+      nextStock: pendingStockAdjustment.after,
       actor: 'Admin',
       reason,
       source: 'manual_adjustment',
@@ -232,9 +243,14 @@ const AdminProducts = () => {
       pushToast(result.error);
       return;
     }
-
-    pushToast(ADMIN_TOAST_MESSAGES.products.stockAdjusted(editingStock.sku, current.stock, value));
-    setEditingStock(null);
+    pushToast(
+      ADMIN_TOAST_MESSAGES.products.stockAdjusted(
+        pendingStockAdjustment.sku,
+        pendingStockAdjustment.before,
+        pendingStockAdjustment.after,
+      ),
+    );
+    setPendingStockAdjustment(null);
   };
 
   const openDrawer = () => {
@@ -396,7 +412,7 @@ const AdminProducts = () => {
                 <div role="cell" className="admin-actions">
                   <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.edit} aria-label={ADMIN_ACTION_TITLES.edit} onClick={openDrawer}><Pencil size={16} /></button>
                   <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.manageVariants} aria-label={ADMIN_ACTION_TITLES.manageVariants} onClick={openVariants}><Layers size={16} /></button>
-                  <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.delete} aria-label={ADMIN_ACTION_TITLES.delete}><Trash2 size={16} /></button>
+                  <button className="admin-icon-btn subtle danger-icon" title={ADMIN_ACTION_TITLES.delete} aria-label={ADMIN_ACTION_TITLES.delete}><Trash2 size={16} /></button>
                 </div>
               </motion.div>
             ))}
@@ -439,6 +455,24 @@ const AdminProducts = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AdminReasonDialog
+        open={Boolean(pendingStockAdjustment)}
+        title="Xác nhận điều chỉnh tồn kho"
+        description="Vui lòng nhập lý do trước khi cập nhật tồn kho sản phẩm."
+        fieldLabel="Lý do điều chỉnh"
+        placeholder="Ví dụ: Nhập kho bổ sung từ nhà cung cấp"
+        defaultValue={pendingStockAdjustment?.suggestedReason || ''}
+        selectedItems={
+          pendingStockAdjustment
+            ? [`${pendingStockAdjustment.sku}: ${pendingStockAdjustment.before} -> ${pendingStockAdjustment.after}`]
+            : undefined
+        }
+        selectedNoun="sản phẩm"
+        confirmLabel="Xác nhận cập nhật"
+        onCancel={() => setPendingStockAdjustment(null)}
+        onConfirm={confirmStockAdjustment}
+      />
 
       {showDrawer && (
         <>

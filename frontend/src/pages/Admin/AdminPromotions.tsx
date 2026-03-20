@@ -1,7 +1,7 @@
 import './Admin.css';
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Plus, Ticket, Pencil, Pause, Play, X, Tag, Copy, Link2 } from 'lucide-react';
+import { Search, Plus, Ticket, Pencil, Pause, Play, X, Tag, Link2, Trash2 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
 import AdminConfirmDialog from './AdminConfirmDialog';
@@ -35,6 +35,14 @@ interface Promotion {
   startDate: string;
   endDate: string;
   status: PromotionStatus;
+}
+
+interface PromotionDeleteConfirmState {
+  ids: string[];
+  selectedItems: string[];
+  title: string;
+  description: string;
+  confirmLabel: string;
 }
 
 const initialPromotions: Promotion[] = [
@@ -149,17 +157,6 @@ const canActivatePromotion = (promotion: Promotion) => {
   return { ok: true as const };
 };
 
-const buildDuplicateCode = (sourceCode: string, existingCodes: Set<string>) => {
-  const clean = sourceCode.toUpperCase().replace(/-COPY\d*$/, '');
-  let candidate = `${clean}-COPY`;
-  let count = 1;
-  while (existingCodes.has(candidate)) {
-    candidate = `${clean}-COPY${count}`;
-    count += 1;
-  }
-  return candidate;
-};
-
 const validatePromotionForm = (form: Promotion, rows: Promotion[], editingId: string | null) => {
   const errors: Partial<Record<'name' | 'code' | 'discountValue' | 'maxDiscount' | 'minOrderValue' | 'userLimit' | 'totalIssued' | 'startDate' | 'endDate', string>> = {};
 
@@ -215,7 +212,7 @@ const AdminPromotions = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<Promotion>(emptyPromotion);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<PromotionDeleteConfirmState | null>(null);
   const { toast, pushToast } = useAdminToast();
 
   const {
@@ -264,7 +261,7 @@ const AdminPromotions = () => {
 
   const resetCurrentView = () => {
     setSelected(new Set());
-    setShowDeleteConfirm(false);
+    setDeleteConfirm(null);
     view.resetCurrentView();
     pushToast(ADMIN_TOAST_MESSAGES.promotions.resetView);
   };
@@ -296,6 +293,7 @@ const AdminPromotions = () => {
 
   useEffect(() => {
     setSelected(new Set());
+    setDeleteConfirm(null);
   }, [statusFilter, search]);
 
   const openCreateDrawer = () => {
@@ -365,25 +363,6 @@ const AdminPromotions = () => {
     );
   };
 
-  const duplicatePromotion = (id: string) => {
-    const source = rows.find((item) => item.id === id);
-    if (!source) return;
-
-    const existingCodes = new Set(rows.map((item) => item.code));
-    const duplicateCode = buildDuplicateCode(source.code, existingCodes);
-    const duplicated: Promotion = {
-      ...source,
-      id: `pr-${Date.now()}`,
-      name: `${source.name} (Bản sao)`,
-      code: duplicateCode,
-      usedCount: 0,
-      status: 'paused',
-    };
-
-    setRows((prev) => [duplicated, ...prev]);
-    pushToast(ADMIN_TOAST_MESSAGES.promotions.duplicated(source.code, duplicateCode));
-  };
-
   const toggleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelected(new Set(filtered.map((item) => item.id)));
@@ -413,20 +392,37 @@ const AdminPromotions = () => {
   };
 
   const deleteSelected = () => {
-    if (selected.size === 0) {
-      setShowDeleteConfirm(false);
+    if (!deleteConfirm || deleteConfirm.ids.length === 0) {
+      setDeleteConfirm(null);
       return;
     }
-    const selectedIds = new Set(selected);
+    const selectedIds = new Set(deleteConfirm.ids);
     setRows((prev) => prev.filter((item) => !selectedIds.has(item.id)));
     setSelected(new Set());
-    setShowDeleteConfirm(false);
+    setDeleteConfirm(null);
     pushToast(ADMIN_TOAST_MESSAGES.promotions.bulkDeleted(selectedIds.size));
   };
 
   const requestDeleteSelected = () => {
     if (selected.size === 0) return;
-    setShowDeleteConfirm(true);
+    const selectedRows = rows.filter((item) => selected.has(item.id));
+    setDeleteConfirm({
+      ids: selectedRows.map((item) => item.id),
+      selectedItems: selectedRows.map((item) => `${item.name} (${item.code})`),
+      title: 'Xóa chiến dịch đã chọn',
+      description: 'Bạn có chắc chắn muốn xóa các chiến dịch đã chọn? Hành động này không thể hoàn tác.',
+      confirmLabel: 'Xóa chiến dịch',
+    });
+  };
+
+  const requestDeleteOne = (promotion: Promotion) => {
+    setDeleteConfirm({
+      ids: [promotion.id],
+      selectedItems: [`${promotion.name} (${promotion.code})`],
+      title: 'Xóa chiến dịch',
+      description: 'Bạn có chắc chắn muốn xóa chiến dịch này? Hành động này không thể hoàn tác.',
+      confirmLabel: 'Xóa chiến dịch',
+    });
   };
 
   return (
@@ -539,10 +535,10 @@ const AdminPromotions = () => {
                   <div role="cell"><span className={`admin-pill ${promotionStatusClass(currentStatus)}`}>{promotionStatusLabel(currentStatus)}</span></div>
                   <div role="cell" className="admin-actions">
                     <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.edit} aria-label={ADMIN_ACTION_TITLES.edit} onClick={() => openEditDrawer(promo)}><Pencil size={16} /></button>
-                    <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.duplicateCampaign} aria-label={ADMIN_ACTION_TITLES.duplicateCampaign} onClick={() => duplicatePromotion(promo.id)}><Copy size={16} /></button>
                     <button className="admin-icon-btn subtle" title={promo.status === 'paused' ? ADMIN_ACTION_TITLES.resumeCampaign : ADMIN_ACTION_TITLES.pauseCampaign} aria-label={promo.status === 'paused' ? ADMIN_ACTION_TITLES.resumeCampaign : ADMIN_ACTION_TITLES.pauseCampaign} onClick={() => togglePause(promo.id)}>
                       {promo.status === 'paused' ? <Play size={16} /> : <Pause size={16} />}
                     </button>
+                    <button className="admin-icon-btn subtle danger-icon" title={ADMIN_ACTION_TITLES.delete} aria-label={ADMIN_ACTION_TITLES.delete} onClick={() => requestDeleteOne(promo)}><Trash2 size={16} /></button>
                   </div>
                 </motion.div>
               );
@@ -588,12 +584,14 @@ const AdminPromotions = () => {
       </AnimatePresence>
 
       <AdminConfirmDialog
-        open={showDeleteConfirm}
-        title="Xóa chiến dịch đã chọn"
-        description={`Bạn có chắc chắn muốn xóa ${selected.size} chiến dịch đã chọn? Hành động này không thể hoàn tác.`}
-        confirmLabel="Xóa chiến dịch"
+        open={Boolean(deleteConfirm)}
+        title={deleteConfirm?.title || 'Xóa chiến dịch'}
+        description={deleteConfirm?.description || ''}
+        selectedItems={deleteConfirm?.selectedItems}
+        selectedNoun={t.selectedNoun}
+        confirmLabel={deleteConfirm?.confirmLabel || 'Xóa chiến dịch'}
         danger
-        onCancel={() => setShowDeleteConfirm(false)}
+        onCancel={() => setDeleteConfirm(null)}
         onConfirm={deleteSelected}
       />
 

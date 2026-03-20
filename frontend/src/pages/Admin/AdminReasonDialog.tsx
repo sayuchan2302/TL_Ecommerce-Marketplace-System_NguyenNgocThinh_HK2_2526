@@ -1,23 +1,30 @@
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-interface AdminConfirmDialogProps {
+interface AdminReasonDialogProps {
   open: boolean;
   title: string;
   description: string;
+  fieldLabel?: string;
+  placeholder?: string;
+  defaultValue?: string;
   selectedItems?: string[];
   selectedNoun?: string;
   maxVisibleItems?: number;
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
-  onConfirm: () => void;
+  onConfirm: (reason: string) => void;
   onCancel: () => void;
 }
 
-const AdminConfirmDialog = ({
+const AdminReasonDialog = ({
   open,
   title,
   description,
+  fieldLabel = 'Lý do',
+  placeholder = 'Nhập lý do...',
+  defaultValue = '',
   selectedItems,
   selectedNoun = 'mục',
   maxVisibleItems = 6,
@@ -26,9 +33,16 @@ const AdminConfirmDialog = ({
   danger = false,
   onConfirm,
   onCancel,
-}: AdminConfirmDialogProps) => {
+}: AdminReasonDialogProps) => {
+  const [reason, setReason] = useState(defaultValue);
+
+  useEffect(() => {
+    if (open) {
+      setReason(defaultValue);
+    }
+  }, [open, defaultValue]);
+
   const selectedList = selectedItems || [];
-  const hasSelectedItems = selectedList.length > 0;
   const visibleItems = selectedList.slice(0, maxVisibleItems);
   const hiddenCount = Math.max(0, selectedList.length - visibleItems.length);
 
@@ -57,7 +71,7 @@ const AdminConfirmDialog = ({
             <h3>{title}</h3>
             <p>{description}</p>
 
-            {hasSelectedItems && (
+            {selectedList.length > 0 && (
               <div className="confirm-selection-block">
                 <p className="confirm-selection-count">Đã chọn {selectedList.length} {selectedNoun}:</p>
                 <ul className="confirm-selection-list">
@@ -69,9 +83,26 @@ const AdminConfirmDialog = ({
               </div>
             )}
 
+            <label className="form-field confirm-reason-field">
+              <span>{fieldLabel}</span>
+              <textarea
+                rows={3}
+                className="confirm-reason-input"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder={placeholder}
+              />
+            </label>
+
             <div className="confirm-modal-actions">
               <button className="admin-ghost-btn" onClick={onCancel}>{cancelLabel}</button>
-              <button className={`admin-primary-btn ${danger ? 'danger' : ''}`.trim()} onClick={onConfirm}>{confirmLabel}</button>
+              <button
+                className={`admin-primary-btn ${danger ? 'danger' : ''}`.trim()}
+                onClick={() => onConfirm(reason.trim())}
+                disabled={!reason.trim()}
+              >
+                {confirmLabel}
+              </button>
             </div>
           </motion.div>
         </>
@@ -80,4 +111,4 @@ const AdminConfirmDialog = ({
   );
 };
 
-export default AdminConfirmDialog;
+export default AdminReasonDialog;

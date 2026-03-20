@@ -317,10 +317,10 @@ const AdminOrders = () => {
                 </div>
                 <div role="cell" className="admin-muted">{formatDateTime(order.date)}</div>
                 <div role="cell" className="admin-actions">
-                  <Link to={`/admin/orders/${order.code}`} className="admin-icon-btn" aria-label={ADMIN_ACTION_TITLES.viewDetail}>
+                  <Link to={`/admin/orders/${order.code}`} className="admin-icon-btn subtle" aria-label={ADMIN_ACTION_TITLES.viewDetail}>
                     <Eye size={16} />
                   </Link>
-                  <button className="admin-icon-btn" type="button" aria-label={ADMIN_ACTION_TITLES.printInvoice}>
+                  <button className="admin-icon-btn subtle" type="button" aria-label={ADMIN_ACTION_TITLES.printInvoice}>
                     <Printer size={16} />
                   </button>
                 </div>

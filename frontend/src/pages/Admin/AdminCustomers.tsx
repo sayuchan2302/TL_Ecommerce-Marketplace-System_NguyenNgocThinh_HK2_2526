@@ -1,9 +1,11 @@
 import './Admin.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Eye, Pencil, Ban, X, Mail, Download, Gift, ChevronDown, Sparkles, Link2 } from 'lucide-react';
+import { Search, Eye, Pencil, Ban, X, Mail, Download, Gift, ChevronDown, Sparkles, Link2, Trash2 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
+import AdminConfirmDialog from './AdminConfirmDialog';
+import AdminReasonDialog from './AdminReasonDialog';
 import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
@@ -16,6 +18,18 @@ import { ADMIN_TEXT } from './adminText';
 type LoyaltyTier = 'Bronze' | 'Silver' | 'Gold' | 'Diamond';
 type AccountStatus = 'active' | 'banned';
 type DrawerTab = 'activity' | 'preferences' | 'notes';
+
+interface PendingLockAction {
+  ids: string[];
+  names: string[];
+  isBulk: boolean;
+  suggestedReason: string;
+}
+
+interface CustomerDeleteConfirmState {
+  ids: string[];
+  selectedItems: string[];
+}
 
 interface CustomerOrder {
   code: string;
@@ -284,6 +298,8 @@ const AdminCustomers = () => {
   const [drawerCustomerId, setDrawerCustomerId] = useState<string | null>(null);
   const [drawerTab, setDrawerTab] = useState<DrawerTab>('activity');
   const [draftNote, setDraftNote] = useState('');
+  const [pendingLockAction, setPendingLockAction] = useState<PendingLockAction | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<CustomerDeleteConfirmState | null>(null);
   const { toast, pushToast } = useAdminToast(2300);
   const filterDropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -324,6 +340,7 @@ const AdminCustomers = () => {
 
   useEffect(() => {
     setSelected(new Set());
+    setDeleteConfirm(null);
   }, [activeTab, tierFilter, spendingFilter]);
 
   useEffect(() => {
@@ -382,6 +399,8 @@ const AdminCustomers = () => {
   const resetCurrentView = () => {
     setSelected(new Set());
     setOpenFilter(null);
+    setPendingLockAction(null);
+    setDeleteConfirm(null);
     view.resetCurrentView();
     pushToast(ADMIN_TOAST_MESSAGES.customers.resetView);
   };
@@ -410,14 +429,12 @@ const AdminCustomers = () => {
     const user = customers.find((c) => c.id === customerId);
     if (!user) return;
     if (user.status === 'active') {
-      const reason = window.prompt(`Nhập lý do khóa tài khoản ${user.name}:`, 'Vi phạm chính sách mua hàng');
-      if (reason === null) return;
-      if (!reason.trim()) {
-        pushToast(ADMIN_TOAST_MESSAGES.customers.lockReasonRequired);
-        return;
-      }
-      setCustomers((prev) => prev.map((c) => (c.id === customerId ? { ...c, status: 'banned' } : c)));
-      pushToast(ADMIN_TOAST_MESSAGES.customers.lockedAccount(user.name));
+      setPendingLockAction({
+        ids: [customerId],
+        names: [user.name],
+        isBulk: false,
+        suggestedReason: 'Vi phạm chính sách mua hàng',
+      });
       return;
     }
 
@@ -448,20 +465,58 @@ const AdminCustomers = () => {
 
   const handleBulkBan = () => {
     if (!selectedIds.length) return;
-    const reason = window.prompt('Nhập lý do khóa các tài khoản đã chọn:', 'Nghi ngờ gian lận/hoàn trả bất thường');
-    if (reason === null) return;
-    if (!reason.trim()) {
-      pushToast(ADMIN_TOAST_MESSAGES.customers.lockReasonRequired);
-      return;
-    }
     const targetIds = new Set(customers.filter((c) => selected.has(c.id) && c.status !== 'banned').map((c) => c.id));
     if (targetIds.size === 0) {
       pushToast(ADMIN_TOAST_MESSAGES.customers.alreadyBanned);
       return;
     }
+    const names = customers.filter((c) => targetIds.has(c.id)).map((c) => c.name);
+    setPendingLockAction({
+      ids: Array.from(targetIds),
+      names,
+      isBulk: true,
+      suggestedReason: 'Nghi ngờ gian lận/hoàn trả bất thường',
+    });
+  };
+
+  const confirmLockCustomers = (reason: string) => {
+    if (!pendingLockAction) return;
+    if (!reason.trim()) {
+      pushToast(ADMIN_TOAST_MESSAGES.customers.lockReasonRequired);
+      return;
+    }
+    const targetIds = new Set(pendingLockAction.ids);
     setCustomers((prev) => prev.map((c) => (targetIds.has(c.id) ? { ...c, status: 'banned' } : c)));
-    pushToast(ADMIN_TOAST_MESSAGES.customers.bulkLocked(targetIds.size));
-    setSelected(new Set());
+    if (pendingLockAction.isBulk) {
+      pushToast(ADMIN_TOAST_MESSAGES.customers.bulkLocked(targetIds.size));
+      setSelected(new Set());
+    } else {
+      pushToast(ADMIN_TOAST_MESSAGES.customers.lockedAccount(pendingLockAction.names[0] || 'khách hàng'));
+    }
+    setPendingLockAction(null);
+  };
+
+  const requestDeleteCustomer = (customer: Customer) => {
+    setDeleteConfirm({
+      ids: [customer.id],
+      selectedItems: [`${customer.name} (${customer.email})`],
+    });
+  };
+
+  const confirmDeleteCustomers = () => {
+    if (!deleteConfirm || deleteConfirm.ids.length === 0) {
+      setDeleteConfirm(null);
+      return;
+    }
+    const idsToDelete = new Set(deleteConfirm.ids);
+    setCustomers((prev) => prev.filter((item) => !idsToDelete.has(item.id)));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      idsToDelete.forEach((id) => next.delete(id));
+      return next;
+    });
+    setDeleteConfirm(null);
+    pushToast(ADMIN_TOAST_MESSAGES.customers.deleted(idsToDelete.size));
   };
 
   const handleBulkSendEmail = () => {
@@ -605,6 +660,7 @@ const AdminCustomers = () => {
                   <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.viewDetail} aria-label={ADMIN_ACTION_TITLES.viewDetail} onClick={() => openDrawer(customer, 'activity')}><Eye size={16} /></button>
                   <button className="admin-icon-btn subtle" title={ADMIN_ACTION_TITLES.editNote} aria-label={ADMIN_ACTION_TITLES.editNote} onClick={() => openDrawer(customer, 'notes')}><Pencil size={16} /></button>
                   <button className="admin-icon-btn subtle" title={customer.status === 'active' ? ADMIN_ACTION_TITLES.lockAccount : ADMIN_ACTION_TITLES.unlockAccount} aria-label={customer.status === 'active' ? ADMIN_ACTION_TITLES.lockAccount : ADMIN_ACTION_TITLES.unlockAccount} onClick={() => toggleBanStatus(customer.id)}><Ban size={16} /></button>
+                  <button className="admin-icon-btn subtle danger-icon" title={ADMIN_ACTION_TITLES.delete} aria-label={ADMIN_ACTION_TITLES.delete} onClick={() => requestDeleteCustomer(customer)}><Trash2 size={16} /></button>
                 </div>
               </motion.div>
             ))}
@@ -731,6 +787,33 @@ const AdminCustomers = () => {
           </>
         )}
       </AnimatePresence>
+
+      <AdminConfirmDialog
+        open={Boolean(deleteConfirm)}
+        title="Xóa khách hàng"
+        description="Bạn có chắc chắn muốn xóa khách hàng đã chọn? Hành động này không thể hoàn tác."
+        selectedItems={deleteConfirm?.selectedItems}
+        selectedNoun={t.selectedNoun}
+        confirmLabel="Xóa khách hàng"
+        danger
+        onCancel={() => setDeleteConfirm(null)}
+        onConfirm={confirmDeleteCustomers}
+      />
+
+      <AdminReasonDialog
+        open={Boolean(pendingLockAction)}
+        title={pendingLockAction?.isBulk ? 'Khóa nhiều tài khoản' : 'Khóa tài khoản'}
+        description="Vui lòng nhập lý do trước khi khóa tài khoản khách hàng."
+        fieldLabel="Lý do khóa"
+        placeholder="Nhập lý do khóa tài khoản..."
+        defaultValue={pendingLockAction?.suggestedReason || ''}
+        selectedItems={pendingLockAction?.names}
+        selectedNoun="tài khoản"
+        confirmLabel="Xác nhận khóa"
+        danger
+        onCancel={() => setPendingLockAction(null)}
+        onConfirm={confirmLockCustomers}
+      />
 
       {toast && <div className="toast success">{toast}</div>}
     </AdminLayout>
