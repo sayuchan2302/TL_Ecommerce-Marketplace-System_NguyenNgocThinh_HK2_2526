@@ -28,4 +28,5 @@ export interface Order {
   statusSteps: OrderStatusStep[];
   cancelReason?: string;
   cancelledAt?: string;
+  tracking?: string;
 }

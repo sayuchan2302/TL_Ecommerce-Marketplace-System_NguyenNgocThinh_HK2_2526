@@ -20,7 +20,7 @@ export interface AdminOrderPricing {
 export interface AdminOrderTimelineEntry {
   time: string;
   text: string;
-  tone: 'success' | 'pending' | 'error' | 'neutral';
+  tone: 'success' | 'pending' | 'error' | 'neutral' | 'info';
 }
 
 export interface AdminOrderData {

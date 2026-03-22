@@ -27,7 +27,7 @@ interface ProductGridProps {
 
 const ProductGrid = ({ customResults, viewState }: ProductGridProps) => {
   const [isLoading, setIsLoading] = useState(true);
-  const internalView = useClientViewState({ path: '/search', validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
+  const internalView = useClientViewState({ validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
   const view = viewState ?? internalView;
 
   useEffect(() => {
@@ -105,7 +105,7 @@ const ProductGrid = ({ customResults, viewState }: ProductGridProps) => {
             id="sort-select"
             className="sort-select"
             value={view.sortKey}
-            onChange={(e) => view.setSort(e.target.value)}
+            onChange={(e) => view.setSort(e.target.value as SortKey)}
           >
             <option value="newest">{t.sort.newest}</option>
             <option value="bestseller">{t.sort.bestseller}</option>

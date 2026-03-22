@@ -76,6 +76,8 @@ export const reviewService = {
       productId: submission.productId,
       productName: submission.productName || 'Sản phẩm',
       productImage: submission.productImage || '',
+      customerName: 'Khách hàng',
+      customerEmail: '',
       orderId: submission.orderId,
       rating: submission.rating,
       content: submission.content,

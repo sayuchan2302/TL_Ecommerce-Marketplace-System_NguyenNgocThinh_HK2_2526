@@ -7,10 +7,10 @@ import { useToast } from '../../contexts/ToastContext';
 const emptyForm: Omit<Address, 'id'> = {
   fullName: '',
   phone: '',
-  street: '',
+  detail: '',
   ward: '',
   district: '',
-  city: '',
+  province: '',
   isDefault: false,
 };
 
@@ -27,7 +27,7 @@ const AddressesPage = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.fullName || !form.phone || !form.street || !form.city) {
+    if (!form.fullName || !form.phone || !form.detail || !form.province) {
       addToast('Vui lòng điền đủ thông tin', 'error');
       return;
     }
@@ -69,8 +69,8 @@ const AddressesPage = () => {
               <input className="account-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </div>
             <div className="account-field">
-              <label>Địa chỉ</label>
-              <input className="account-input" value={form.street} onChange={(e) => setForm({ ...form, street: e.target.value })} />
+              <label>Địa chỉ chi tiết</label>
+              <input className="account-input" value={form.detail} onChange={(e) => setForm({ ...form, detail: e.target.value })} />
             </div>
             <div className="account-field">
               <label>Phường/Xã</label>
@@ -82,7 +82,7 @@ const AddressesPage = () => {
             </div>
             <div className="account-field">
               <label>Tỉnh/Thành phố</label>
-              <input className="account-input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+              <input className="account-input" value={form.province} onChange={(e) => setForm({ ...form, province: e.target.value })} />
             </div>
             <div className="account-field" style={{ alignSelf: 'end' }}>
               <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -110,8 +110,8 @@ const AddressesPage = () => {
                     {addr.fullName} {addr.isDefault && <span className="badge-default">Mặc định</span>}
                   </h4>
                   <div className="account-meta">{addr.phone}</div>
-                  <div className="account-meta">{addr.street}</div>
-                  <div className="account-meta">{[addr.ward, addr.district, addr.city].filter(Boolean).join(', ')}</div>
+                  <div className="account-meta">{addr.detail}</div>
+                  <div className="account-meta">{[addr.ward, addr.district, addr.province].filter(Boolean).join(', ')}</div>
                 </div>
                 <div className="account-actions">
                   {!addr.isDefault && (

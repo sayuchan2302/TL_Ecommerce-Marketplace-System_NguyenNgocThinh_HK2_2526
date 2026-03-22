@@ -10,7 +10,7 @@ import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
 import { ADMIN_DICTIONARY } from './adminDictionary';
-import { promotionStore, type Promotion, type DiscountType } from '../../services/promotionStore';
+import { promotionStore, type Promotion, type PromotionStatus, type DiscountType } from '../../services/promotionStore';
 import { promotionStatusClass, promotionStatusLabel } from './adminStatusMaps';
 
 interface PromotionDeleteConfirmState {

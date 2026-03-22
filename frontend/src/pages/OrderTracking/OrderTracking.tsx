@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CheckCircle2, Clock, MapPin, Package, Phone, Search, XCircle } from 'lucide-react';
 import './OrderTracking.css';
 import { useToast } from '../../contexts/ToastContext';
-import { mockOrders } from '../../mocks/products';
+import { orderService } from '../../services/orderService';
 import { CLIENT_TEXT } from '../../utils/texts';
 
 const t = CLIENT_TEXT.orderTracking;
@@ -23,6 +23,7 @@ type MockOrder = {
   eta: string;
   status: 'delivered' | 'shipping' | 'processing' | 'pending' | 'cancelled';
   steps: TrackingStep[];
+  tracking?: string;
 };
 
 const OrderTracking = () => {
@@ -38,10 +39,29 @@ const OrderTracking = () => {
     setLoading(true);
     setNotFound(false);
     setTimeout(() => {
-      const found = mockOrders.find(
-        (o) => o.id.toLowerCase() === orderId.trim().toLowerCase() && o.phone.trim() === phone.trim()
-      );
-      if (found) {
+      const order = orderService.getById(orderId.trim());
+      if (order && order.addressSummary.includes(phone.trim())) {
+        const statusMap: Record<string, MockOrder['status']> = {
+          pending: 'pending',
+          processing: 'processing',
+          shipping: 'shipping',
+          delivered: 'delivered',
+          canceled: 'cancelled',
+        };
+        const found: MockOrder = {
+          id: order.id,
+          phone: order.addressSummary.split(',')[1]?.trim() || '',
+          customer: order.addressSummary.split(',')[0]?.trim() || '',
+          address: order.addressSummary.split(',').slice(2).join(',').trim() || '',
+          eta: '',
+          status: statusMap[order.status] || 'pending',
+          tracking: order.tracking || '',
+          steps: order.statusSteps.map((step) => ({
+            label: step.label,
+            time: step.timestamp,
+            status: 'done' as const,
+          })),
+        };
         setResult(found);
         addToast(t.found, 'success');
       } else {
@@ -109,6 +129,9 @@ const OrderTracking = () => {
             <div className="result-header">
               <div>
                 <p className="result-id">Mã đơn: <strong>{result.id}</strong></p>
+                {result.tracking && (
+                  <p className="result-meta">{t.result.trackingNumber}: <strong>{result.tracking}</strong></p>
+                )}
                 <p className="result-meta">{t.result.customer}: {result.customer}</p>
                 <p className="result-meta">SĐT: {result.phone}</p>
                 <p className="result-meta"><MapPin size={14} /> {result.address}</p>

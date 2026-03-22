@@ -25,10 +25,10 @@ export const addressService = {
           id: 'addr-1',
           fullName: 'Anh Thịnh',
           phone: '0382253049',
-          street: 'JJJV+Q7F, Quốc lộ 37',
+          detail: 'JJJV+Q7F, Quốc lộ 37',
           ward: 'Thị trấn Hùng Sơn',
           district: 'Huyện Đại Từ',
-          city: 'Thái Nguyên',
+          province: 'Thái Nguyên',
           isDefault: true,
         },
       ];
@@ -36,6 +36,10 @@ export const addressService = {
       return seed;
     }
     return data.map(addr => ({ ...addr, isDefault: Boolean(addr.isDefault) }));
+  },
+
+  formatFullAddress(addr: Address): string {
+    return `${addr.detail}, ${addr.ward}, ${addr.district}, ${addr.province}`;
   },
 
   add(address: Omit<Address, 'id'>): Address {

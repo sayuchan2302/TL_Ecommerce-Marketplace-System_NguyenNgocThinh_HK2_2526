@@ -17,13 +17,11 @@ interface ProductCardProps {
   badge?: string;
   colors?: string[];
   sizes?: string[];
-  statusType?: string;
-  stock?: number;
 }
 
 const DEFAULT_SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL'];
 
-const ProductCard = ({ id, sku, name, price, originalPrice, image, badge, colors, sizes, statusType, stock }: ProductCardProps) => {
+const ProductCard = ({ id, sku, name, price, originalPrice, image, badge, colors, sizes }: ProductCardProps) => {
   const discount = originalPrice ? Math.round((1 - price / originalPrice) * 100) : 0;
   const { addToCart } = useCart();
   const { triggerAnimation } = useCartAnimation();
@@ -184,7 +182,7 @@ const ProductCard = ({ id, sku, name, price, originalPrice, image, badge, colors
 
       {/* Quick View Modal */}
       <QuickViewModal
-        product={{ id: sku || id, name, price, originalPrice, image, colors, sizes }}
+        product={{ id: Number(sku) || id, name, price, originalPrice, image, colors, sizes }}
         isOpen={isQuickViewOpen}
         onClose={() => setIsQuickViewOpen(false)}
       />

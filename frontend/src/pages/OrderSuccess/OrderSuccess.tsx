@@ -139,7 +139,7 @@ const OrderSuccess = () => {
           </p>
 
           <div className="os-actions">
-            <Link to="/profile" className="os-btn os-btn-outline">
+            <Link to={`/profile/orders/${orderId}`} className="os-btn os-btn-outline">
               <Package size={16} />
               Theo dõi đơn hàng
             </Link>

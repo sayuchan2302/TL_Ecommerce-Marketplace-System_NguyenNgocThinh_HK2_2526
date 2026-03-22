@@ -1,53 +1,27 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, CheckCircle2 } from 'lucide-react';
+import { addressService } from '../../services/addressService';
+import type { Address } from '../../types';
 import './AddressBookModal.css';
-
-interface SavedAddress {
-  id: string;
-  name: string;
-  phone: string;
-  address: string;
-  ward: string;
-  district: string;
-  city: string;
-  isDefault?: boolean;
-}
-
-// Temporary mock data for saved addresses
-const MOCK_SAVED_ADDRESSES: SavedAddress[] = [
-  {
-    id: '1',
-    name: 'Ngọc Thịnh Nguyễn',
-    phone: '0382253049',
-    address: 'Q7F, Quốc lộ 37',
-    ward: 'Thị trấn Hùng Sơn',
-    district: 'Huyện Đại Từ',
-    city: 'Thái Nguyên',
-    isDefault: true,
-  },
-  {
-    id: '2',
-    name: 'Thịnh Nguyễn',
-    phone: '0987654321',
-    address: 'Số 15, Đường Lê Lợi',
-    ward: 'Phường Bến Nghé',
-    district: 'Quận 1',
-    city: 'Hồ Chí Minh',
-    isDefault: false,
-  }
-];
 
 interface AddressBookModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectAddress: (address: SavedAddress) => void;
+  onSelectAddress: (address: Address) => void;
 }
 
 const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModalProps) => {
-  const [addresses] = useState<SavedAddress[]>(MOCK_SAVED_ADDRESSES);
-  const [selectedId, setSelectedId] = useState<string | null>(
-    addresses.find(a => a.isDefault)?.id || null
-  );
+  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      const addrs = addressService.getAll();
+      setAddresses(addrs);
+      const defaultAddr = addrs.find(a => a.isDefault);
+      setSelectedId(defaultAddr?.id || null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -81,12 +55,12 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
                   onClick={() => setSelectedId(addr.id)}
                 >
                   <div className="address-item-header">
-                    <span className="address-name">{addr.name}</span>
+                    <span className="address-name">{addr.fullName}</span>
                     {addr.isDefault && <span className="address-badge">Mặc định</span>}
                   </div>
                   <div className="address-phone">{addr.phone}</div>
                   <div className="address-full">
-                    {addr.address}, {addr.ward}, {addr.district}, {addr.city}
+                    {addressService.formatFullAddress(addr)}
                   </div>
                   {selectedId === addr.id && (
                     <div className="address-check-icon">

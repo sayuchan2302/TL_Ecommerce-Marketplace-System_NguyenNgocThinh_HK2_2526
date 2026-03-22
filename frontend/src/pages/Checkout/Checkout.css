@@ -106,6 +106,26 @@
   text-decoration: underline;
 }
 
+.save-address-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--co-gray-600);
+}
+
+.save-address-checkbox input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.save-address-checkbox:hover {
+  color: var(--co-admin-text);
+}
+
 /* ---- Form Grid ---- */
 .form-grid {
   display: grid;
@@ -631,6 +651,17 @@
   gap: 12px;
   overflow-x: auto;
   padding: 14px 0;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  -ms-overflow-style: none;
+}
+
+.coupon-ticket-scroll:hover {
+  cursor: grab;
+}
+
+.coupon-ticket-scroll:active {
+  cursor: grabbing;
 }
 
 .coupon-ticket-scroll::-webkit-scrollbar {
@@ -680,10 +711,20 @@
 }
 
 .ticket-radio {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   border: 2px solid var(--co-gray-400);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.ticket-radio.checked {
+  background: var(--co-green);
+  border-color: var(--co-green);
+  color: white;
 }
 
 .ticket-link {

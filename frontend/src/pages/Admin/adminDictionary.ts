@@ -355,6 +355,9 @@ export const ADMIN_DICTIONARY = {
   orderDetail: {
     back: 'Quay lại',
     orderPrefix: 'Đơn hàng',
+    trackingNumber: 'Mã vận đơn',
+    trackingPlaceholder: 'Nhập mã vận đơn...',
+    updateTracking: 'Cập nhật mã vận đơn',
     actions: {
       printInvoice: 'In hóa đơn',
       refund: 'Hoàn tiền',
@@ -368,6 +371,9 @@ export const ADMIN_DICTIONARY = {
       paymentInfo: 'Thông tin thanh toán',
       customerShipping: 'Khách hàng & vận chuyển',
       timeline: 'Lịch sử đơn hàng',
+    },
+    messages: {
+      trackingUpdated: 'Đã cập nhật mã vận đơn',
     },
   },
   workflow: {
@@ -452,6 +458,17 @@ export const ADMIN_DICTIONARY = {
       description: 'Bạn có chắc chắn muốn xóa đánh giá này? Hành động này không thể hoàn tác.',
       confirmLabel: 'Xóa đánh giá',
     },
+    messages: {
+      approveSuccess: 'Đã duyệt đánh giá.',
+      hideSuccess: 'Đã ẩn đánh giá.',
+      replyRequired: 'Vui lòng nhập nội dung phản hồi.',
+      replySuccess: 'Đã gửi phản hồi.',
+      deleteSuccess: 'Đã xóa đánh giá.',
+      bulkApproved: (count: number) => `Đã duyệt ${count} đánh giá.`,
+      noEligibleBulkApprove: 'Không có đánh giá nào hợp lệ để duyệt.',
+      bulkHidden: (count: number) => `Đã ẩn ${count} đánh giá.`,
+      noEligibleBulkHide: 'Không có đánh giá nào hợp lệ để ẩn.',
+    },
   },
   returns: {
     title: 'Đổi trả hàng',
@@ -510,6 +527,27 @@ export const ADMIN_DICTIONARY = {
     floatingActions: {
       markResolved: 'Đánh dấu đã xử lý',
       delete: 'Xóa yêu cầu',
+    },
+  },
+  content: {
+    title: 'Nội dung',
+    tabs: {
+      faq: 'Câu hỏi thường gặp',
+      policy: 'Chính sách',
+    },
+    form: {
+      title: 'Tiêu đề',
+      titlePlaceholder: 'Nhập tiêu đề...',
+      content: 'Nội dung',
+      contentPlaceholder: 'Nhập nội dung...',
+      save: 'Lưu thay đổi',
+      addNew: 'Thêm mới',
+      edit: 'Chỉnh sửa',
+    },
+    messages: {
+      saved: 'Đã lưu thay đổi.',
+      addSuccess: 'Đã thêm mới nội dung.',
+      deleteConfirm: 'Bạn có chắc muốn xóa nội dung này?',
     },
   },
   // Action titles and common labels from adminUiLabels.ts

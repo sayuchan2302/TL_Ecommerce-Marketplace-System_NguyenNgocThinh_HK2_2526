@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, ChevronDown } from 'lucide-react';
+import { addressService } from '../../services/addressService';
 
 interface Province {
   code: number;
@@ -19,11 +20,11 @@ interface Ward {
 interface AddressModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (address: AddressData) => void;
+  onSave?: () => void;
 }
 
 export interface AddressData {
-  name: string;
+  fullName: string;
   phone: string;
   province: string;
   district: string;
@@ -120,8 +121,8 @@ const AddressModal = ({ isOpen, onClose, onSave }: AddressModalProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
-      name,
+    addressService.add({
+      fullName: name,
       phone,
       province: selectedProvinceName,
       district: selectedDistrictName,
@@ -129,6 +130,7 @@ const AddressModal = ({ isOpen, onClose, onSave }: AddressModalProps) => {
       detail,
       isDefault,
     });
+    if (onSave) onSave();
     // Reset form
     setName('');
     setPhone('');

@@ -2,9 +2,9 @@ export interface Address {
   id: string;
   fullName: string;
   phone: string;
-  street: string;
+  detail: string;
   ward: string;
   district: string;
-  city: string;
+  province: string;
   isDefault: boolean;
 }

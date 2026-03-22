@@ -62,7 +62,7 @@ export interface SharedOrder {
   total: number;
 
   // Timeline
-  timeline: Array<{ time: string; text: string; tone: 'success' | 'pending' | 'error' | 'neutral' }>;
+  timeline: Array<{ time: string; text: string; tone: 'success' | 'pending' | 'error' | 'neutral' | 'info' }>;
 
   // Cancel info
   cancelReason?: string;
@@ -279,6 +279,20 @@ export const sharedOrderStore = {
 
   canCancel(order: SharedOrder): boolean {
     return order.fulfillment === 'pending' || order.fulfillment === 'packing';
+  },
+
+  updateTracking(id: string, tracking: string): boolean {
+    const order = _orders.find((o) => o.id === id);
+    if (!order) return false;
+    this.update({
+      ...order,
+      tracking,
+      timeline: [
+        ...order.timeline,
+        { time: new Date().toLocaleString('vi-VN'), text: tracking ? `Cập nhật mã vận đơn: ${tracking}` : 'Đã xóa mã vận đơn', tone: 'info' },
+      ],
+    });
+    return true;
   },
 
   cancel(id: string, reason: string): boolean {

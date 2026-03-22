@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Minus, Plus, ShoppingCart, Check, Heart } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useCartAnimation } from '../../context/CartAnimationContext';
 import { useWishlist } from '../../contexts/WishlistContext';
 import { useCart } from '../../contexts/CartContext';
@@ -26,7 +25,6 @@ const ProductActions = ({ product, selectedColor, selectedSize }: ProductActions
   const { addToCart } = useCart();
   const { triggerAnimation } = useCartAnimation();
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
-  const navigate = useNavigate();
   const isWished = isInWishlist(String(product.id));
 
   const handleBuyNow = (e: React.MouseEvent) => {
@@ -47,9 +45,7 @@ const ProductActions = ({ product, selectedColor, selectedSize }: ProductActions
       fallbackPoint: { x: e.clientX, y: e.clientY },
     });
     setAdded(true);
-    setTimeout(() => {
-      navigate('/cart');
-    }, 300);
+    setTimeout(() => setAdded(false), 2000);
   };
 
   const handleToggleWishlist = (e: React.MouseEvent) => {

@@ -20,7 +20,6 @@ const ProductListing = () => {
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const { setFiltersState } = useFilter();
   const view = useClientViewState({
-    path: `/category/${id || 'all'}`,
     validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'],
     defaultCategory: id || 'all',
   });

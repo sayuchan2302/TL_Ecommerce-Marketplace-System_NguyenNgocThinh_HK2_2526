@@ -270,6 +270,7 @@ export const CLIENT_TEXT = {
       customer: 'Khách hàng',
       eta: 'Dự kiến giao',
       delivered: 'Đã giao',
+      trackingNumber: 'Mã vận đơn',
     },
     steps: {
       received: 'Tiếp nhận',

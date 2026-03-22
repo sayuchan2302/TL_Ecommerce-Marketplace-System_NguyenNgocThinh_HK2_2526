@@ -6,7 +6,6 @@ import FilterSidebar from '../../components/FilterSidebar/FilterSidebar';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
 import EmptySearchState from '../../components/EmptySearchState/EmptySearchState';
 import { searchService } from '../../services/searchService';
-import { useFilter } from '../../contexts/FilterContext';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { useClientViewState } from '../../hooks/useClientViewState';
 import './Search.css';
@@ -17,8 +16,7 @@ const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
-  const { filters } = useFilter();
-  const view = useClientViewState({ path: '/search', validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
+  const view = useClientViewState({ validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
 
   const history = searchService.getRecentSearches();
 
@@ -225,9 +223,9 @@ const Search = () => {
                           selectedPriceRanges={view.priceRanges}
                           selectedSizes={view.sizes}
                           selectedColors={view.colors}
-                          onTogglePrice={(id, checked) => view.togglePrice(id)}
-                          onToggleSize={(size, checked) => view.toggleSize(size)}
-                          onToggleColor={(color, checked) => view.toggleColor(color)}
+                          onTogglePrice={(id, _checked) => view.togglePrice(id)}
+                          onToggleSize={(size, _checked) => view.toggleSize(size)}
+                          onToggleColor={(color, _checked) => view.toggleColor(color)}
                           onReset={() => view.reset()}
                         />
                       </div>

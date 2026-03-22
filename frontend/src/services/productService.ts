@@ -1,6 +1,12 @@
 import type { Product, ProductVariant, ProductStatusType } from '../types';
 import { listAdminProducts, type AdminProductRecord } from '../pages/Admin/adminProductService';
 
+const colorHexMatch = (selected: string, productColor: string): boolean => {
+  const normalize = (c: string) => c.toLowerCase().trim();
+  return normalize(selected).includes(normalize(productColor)) || 
+         normalize(productColor).includes(normalize(selected));
+};
+
 export interface ProductFilter {
   query?: string;
   priceRanges?: string[];

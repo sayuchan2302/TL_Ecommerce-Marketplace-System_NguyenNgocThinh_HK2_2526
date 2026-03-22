@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronRight, Check, Wallet, Loader2, Trash2, X, ChevronDown, Tag, AlertCircle } from 'lucide-react';
+import { ChevronRight, Check, Wallet, Loader2, Trash2, X, ChevronDown, Tag, AlertCircle, MapPin } from 'lucide-react';
 import './Checkout.css';
 import { useCart } from '../../contexts/CartContext';
 import { useToast } from '../../contexts/ToastContext';
 import { formatPrice } from '../../utils/formatters';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { couponService, type Coupon } from '../../services/couponService';
+import { addressService } from '../../services/addressService';
+import { orderService } from '../../services/orderService';
+import type { Address } from '../../types';
 import AddressBookModal from './AddressBookModal';
 
 const t = CLIENT_TEXT.checkout;
@@ -49,8 +52,9 @@ const Checkout = () => {
   const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [formValues, setFormValues] = useState({
     name: '', phone: '', email: '',
-    address: '', city: '', district: '', ward: '', note: ''
+    address: '', province: '', district: '', ward: '', note: ''
   });
+  const [saveAddressToBook, setSaveAddressToBook] = useState(true);
 
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
@@ -73,6 +77,22 @@ const Checkout = () => {
   const [loadingProvinces, setLoadingProvinces] = useState(false);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [loadingWards, setLoadingWards] = useState(false);
+  const couponScrollRef = useRef<HTMLDivElement>(null);
+
+  // Horizontal scroll with mouse wheel on coupon tickets
+  useEffect(() => {
+    const el = couponScrollRef.current;
+    if (!el) return;
+    const handleWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, []);
+
   // Fetch provinces on mount
   useEffect(() => {
     setLoadingProvinces(true);
@@ -158,7 +178,13 @@ const Checkout = () => {
   };
 
   const handleSelectCoupon = (coupon: Coupon) => {
-    setCouponInput(coupon.code);
+    if (appliedCoupon?.code === coupon.code) {
+      setAppliedCoupon(null);
+      addToast('Đã bỏ chọn mã giảm giá', 'info');
+    } else {
+      setAppliedCoupon(coupon);
+      addToast(`Áp dụng mã ${coupon.code} thành công!`, 'success');
+    }
   };
 
   // All cart items go to checkout — selection was done on Cart page
@@ -170,12 +196,16 @@ const Checkout = () => {
   const total = subtotal + shippingFee - discount;
   const savings = discount;
 
-  const handleAddressSelect = (addr: any) => {
+  const handleAddressSelect = (addr: Address) => {
     setFormValues(prev => ({
-      ...prev, name: addr.name, phone: addr.phone, address: addr.address,
-      ward: addr.ward, district: addr.district, city: addr.city,
+      ...prev, 
+      name: addr.fullName, 
+      phone: addr.phone, 
+      address: addr.detail,
+      ward: addr.ward, 
+      district: addr.district, 
+      province: addr.province,
     }));
-    // Try to match codes if possible, though modal provides names
     setSelectedProvinceCode('');
     setSelectedDistrictCode('');
     setSelectedWardCode('');
@@ -188,7 +218,7 @@ const Checkout = () => {
     if (!formValues.phone.trim()) errors.phone = t.validation.requiredPhone;
     else if (!/^(0[3|5|7|8|9])+([0-9]{8})$/.test(formValues.phone.trim())) errors.phone = t.validation.invalidPhone;
     if (!formValues.address.trim()) errors.address = t.validation.requiredAddress;
-    if (!formValues.city) errors.city = t.validation.requiredCity;
+    if (!formValues.province) errors.city = t.validation.requiredCity;
     if (!formValues.district) errors.district = t.validation.requiredDistrict;
     if (!formValues.ward) errors.ward = t.validation.requiredWard;
     return errors;
@@ -209,13 +239,45 @@ const Checkout = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    
     setIsLoading(true);
     setTimeout(() => {
-      setIsLoading(false);
+      if (saveAddressToBook && formValues.name && formValues.phone && formValues.address) {
+        addressService.add({
+          fullName: formValues.name,
+          phone: formValues.phone,
+          detail: formValues.address,
+          ward: formValues.ward,
+          district: formValues.district,
+          province: formValues.province,
+          isDefault: false,
+        });
+      }
+      
       const orderId = Math.floor(Math.random() * 1000000);
-      // Clear all items after successful order
+      
+      orderService.add({
+        id: `CM${orderId}`,
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+        total: subtotal + shippingFee - discount,
+        items: items.map(item => ({
+          id: String(item.id),
+          name: item.name,
+          price: item.price,
+          originalPrice: item.originalPrice,
+          image: item.image,
+          quantity: item.quantity,
+          color: item.color,
+          size: item.size,
+        })),
+        addressSummary: `${formValues.name}, ${formValues.phone}, ${formValues.address}, ${formValues.ward}, ${formValues.district}, ${formValues.province}`,
+        paymentMethod: paymentMethod.toUpperCase(),
+      });
+      
       items.forEach(item => removeFromCart(item.cartId));
       navigate(`/order-success?id=${orderId}`);
+      setIsLoading(false);
     }, 1500);
   };
 
@@ -405,6 +467,15 @@ const Checkout = () => {
                     </div>
                 </div>
 
+                <label className="save-address-checkbox">
+                  <input 
+                    type="checkbox" 
+                    checked={saveAddressToBook} 
+                    onChange={(e) => setSaveAddressToBook(e.target.checked)}
+                  />
+                  <MapPin size={16} />
+                  <span>Lưu vào sổ địa chỉ</span>
+                </label>
 
               </section>
 
@@ -563,12 +634,12 @@ const Checkout = () => {
                 </div>
 
                 {/* Coupon Tickets */}
-                <div className="coupon-ticket-scroll">
+                <div className="coupon-ticket-scroll" ref={couponScrollRef}>
                   {availableCoupons.map((coupon) => (
                     <div 
                       key={coupon.code}
                       className={`coupon-ticket ${appliedCoupon?.code === coupon.code ? 'coupon-selected' : ''}`}
-                      onClick={() => !appliedCoupon && handleSelectCoupon(coupon)}
+                      onClick={() => handleSelectCoupon(coupon)}
                     >
                       <div className="ticket-info">
                         <strong>{coupon.code}</strong> (Còn {coupon.remaining})<br/>
@@ -576,7 +647,9 @@ const Checkout = () => {
                         <div className="ticket-expiry">HSD: {new Date(coupon.expiresAt).toLocaleDateString('vi-VN')}</div>
                       </div>
                       <div className="ticket-action">
-                        <div className="ticket-radio"></div>
+                        <div className={`ticket-radio ${appliedCoupon?.code === coupon.code ? 'checked' : ''}`}>
+                          {appliedCoupon?.code === coupon.code && <Check size={12} />}
+                        </div>
                       </div>
                     </div>
                   ))}

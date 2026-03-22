@@ -23,7 +23,7 @@ import {
   Trash,
   CheckCheck
 } from 'lucide-react';
-import AddressModal, { type AddressData } from './AddressModal';
+import AddressModal from './AddressModal';
 import EmptyState from '../../components/EmptyState/EmptyState';
 import ReviewModal from '../../components/ReviewModal/ReviewModal';
 import { useToast } from '../../contexts/ToastContext';
@@ -33,6 +33,8 @@ import Skeleton from '../../components/Skeleton/Skeleton';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_TOAST_MESSAGES } from '../../utils/clientMessages';
 import { notificationService } from '../../services/notificationService';
+import { addressService } from '../../services/addressService';
+import type { Address } from '../../types';
 import './Profile.css';
 
 const t = CLIENT_TEXT.profile;
@@ -106,7 +108,17 @@ const Profile = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
-  const [savedAddresses, setSavedAddresses] = useState<AddressData[]>([]);
+  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
+
+  useEffect(() => {
+    if (activeTab === 'addresses') {
+      setSavedAddresses(addressService.getAll());
+    }
+  }, [activeTab]);
+
+  const refreshAddresses = () => {
+    setSavedAddresses(addressService.getAll());
+  };
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewProduct, setReviewProduct] = useState<PendingProduct | null>(null);
@@ -460,11 +472,11 @@ const Profile = () => {
                 />
               ) : (
                 <div className="address-list">
-                  {savedAddresses.map((addr, index) => (
-                    <div key={index} className="address-card">
+                  {savedAddresses.map((addr) => (
+                    <div key={addr.id} className="address-card">
                       <div className="address-card-info">
                         <div className="address-card-top">
-                          <span className="address-card-name">{addr.name}</span>
+                          <span className="address-card-name">{addr.fullName}</span>
                           <span className="address-card-divider">|</span>
                           <span className="address-card-phone">{addr.phone}</span>
                           {addr.isDefault && <span className="address-default-badge">Mặc định</span>}
@@ -474,7 +486,11 @@ const Profile = () => {
                       </div>
                       <button 
                         className="address-card-delete" 
-                        onClick={() => setSavedAddresses(prev => prev.filter((_, i) => i !== index))}
+                        onClick={() => {
+                          addressService.remove(addr.id);
+                          refreshAddresses();
+                          addToast('Đã xóa địa chỉ', 'success');
+                        }}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -897,7 +913,7 @@ const Profile = () => {
       <AddressModal
         isOpen={isAddressModalOpen}
         onClose={() => setIsAddressModalOpen(false)}
-        onSave={(newAddr) => setSavedAddresses(prev => [...prev, newAddr])}
+        onSave={refreshAddresses}
       />
 
       {/* Review Modal */}

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import AdminLayout from './AdminLayout';
-import { Printer, XCircle, RotateCcw, Truck, User, Copy, Download } from 'lucide-react';
+import { Printer, XCircle, RotateCcw, Truck, User, Copy, Download, Save } from 'lucide-react';
 import {
   fulfillmentLabel,
   fulfillmentTransitions,
@@ -15,6 +15,7 @@ import {
   type PaymentStatus,
 } from './orderWorkflow';
 import { getAdminOrderByCode, subscribeAdminOrders, transitionAdminOrder } from './adminOrderService';
+import { sharedOrderStore } from '../../services/sharedOrderStore';
 import { AdminStateBlock } from './AdminStateBlocks';
 import { useAdminToast } from './useAdminToast';
 import { ADMIN_DICTIONARY } from './adminDictionary';
@@ -31,6 +32,8 @@ const AdminOrderDetail = () => {
   const [showTransitionModal, setShowTransitionModal] = useState(false);
   const [reasonCode, setReasonCode] = useState<TransitionReasonCode>('other');
   const [reasonNote, setReasonNote] = useState('');
+  const [isEditingTracking, setIsEditingTracking] = useState(false);
+  const [trackingInput, setTrackingInput] = useState('');
 
   const fulfillment = order?.fulfillment || 'pending';
   const paymentStatus = order?.paymentStatus || 'unpaid';
@@ -192,13 +195,51 @@ const AdminOrderDetail = () => {
                <div className="od-card-row"><span className="od-label">Thanh toán</span><span className={`admin-pill ${paymentStatus === 'paid' ? 'success' : paymentStatus === 'refund_pending' ? 'error' : 'pending'}`}>{paymentLabel(paymentStatus)}</span></div>
                <div className="od-card-row"><span className="od-label">Vận chuyển</span><span className={`admin-pill ${fulfillment === 'done' ? 'success' : fulfillment === 'canceled' ? 'error' : 'pending'}`}><Truck size={14} /> {shipLabel(fulfillment)}</span></div>
               <div className="od-card-row tracking-row">
-                <span className="od-label">Mã vận đơn</span>
-                <div className="tracking-value">
-                  <strong>{order.tracking}</strong>
-                   <button className="admin-icon-btn subtle" aria-label={ADMIN_DICTIONARY.actionTitles.copyTracking} onClick={() => navigator.clipboard?.writeText(order.tracking)}>
-                    <Copy size={14} />
-                  </button>
-                </div>
+                <span className="od-label">{t.trackingNumber}</span>
+                {isEditingTracking ? (
+                  <div className="tracking-edit">
+                    <input
+                      type="text"
+                      className="tracking-input"
+                      placeholder={t.trackingPlaceholder}
+                      value={trackingInput}
+                      onChange={(e) => setTrackingInput(e.target.value)}
+                    />
+                    <button
+                      className="admin-icon-btn subtle"
+                      aria-label={t.updateTracking}
+                      onClick={() => {
+                        sharedOrderStore.updateTracking(order.code, trackingInput.trim());
+                        setOrder(getAdminOrderByCode(orderCode));
+                        setIsEditingTracking(false);
+                        pushToast(t.messages.trackingUpdated);
+                      }}
+                    >
+                      <Save size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="tracking-value">
+                    <strong>{order.tracking || '-'}</strong>
+                    <button
+                      className="admin-icon-btn subtle"
+                      aria-label={ADMIN_DICTIONARY.actionTitles.copyTracking}
+                      onClick={() => navigator.clipboard?.writeText(order.tracking)}
+                    >
+                      <Copy size={14} />
+                    </button>
+                    <button
+                      className="admin-icon-btn subtle"
+                      aria-label={t.updateTracking}
+                      onClick={() => {
+                        setTrackingInput(order.tracking || '');
+                        setIsEditingTracking(true);
+                      }}
+                    >
+                      <Save size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </section>

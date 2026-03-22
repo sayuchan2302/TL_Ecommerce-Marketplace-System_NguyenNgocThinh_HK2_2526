@@ -5,7 +5,25 @@
 import { sharedOrderStore, fulfillmentToClientStatus, clientStatusToFulfillment, type SharedOrder, type ClientOrderStatus } from './sharedOrderStore';
 import type { Order, OrderStatus, OrderItem, OrderStatusStep } from '../types';
 
-// ── Adapters ─────────────────────────────────────────────────────────────
+interface OrderInput {
+  id: string;
+  createdAt?: string;
+  status: OrderStatus;
+  total: number;
+  items: {
+    id: string;
+    name: string;
+    price: number;
+    originalPrice?: number;
+    image: string;
+    quantity: number;
+    color?: string;
+    size?: string;
+  }[];
+  addressSummary: string;
+  paymentMethod: string;
+}
+
 const toClientOrder = (o: SharedOrder): Order => ({
   id: o.id,
   createdAt: o.createdAt,
@@ -29,6 +47,7 @@ const toClientOrder = (o: SharedOrder): Order => ({
   })),
   cancelReason: o.cancelReason,
   cancelledAt: o.cancelledAt,
+  tracking: o.tracking,
 });
 
 export const orderService = {
@@ -41,7 +60,7 @@ export const orderService = {
     return order ? toClientOrder(order) : null;
   },
 
-  add(order: Order) {
+  add(order: OrderInput) {
     const now = new Date().toISOString();
     const shared: SharedOrder = {
       id: order.id,

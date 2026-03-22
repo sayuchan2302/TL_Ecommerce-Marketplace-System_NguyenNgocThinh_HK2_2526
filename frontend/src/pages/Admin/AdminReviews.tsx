@@ -158,16 +158,16 @@ const t = ADMIN_DICTIONARY.reviews;
   };
 
     const handleApprove = useCallback((id: string) => {
-      if (applyStatusUpdate(id, 'approved')) pushToast(ADMIN_DICTIONARY.reviews.approveSuccess);
+      if (applyStatusUpdate(id, 'approved')) pushToast((ADMIN_DICTIONARY.reviews as any).approveSuccess);
     }, [pushToast]);
 
     const handleHide = useCallback((id: string) => {
-      if (applyStatusUpdate(id, 'hidden')) pushToast(ADMIN_DICTIONARY.reviews.hideSuccess);
+      if (applyStatusUpdate(id, 'hidden')) pushToast((ADMIN_DICTIONARY.reviews as any).hideSuccess);
     }, [pushToast]);
 
   const handleReply = useCallback((id: string) => {
     if (!replyText.trim()) {
-      pushToast(ADMIN_DICTIONARY.reviews.replyRequired);
+      pushToast((ADMIN_DICTIONARY.reviews as any).replyRequired);
       return;
     }
     const updated = adminReviewService.addReply(id, replyText.trim());
@@ -175,7 +175,7 @@ const t = ADMIN_DICTIONARY.reviews;
       setAllReviews((prev) => prev.map((r) => (r.id === id ? updated : r)));
       setDrawerReview(updated);
       setReplyText('');
-      pushToast(ADMIN_DICTIONARY.reviews.replySuccess);
+      pushToast((ADMIN_DICTIONARY.reviews as any).replySuccess);
     }
   }, [replyText, pushToast]);
 
@@ -188,7 +188,7 @@ const t = ADMIN_DICTIONARY.reviews;
         count++;
       }
     });
-    pushToast(ADMIN_DICTIONARY.reviews.deleteSuccess);
+    pushToast((ADMIN_DICTIONARY.reviews as any).deleteSuccess);
     setSelected(new Set());
     setDeleteTarget(null);
     if (drawerReview && deleteTarget.ids.includes(drawerReview.id)) closeDrawer();
@@ -202,9 +202,9 @@ const t = ADMIN_DICTIONARY.reviews;
     });
     if (count > 0) {
       setSelected(new Set());
-      pushToast(ADMIN_DICTIONARY.reviews.bulkApproved(count));
+      pushToast((ADMIN_DICTIONARY.reviews as any).bulkApproved(count));
     } else {
-      pushToast(ADMIN_DICTIONARY.reviews.noEligibleBulkApprove);
+      pushToast((ADMIN_DICTIONARY.reviews as any).noEligibleBulkApprove);
     }
   }, [selected, pushToast]);
 
@@ -215,9 +215,9 @@ const t = ADMIN_DICTIONARY.reviews;
     });
     if (count > 0) {
       setSelected(new Set());
-      pushToast(ADMIN_DICTIONARY.reviews.bulkHidden(count));
+      pushToast((ADMIN_DICTIONARY.reviews as any).bulkHidden(count));
     } else {
-      pushToast(ADMIN_DICTIONARY.reviews.noEligibleBulkHide);
+      pushToast((ADMIN_DICTIONARY.reviews as any).noEligibleBulkHide);
     }
   }, [selected, pushToast]);
 

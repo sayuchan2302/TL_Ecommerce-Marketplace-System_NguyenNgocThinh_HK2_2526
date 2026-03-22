@@ -40,6 +40,7 @@ const AdminCustomers = lazy(() => import('./pages/Admin/AdminCustomers'));
 const AdminPromotions = lazy(() => import('./pages/Admin/AdminPromotions'));
 const AdminReviews = lazy(() => import('./pages/Admin/AdminReviews'));
 const AdminReturns = lazy(() => import('./pages/Admin/AdminReturns'));
+const AdminContent = lazy(() => import('./pages/Admin/AdminContent'));
 
 // Core components (not lazy loaded - needed immediately)
 import TopBar from './components/TopBar/TopBar';
@@ -128,6 +129,7 @@ function App() {
                         <Route path="/admin/promotions" element={<AdminPromotions />} />
                         <Route path="/admin/reviews" element={<AdminReviews />} />
                         <Route path="/admin/returns" element={<AdminReturns />} />
+                        <Route path="/admin/content" element={<AdminContent />} />
                       </Routes>
                     </div>
                   </RouteLoader>
