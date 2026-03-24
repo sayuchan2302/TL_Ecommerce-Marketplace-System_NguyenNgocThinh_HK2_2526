@@ -69,14 +69,21 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'auto';
-    }
-    
-    // Reset tab when reopened
-    if (isOpen) {
       setActiveTab(initialTab);
       setIsForgot(false);
+    } else {
+      document.body.style.overflow = 'auto';
+      // Reset form when closed
+      setFullName('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+      setLoginErrors({});
+      setRegisterErrors({});
+      setForgotEmail('');
+      setForgotError(null);
     }
 
     return () => {
@@ -174,7 +181,7 @@ const AuthModal = ({ isOpen, onClose, initialTab = 'login' }: AuthModalProps) =>
   };
 
   const content = (
-    <div className="auth-modal-overlay" onClick={onClose} style={{ display: isOpen ? 'flex' : 'none' }}>
+    <div className="auth-modal-overlay" style={{ display: isOpen ? 'flex' : 'none' }}>
       <div className="auth-modal-content" onClick={(e) => e.stopPropagation()}>
         <button className="auth-modal-close" onClick={onClose} aria-label="Đóng">
           <X size={24} />

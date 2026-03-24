@@ -700,6 +700,7 @@
 
 .ticket-info strong {
   font-size: 14px;
+  color: var(--co-blue);
 }
 
 .ticket-desc {
@@ -828,18 +829,22 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--co-green);
+  color: var(--co-blue);
   font-size: 12px;
   margin-top: 8px;
-  padding: 8px 12px;
-  background: #f0fdf4;
-  border-radius: 6px;
+  padding: 12px 16px;
+  background-color: var(--co-blue-light);
+  border-radius: 8px;
 }
 
 .coupon-selected {
   background: #dbeafe;
   border-left-color: var(--co-blue);
   cursor: pointer;
+}
+
+.coupon-selected .ticket-info strong {
+  color: var(--co-blue);
 }
 
 .coupon-ticket:not(.coupon-selected):hover {
@@ -993,8 +998,12 @@
   flex: 1;
   justify-content: center;
   font-size: 14px;
-  color: var(--text-secondary);
   cursor: pointer;
+}
+
+.voucher-code-text {
+  color: var(--co-blue);
+  font-weight: 600;
 }
 
 .voucher-icon-img {
@@ -1051,6 +1060,30 @@
   color: #111;
 }
 
+.bar-price-points {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.bar-price-points .points-value {
+  font-weight: 600;
+  color: var(--co-blue);
+}
+
+.bar-price-points .savings-text {
+  color: #d32f2f;
+}
+
+.bar-price-points .sub-value {
+  font-weight: 600;
+  color: #d32f2f;
+}
+
 /* Button — full height, dark, no border-radius */
 .btn-place-order-sticky {
   background: var(--co-black);
@@ -1095,10 +1128,15 @@
 
 @media (prefers-reduced-motion: reduce) {
   @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
   }
-  
+
   .spinner {
     animation: spin 2s linear infinite;
   }

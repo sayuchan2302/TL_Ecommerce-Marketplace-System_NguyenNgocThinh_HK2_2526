@@ -42,6 +42,9 @@
   margin-bottom: 24px;
   color: white;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 /* Layout: Loyalty Panel on top, sidebar + content side by side */
@@ -51,24 +54,59 @@
   align-items: flex-start;
 }
 
+.loyalty-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.loyalty-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.loyalty-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.loyalty-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.loyalty-avatar span {
+  font-size: 28px;
+  font-weight: 700;
+}
+
 .loyalty-welcome {
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .loyalty-welcome .welcome-text {
-  font-size: 16px;
-  opacity: 0.8;
+  font-size: 14px;
+  opacity: 0.7;
 }
 
 .loyalty-welcome .welcome-name {
   font-size: 24px;
   font-weight: 700;
-  margin-left: 8px;
 }
 
 .loyalty-stats {
   display: flex;
-  gap: 48px;
+  gap: 32px;
+}
   margin-bottom: 20px;
 }
 
@@ -337,6 +375,12 @@
   border-bottom: 1px solid var(--co-gray-200);
 }
 
+.notify-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .profile-content-title {
   font-size: 24px;
   font-weight: 700;
@@ -533,6 +577,11 @@
   backdrop-filter: blur(2px);
   z-index: 110;
   padding: 0;
+  overflow-y: auto;
+}
+
+body.modal-open {
+  overflow: hidden !important;
 }
 
 .profile-modal {
@@ -1635,7 +1684,7 @@
 .notifications-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
 }
 
 .notification-card {
@@ -1644,13 +1693,13 @@
   gap: 14px;
   padding: 16px;
   background: var(--co-white);
-  border-radius: 12px;
   cursor: pointer;
   transition: background 0.2s, box-shadow 0.2s;
   position: relative;
   border: none;
   width: 100%;
   text-align: left;
+  border-bottom: 1px solid var(--co-gray-100);
 }
 
 .notification-card:hover {
@@ -1762,23 +1811,27 @@
   border-radius: 50%;
 }
 
-.mark-all-read-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: var(--co-blue);
-  color: white;
+.mark-all-read-text-btn {
+  background: transparent;
   border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 0;
+  color: var(--co-blue);
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: color 0.2s;
+  text-decoration: none;
 }
 
-.mark-all-read-btn:hover {
-  opacity: 0.85;
+.mark-all-read-text-btn:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.mark-all-read-text-btn:disabled {
+  color: var(--co-gray-400);
+  cursor: default;
+  text-decoration: none;
 }
 
 /* Order Drawer in Profile */

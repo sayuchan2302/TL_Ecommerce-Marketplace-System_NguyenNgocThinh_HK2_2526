@@ -119,20 +119,20 @@ const Checkout = () => {
   // All cart items go to checkout — selection was done on Cart page
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const shippingFee = subtotal > 200000 ? 0 : 30000;
-  const discount = appliedCoupon 
-    ? couponService.calculateDiscount(appliedCoupon, subtotal) 
+  const discount = appliedCoupon
+    ? couponService.calculateDiscount(appliedCoupon, subtotal)
     : 0;
   const total = subtotal + shippingFee - discount;
   const savings = discount;
 
   const handleAddressSelect = (addr: Address) => {
     setFormValues(prev => ({
-      ...prev, 
-      name: addr.fullName, 
-      phone: addr.phone, 
+      ...prev,
+      name: addr.fullName,
+      phone: addr.phone,
       address: addr.detail,
-      ward: addr.ward, 
-      district: addr.district, 
+      ward: addr.ward,
+      district: addr.district,
       province: addr.province,
     }));
     addressLocation.clearSelection();
@@ -166,7 +166,7 @@ const Checkout = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    
+
     setIsLoading(true);
     setTimeout(() => {
       if (saveAddressToBook && formValues.name && formValues.phone && formValues.address) {
@@ -180,9 +180,9 @@ const Checkout = () => {
           isDefault: false,
         });
       }
-      
+
       const orderId = Math.floor(Math.random() * 1000000);
-      
+
       orderService.add({
         id: `CM${orderId}`,
         createdAt: new Date().toISOString(),
@@ -201,7 +201,7 @@ const Checkout = () => {
         addressSummary: `${formValues.name}, ${formValues.phone}, ${formValues.address}, ${formValues.ward}, ${formValues.district}, ${formValues.province}`,
         paymentMethod: paymentMethod.toUpperCase(),
       });
-      
+
       items.forEach(item => removeFromCart(item.cartId));
       navigate(`/order-success?id=${orderId}`);
       setIsLoading(false);
@@ -241,7 +241,7 @@ const Checkout = () => {
                 </div>
 
                 <div className="form-grid">
-<div className="form-group col-span-2">
+                  <div className="form-group col-span-2">
                     <label className="input-label">{t.form.name}</label>
                     <div className="input-with-prefix">
                       <select className="prefix-select" name="salutation" autoComplete="honorific-prefix">
@@ -374,19 +374,19 @@ const Checkout = () => {
                     {formErrors.ward && <span className="field-error">{formErrors.ward}</span>}
                   </div>
 
-                    <div className="form-group col-span-2">
-                      <label className="input-label">Ghi chú</label>
-                      <input type="text" className="checkout-input" placeholder="Nhập ghi chú"
-                        value={formValues.note} onChange={e => handleFieldChange('note', e.target.value)}
-                        name="note"
-                        autoComplete="off" />
-                    </div>
+                  <div className="form-group col-span-2">
+                    <label className="input-label">Ghi chú</label>
+                    <input type="text" className="checkout-input" placeholder="Nhập ghi chú"
+                      value={formValues.note} onChange={e => handleFieldChange('note', e.target.value)}
+                      name="note"
+                      autoComplete="off" />
+                  </div>
                 </div>
 
                 <label className="save-address-checkbox">
-                  <input 
-                    type="checkbox" 
-                    checked={saveAddressToBook} 
+                  <input
+                    type="checkbox"
+                    checked={saveAddressToBook}
                     onChange={(e) => setSaveAddressToBook(e.target.checked)}
                   />
                   <MapPin size={16} />
@@ -395,7 +395,7 @@ const Checkout = () => {
 
               </section>
 
-{/* Payment Methods */}
+              {/* Payment Methods */}
               <section className="checkout-section">
                 <h2 className="checkout-section-title">{t.payment}</h2>
                 <div className="payment-options-list">
@@ -552,13 +552,13 @@ const Checkout = () => {
                 {/* Coupon Tickets */}
                 <div className="coupon-ticket-scroll" ref={couponScrollRef}>
                   {availableCoupons.map((coupon) => (
-                    <div 
+                    <div
                       key={coupon.code}
                       className={`coupon-ticket ${appliedCoupon?.code === coupon.code ? 'coupon-selected' : ''}`}
                       onClick={() => handleSelectCoupon(coupon)}
                     >
                       <div className="ticket-info">
-                        <strong>{coupon.code}</strong> ({t.ticketRemaining.replace('{count}', String(coupon.remaining))})<br/>
+                        <strong>{coupon.code}</strong> ({t.ticketRemaining.replace('{count}', String(coupon.remaining))})<br />
                         <span className="ticket-desc">{coupon.description}</span>
                         <div className="ticket-expiry">{t.ticketExpiry.replace('{date}', new Date(coupon.expiresAt).toLocaleDateString('vi-VN'))}</div>
                       </div>
@@ -577,9 +577,9 @@ const Checkout = () => {
                     <Wallet size={16} /> {t.walletVoucher}
                   </button>
                   <div className="input-group-row">
-                    <input 
-                      type="text" 
-                      placeholder={t.enterCouponCode} 
+                    <input
+                      type="text"
+                      placeholder={t.enterCouponCode}
                       className={`checkout-input coupon-input ${couponError ? 'input-error' : ''}`}
                       value={couponInput}
                       onChange={(e) => {
@@ -593,8 +593,8 @@ const Checkout = () => {
                         <X size={16} aria-hidden="true" />
                       </button>
                     ) : (
-                      <button 
-                        className="btn-dark-apply" 
+                      <button
+                        className="btn-dark-apply"
                         onClick={handleApplyCoupon}
                         disabled={isCouponLoading}
                         aria-label="Áp dụng mã giảm giá"
@@ -667,8 +667,17 @@ const Checkout = () => {
                   </div>
                   <div className="bar-divider"></div>
                   <div className="voucher-indicator">
-                    <img src="https://n7media.coolmate.me/uploads/March2024/voucher-logo-mb.png?aio=w-300" alt="Voucher" className="voucher-icon-img" />
-                    <span>Voucher</span>
+                    {appliedCoupon ? (
+                      <>
+                        <img src="https://n7media.coolmate.me/uploads/March2024/voucher-logo-mb.png?aio=w-300" alt="Voucher" className="voucher-icon-img" />
+                        <span className="voucher-code-text">{appliedCoupon.code}</span>
+                      </>
+                    ) : (
+                      <>
+                        <img src="https://n7media.coolmate.me/uploads/March2024/voucher-logo-mb.png?aio=w-300" alt="Voucher" className="voucher-icon-img" />
+                        <span>Voucher</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -677,11 +686,10 @@ const Checkout = () => {
               <div className="bottom-bar-right">
                 <div className="bar-price-block">
                   <div className="bar-price-main">{formatPrice(total)}</div>
-                  <div className="bar-price-sub">
-                    {savings > 0 ? (
-                      <span className="sub-text">Tiết kiệm <span className="sub-value">{formatPrice(savings)}</span></span>
-                    ) : (
-                      <span className="sub-text">&nbsp;</span>
+                  <div className="bar-price-points">
+                    <span>Điểm tích lũy: <span className="points-value">+{Math.floor(total / 1000).toLocaleString('vi-VN')}</span></span>
+                    {savings > 0 && (
+                      <span className="savings-text"> | Tiết kiệm: <span className="sub-value">{formatPrice(savings)}</span></span>
                     )}
                   </div>
                 </div>

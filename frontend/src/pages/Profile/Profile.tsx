@@ -21,7 +21,6 @@ import {
   Star,
   Info,
   Trash,
-  CheckCheck,
   Pencil
 } from 'lucide-react';
 import AddressModal from './AddressModal';
@@ -104,6 +103,15 @@ const Profile = () => {
         setActiveTab(tabParam);
       }
     }
+    
+    // Handle orderId from URL - open order detail drawer
+    const orderIdParam = searchParams.get('orderId');
+    if (orderIdParam && activeTab === 'orders') {
+      const foundOrder = orders.find(o => o.id === orderIdParam);
+      if (foundOrder) {
+        setSelectedOrder(foundOrder);
+      }
+    }
   }, [searchParams, activeTab]);
 
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -147,6 +155,7 @@ const Profile = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [vouchers, setVouchers] = useState<Coupon[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [orderFilter, setOrderFilter] = useState('Tất cả');
 
   useEffect(() => {
     if (activeTab === 'orders') {
@@ -156,6 +165,26 @@ const Profile = () => {
       setVouchers(couponService.getAvailableCoupons());
     }
   }, [activeTab]);
+
+  // Sync activeTab with URL query param
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') as TabId | null;
+    if (tabParam && ['account', 'orders', 'vouchers', 'addresses', 'reviews', 'notifications'].includes(tabParam)) {
+      if (tabParam !== activeTab) {
+        setActiveTab(tabParam);
+      }
+    }
+    
+    // Handle orderId from URL - open order detail drawer
+    const orderIdParam = searchParams.get('orderId');
+    if (orderIdParam) {
+      const allOrders = orderService.list();
+      const foundOrder = allOrders.find(o => o.id === orderIdParam);
+      if (foundOrder) {
+        setSelectedOrder(foundOrder);
+      }
+    }
+  }, [searchParams, activeTab]);
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewProduct, setReviewProduct] = useState<PendingProduct | null>(null);
@@ -204,6 +233,16 @@ const Profile = () => {
     const timer = setTimeout(() => setIsLoading(false), 600);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    const anyModalOpen = isAccountModalOpen || isPasswordModalOpen || isAddressModalOpen || isReviewModalOpen || !!selectedOrder;
+    if (anyModalOpen) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    return () => document.body.classList.remove('modal-open');
+  }, [isAccountModalOpen, isPasswordModalOpen, isAddressModalOpen, isReviewModalOpen, selectedOrder]);
 
   const handleLogout = () => {
     logout();
@@ -290,15 +329,31 @@ const Profile = () => {
             {/* Order Status Filter Tabs */}
             <div className="order-filter-tabs">
               {['Tất cả', 'Chờ xác nhận', 'Đang giao', 'Đã giao', 'Đã hủy'].map((status) => (
-                <button key={status} className={`order-filter-btn ${status === 'Tất cả' ? 'active' : ''}`}>
+                <button 
+                  key={status} 
+                  className={`order-filter-btn ${orderFilter === status ? 'active' : ''}`}
+                  onClick={() => setOrderFilter(status)}
+                >
                   {status}
                 </button>
               ))}
             </div>
 
-            {/* Order Cards */}
+            {/* Order Status Filter */}
+            {(() => {
+              const statusMap: Record<string, string> = {
+                'Tất cả': 'all',
+                'Chờ xác nhận': 'pending',
+                'Đang giao': 'shipping',
+                'Đã giao': 'delivered',
+                'Đã hủy': 'cancelled',
+              };
+              const filteredOrders = orderFilter === 'Tất cả' 
+                ? orders 
+                : orders.filter(o => o.status === statusMap[orderFilter]);
+              return (
             <div className="order-list">
-              {orders.length === 0 ? (
+              {filteredOrders.length === 0 ? (
                 <EmptyState 
                   icon={<Package size={80} strokeWidth={1} />}
                   title="Bạn chưa có đơn hàng nào"
@@ -348,6 +403,20 @@ const Profile = () => {
                         <span className="order-total-price">{order.total.toLocaleString('vi-VN')}đ</span>
                       </div>
                       <div className="order-actions">
+                        {order.status === 'pending' && (
+                          <button 
+                            className="order-action-btn order-btn-danger"
+                            onClick={() => {
+                              if (confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
+                                orderService.cancel(order.id, 'Khách hàng hủy đơn');
+                                setOrders(orderService.list());
+                                addToast('Đã hủy đơn hàng thành công', 'success');
+                              }
+                            }}
+                          >
+                            Hủy đơn hàng
+                          </button>
+                        )}
                         <button 
                           className="order-action-btn order-btn-outline"
                           onClick={() => setSelectedOrder(order)}
@@ -369,6 +438,8 @@ const Profile = () => {
                 ))
               )}
             </div>
+              );
+            })()}
           </div>
         );
       case 'vouchers':
@@ -566,17 +637,17 @@ const Profile = () => {
       case 'notifications':
         return (
           <div className="tab-pane">
-            <div className="profile-content-header">
+            <div className="profile-content-header notify-header">
               <h2 className="profile-content-title">Thông báo</h2>
-              {unreadCount > 0 && (
+              {notifications.length > 0 && (
                 <button 
-                  className="mark-all-read-btn"
+                  className="mark-all-read-text-btn"
                   onClick={() => {
                     markAllAsRead();
                     addToast(CLIENT_TOAST_MESSAGES.notifications.markedAllRead, 'success');
                   }}
+                  disabled={unreadCount === 0}
                 >
-                  <CheckCheck size={16} />
                   Đánh dấu tất cả đã đọc
                 </button>
               )}
@@ -652,23 +723,34 @@ const Profile = () => {
 
         {/* Loyalty Panel - Full Width at top */}
         <div className="loyalty-panel">
-          <div className="loyalty-welcome">
-            <span className="welcome-text">Xin chào</span>
-            <span className="welcome-name">{user.name}!</span>
-          </div>
-          <div className="loyalty-stats">
-            <div className="loyalty-stat">
-              <span className="stat-label">Hạng thành viên</span>
-              <span 
-                className="stat-value tier-badge" 
-                style={{ backgroundColor: tierConfig.bg, color: tierConfig.color, borderColor: tierConfig.color }}
-              >
-                {tierConfig.label}
-              </span>
+          <div className="loyalty-top">
+            <div className="loyalty-left">
+              <div className="loyalty-avatar">
+                {user.avatar ? (
+                  <img src={user.avatar} alt={user.name} />
+                ) : (
+                  <span>{user.name.charAt(0).toUpperCase()}</span>
+                )}
+              </div>
+              <div className="loyalty-welcome">
+                <span className="welcome-text">Xin chào</span>
+                <span className="welcome-name">{user.name}!</span>
+              </div>
             </div>
-            <div className="loyalty-stat">
-              <span className="stat-label">Điểm tích lũy</span>
-              <span className="stat-value points">{user.points.toLocaleString('vi-VN')} điểm</span>
+            <div className="loyalty-stats">
+              <div className="loyalty-stat">
+                <span className="stat-label">Hạng thành viên</span>
+                <span 
+                  className="stat-value tier-badge" 
+                  style={{ backgroundColor: tierConfig.bg, color: tierConfig.color, borderColor: tierConfig.color }}
+                >
+                  {tierConfig.label}
+                </span>
+              </div>
+              <div className="loyalty-stat">
+                <span className="stat-label">Điểm tích lũy</span>
+                <span className="stat-value points">{user.points.toLocaleString('vi-VN')} điểm</span>
+              </div>
             </div>
           </div>
           {nextTier && (
@@ -948,7 +1030,13 @@ const Profile = () => {
                 </span>
               </div>
 
-              {/* Products */}
+              {/* Shipping Address - First */}
+              <div className="order-drawer-section">
+                <h4>Địa chỉ giao hàng</h4>
+                <p className="order-drawer-address">{selectedOrder.addressSummary}</p>
+              </div>
+
+              {/* Products - Second */}
               <div className="order-drawer-section">
                 <h4>Sản phẩm ({selectedOrder.items.length})</h4>
                 <div className="order-drawer-items">
@@ -965,12 +1053,6 @@ const Profile = () => {
                     </div>
                   ))}
                 </div>
-              </div>
-
-              {/* Shipping Address */}
-              <div className="order-drawer-section">
-                <h4>Địa chỉ giao hàng</h4>
-                <p className="order-drawer-address">{selectedOrder.addressSummary}</p>
               </div>
 
               {/* Payment Method */}
