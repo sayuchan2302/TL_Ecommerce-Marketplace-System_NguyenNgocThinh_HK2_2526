@@ -24,10 +24,8 @@ import { MARKETPLACE_DICTIONARY } from '../../utils/clientDictionary';
 
 const formatVND = (n: number) => n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
 
-const AdminOrderDetail = () => {
+const AdminOrderDetailContent = ({ orderCode, routeId }: { orderCode: string; routeId?: string }) => {
   const t = ADMIN_DICTIONARY.orderDetail;
-  const { id } = useParams();
-  const orderCode = useMemo(() => (id || '').replace('#', ''), [id]);
   const [order, setOrder] = useState(() => getAdminOrderByCode(orderCode));
   const { toast, pushToast } = useAdminToast();
   const [pendingTransition, setPendingTransition] = useState<FulfillmentStatus | null>(null);
@@ -59,13 +57,6 @@ const AdminOrderDetail = () => {
     const unsubscribe = subscribeAdminOrders(syncOrder);
     syncOrder();
     return unsubscribe;
-  }, [orderCode]);
-
-  useEffect(() => {
-    setPendingTransition(null);
-    setShowTransitionModal(false);
-    setReasonCode('other');
-    setReasonNote('');
   }, [orderCode]);
 
   if (!order) {
@@ -140,7 +131,7 @@ const AdminOrderDetail = () => {
       title={
         <div className="od-title-row">
           <button className="admin-ghost-btn" onClick={() => window.history.back()} aria-label={t.back}>←</button>
-          <span>{t.orderPrefix} #{id || order.code}</span>
+          <span>{t.orderPrefix} #{routeId || order.code}</span>
         </div>
       }
       actions={(
@@ -392,6 +383,13 @@ const AdminOrderDetail = () => {
       {toast && <div className="toast success">{toast}</div>}
     </AdminLayout>
   );
+};
+
+const AdminOrderDetail = () => {
+  const { id } = useParams();
+  const orderCode = useMemo(() => (id || '').replace('#', ''), [id]);
+
+  return <AdminOrderDetailContent key={orderCode} orderCode={orderCode} routeId={id} />;
 };
 
 export default AdminOrderDetail;

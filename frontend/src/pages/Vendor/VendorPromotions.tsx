@@ -1,8 +1,19 @@
 import './Vendor.css';
 import { useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Link2, Pause, Pencil, Play, Plus, Search, Trash2, X } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Link2, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import VendorLayout from './VendorLayout';
+import {
+  PanelDrawerFooter,
+  PanelDrawerHeader,
+  PanelDrawerSection,
+  PanelFloatingBar,
+  PanelSearchField,
+  PanelStatsGrid,
+  PanelTableFooter,
+  PanelTabs,
+  PanelViewSummary,
+} from '../../components/Panel/PanelPrimitives';
 import { AdminStateBlock, AdminToast } from '../Admin/AdminStateBlocks';
 import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
 
@@ -175,16 +186,62 @@ const VendorPromotions = () => {
     pushToast('Đã xóa voucher shop');
   };
 
+  const statItems = [
+    {
+      key: 'all',
+      label: 'Tổng voucher',
+      value: vouchers.length,
+      sub: `Lượt sử dụng: ${stats.totalUsage}`,
+      onClick: () => setActiveTab('all'),
+    },
+    {
+      key: 'running',
+      label: 'Đang chạy',
+      value: stats.running,
+      sub: 'Voucher đang tác động doanh thu',
+      tone: 'success',
+      onClick: () => setActiveTab('running'),
+    },
+    {
+      key: 'paused',
+      label: 'Tạm dừng',
+      value: stats.paused,
+      sub: 'Chờ kích hoạt lại khi cần',
+      tone: 'warning',
+      onClick: () => setActiveTab('paused'),
+    },
+    {
+      key: 'draft',
+      label: 'Bản nháp',
+      value: stats.draft,
+      sub: 'Chờ chốt lịch chạy',
+      tone: 'info',
+      onClick: () => setActiveTab('draft'),
+    },
+  ] as const;
+
+  const tabItems = TABS.map((tab) => ({ key: tab.key, label: tab.label }));
+  const summaryChips = [
+    ...(activeTab !== 'all'
+      ? [{ key: 'status', label: `Trạng thái: ${TABS.find((tab) => tab.key === activeTab)?.label || 'Tất cả'}` }]
+      : []),
+    ...(search.trim() ? [{ key: 'query', label: `Từ khóa: ${search.trim()}` }] : []),
+  ];
+
   return (
     <VendorLayout
       title="Voucher shop và doanh thu ưu đãi"
       breadcrumbs={[{ label: 'Voucher shop' }, { label: 'Khuyến mãi riêng' }]}
       actions={(
         <>
-          <div className="admin-search">
-            <Search size={16} />
-            <input placeholder="Tìm tên voucher hoặc mã giảm giá" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
-          </div>
+          <PanelSearchField
+            placeholder="Tìm tên voucher hoặc mã giảm giá"
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
+          />
           <button className="admin-ghost-btn" onClick={() => void shareCurrentView()}>
             <Link2 size={16} />
             Chia sẻ bộ lọc
@@ -197,43 +254,17 @@ const VendorPromotions = () => {
         </>
       )}
     >
-      <div className="admin-stats grid-4">
-        <button type="button" className="admin-stat-card vendor-stat-button" onClick={() => setActiveTab('all')}>
-          <div className="admin-stat-label">Tổng voucher</div>
-          <div className="admin-stat-value">{vouchers.length}</div>
-          <div className="admin-stat-sub">Lượt sử dụng: {stats.totalUsage}</div>
-        </button>
-        <button type="button" className="admin-stat-card success vendor-stat-button" onClick={() => setActiveTab('running')}>
-          <div className="admin-stat-label">Đang chạy</div>
-          <div className="admin-stat-value">{stats.running}</div>
-          <div className="admin-stat-sub">Voucher đang tác động doanh thu</div>
-        </button>
-        <button type="button" className="admin-stat-card warning vendor-stat-button" onClick={() => setActiveTab('paused')}>
-          <div className="admin-stat-label">Tạm dừng</div>
-          <div className="admin-stat-value">{stats.paused}</div>
-          <div className="admin-stat-sub">Chờ kích hoạt lại khi cần</div>
-        </button>
-        <button type="button" className="admin-stat-card info vendor-stat-button" onClick={() => setActiveTab('draft')}>
-          <div className="admin-stat-label">Bản nháp</div>
-          <div className="admin-stat-value">{stats.draft}</div>
-          <div className="admin-stat-sub">Chờ chốt lịch chạy</div>
-        </button>
-      </div>
+      <PanelStatsGrid items={[...statItems]} accentClassName="vendor-stat-button" />
 
-      <div className="admin-tabs">
-        {TABS.map((tab) => (
-          <button key={tab.key} className={`admin-tab ${activeTab === tab.key ? 'active vendor-active-tab' : ''}`} onClick={() => setActiveTab(tab.key as 'all' | VoucherStatus)}>
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+      <PanelTabs
+        items={tabItems}
+        activeKey={activeTab}
+        onChange={(key) => setActiveTab(key as 'all' | VoucherStatus)}
+        accentClassName="vendor-active-tab"
+      />
 
       {(activeTab !== 'all' || Boolean(search.trim())) && (
-        <div className="admin-view-summary">
-          <span className="summary-chip">Trạng thái: {TABS.find((tab) => tab.key === activeTab)?.label || 'Tất cả'}</span>
-          {search.trim() && <span className="summary-chip">Từ khóa: {search.trim()}</span>}
-          <button className="summary-clear" onClick={resetCurrentView}>Xóa bộ lọc</button>
-        </div>
+        <PanelViewSummary chips={summaryChips} clearLabel="Xóa bộ lọc" onClear={resetCurrentView} />
       )}
 
       <section className="admin-panels single">
@@ -328,37 +359,29 @@ const VendorPromotions = () => {
                 })}
               </div>
 
-              <div className="table-footer">
-                <span className="table-footer-meta">Hiển thị {(page - 1) * perPage + 1}-{Math.min(page * perPage, filtered.length)} trên {filtered.length} voucher</span>
-                <div className="pagination">
-                  <button className="page-btn" disabled={page === 1} onClick={() => setPage((current) => Math.max(current - 1, 1))}>Trước</button>
-                  {Array.from({ length: totalPages }).map((_, index) => (
-                    <button key={index + 1} className={`page-btn ${page === index + 1 ? 'active vendor-active-page' : ''}`} onClick={() => setPage(index + 1)}>
-                      {index + 1}
-                    </button>
-                  ))}
-                  <button className="page-btn" disabled={page === totalPages} onClick={() => setPage((current) => Math.min(current + 1, totalPages))}>Sau</button>
-                </div>
-              </div>
+              <PanelTableFooter
+                meta={`Hiển thị ${(page - 1) * perPage + 1}-${Math.min(page * perPage, filtered.length)} trên ${filtered.length} voucher`}
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                activePageClassName="vendor-active-page"
+                nextLabel="Sau"
+              />
             </>
           )}
         </div>
       </section>
 
-      <AnimatePresence>
-        {selected.size > 0 && (
-          <motion.div className="admin-floating-bar vendor-floating-bar" initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 22 }} transition={{ duration: 0.22, ease: 'easeOut' }}>
-            <div className="admin-floating-content">
-              <span>Đã chọn {selected.size} voucher</span>
-              <div className="admin-actions">
-                <button className="admin-ghost-btn" onClick={() => toggleVoucher(Array.from(selected), 'paused')}>Tạm dừng</button>
-                <button className="admin-ghost-btn" onClick={() => toggleVoucher(Array.from(selected), 'running')}>Kích hoạt</button>
-                <button className="admin-ghost-btn danger" onClick={() => requestDelete(Array.from(selected))}>Xóa đã chọn</button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <PanelFloatingBar show={selected.size > 0} className="vendor-floating-bar">
+        <div className="admin-floating-content">
+          <span>Đã chọn {selected.size} voucher</span>
+          <div className="admin-actions">
+            <button className="admin-ghost-btn" onClick={() => toggleVoucher(Array.from(selected), 'paused')}>Tạm dừng</button>
+            <button className="admin-ghost-btn" onClick={() => toggleVoucher(Array.from(selected), 'running')}>Kích hoạt</button>
+            <button className="admin-ghost-btn danger" onClick={() => requestDelete(Array.from(selected))}>Xóa đã chọn</button>
+          </div>
+        </div>
+      </PanelFloatingBar>
 
       <AdminConfirmDialog
         open={Boolean(deleteState)}
@@ -376,18 +399,14 @@ const VendorPromotions = () => {
         <>
           <div className="drawer-overlay" onClick={() => setDrawerOpen(false)} />
           <div className="drawer">
-            <div className="drawer-header">
-              <div>
-                <p className="drawer-eyebrow">Voucher shop</p>
-                <h3>{voucherForm.id ? 'Cập nhật voucher' : 'Tạo voucher mới'}</h3>
-              </div>
-              <button className="admin-icon-btn" onClick={() => setDrawerOpen(false)} aria-label="Đóng biểu mẫu voucher">
-                <X size={16} />
-              </button>
-            </div>
+            <PanelDrawerHeader
+              eyebrow="Voucher shop"
+              title={voucherForm.id ? 'Cập nhật voucher' : 'Tạo voucher mới'}
+              onClose={() => setDrawerOpen(false)}
+              closeLabel="Đóng biểu mẫu voucher"
+            />
             <div className="drawer-body">
-              <section className="drawer-section">
-                <h4>Nhận diện ưu đãi</h4>
+              <PanelDrawerSection title="Nhận diện ưu đãi">
                 <div className="form-grid">
                   <label className="form-field">
                     <span>Tên voucher</span>
@@ -402,9 +421,8 @@ const VendorPromotions = () => {
                     <textarea rows={3} value={voucherForm.description} onChange={(e) => setVoucherForm((current) => ({ ...current, description: e.target.value }))} />
                   </label>
                 </div>
-              </section>
-              <section className="drawer-section">
-                <h4>Cấu hình khuyến mãi</h4>
+              </PanelDrawerSection>
+              <PanelDrawerSection title="Cấu hình khuyến mãi">
                 <div className="form-grid">
                   <label className="form-field">
                     <span>Loại giảm</span>
@@ -438,12 +456,12 @@ const VendorPromotions = () => {
                     </select>
                   </label>
                 </div>
-              </section>
+              </PanelDrawerSection>
             </div>
-            <div className="drawer-footer">
+            <PanelDrawerFooter>
               <button className="admin-ghost-btn" onClick={() => setDrawerOpen(false)}>Hủy</button>
               <button className="admin-primary-btn vendor-admin-primary" onClick={saveVoucher}>Lưu voucher</button>
-            </div>
+            </PanelDrawerFooter>
           </div>
         </>
       )}

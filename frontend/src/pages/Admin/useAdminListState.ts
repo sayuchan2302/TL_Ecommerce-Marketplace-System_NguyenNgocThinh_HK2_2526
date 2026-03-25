@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAdminPagination } from './useAdminPagination';
 
 type SortDirection = 'asc' | 'desc';
@@ -39,14 +39,10 @@ export const useAdminListState = <T,>({
   onSortChange,
   pageValue,
   onPageChange,
-  loadingDelayMs = 220,
-  loadingDeps = [],
 }: UseAdminListStateOptions<T>) => {
   const [internalSearch, setInternalSearch] = useState(initialSearch);
   const [internalSortKey, setInternalSortKey] = useState<string | null>(initialSortKey);
   const [internalSortDirection, setInternalSortDirection] = useState<SortDirection>(initialSortDirection);
-  const [isLoading, setIsLoading] = useState(true);
-
   const isSearchControlled = typeof searchValue === 'string';
   const isSortControlled = typeof sortKeyValue !== 'undefined' || typeof sortDirectionValue !== 'undefined';
 
@@ -103,12 +99,6 @@ export const useAdminListState = <T,>({
     onPageChange,
   });
 
-  useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => setIsLoading(false), loadingDelayMs);
-    return () => clearTimeout(timer);
-  }, [search, sortKey, sortDirection, loadingDelayMs, ...loadingDeps]);
-
   const toggleSort = (key: string) => {
     if (!sorters || !sorters[key]) return;
     if (sortKey !== key) {
@@ -131,7 +121,7 @@ export const useAdminListState = <T,>({
     setSortKey,
     setSortDirection,
     toggleSort,
-    isLoading,
+    isLoading: false,
     filteredItems,
     ...pagination,
     clearFilters,

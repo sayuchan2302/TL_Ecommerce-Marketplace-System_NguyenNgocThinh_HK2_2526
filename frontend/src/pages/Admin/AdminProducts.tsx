@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import AdminVariantModal from './AdminVariantModal';
 import type { VariantRow } from './AdminVariantModal';
-import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
+import { AdminStateBlock } from './AdminStateBlocks';
 import AdminReasonDialog from './AdminReasonDialog';
 import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
@@ -354,9 +354,7 @@ const AdminProducts = () => {
 
       <section className="admin-panels single">
         <div className="admin-panel">
-          {isLoading ? (
-            <AdminTableSkeleton columns={7} rows={6} />
-          ) : filtered.length === 0 ? (
+          {isLoading ? null : filtered.length === 0 ? (
             <AdminStateBlock
               type={search.trim() ? 'search-empty' : 'empty'}
               title={search.trim() ? t.empty.searchTitle : t.empty.defaultTitle}

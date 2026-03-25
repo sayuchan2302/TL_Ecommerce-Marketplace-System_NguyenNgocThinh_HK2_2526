@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, Clock, X, TrendingUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,32 +19,18 @@ interface SearchDropdownProps {
 }
 
 const SearchDropdown = ({ isOpen, onClose, inputValue, onSearch }: SearchDropdownProps) => {
-  const [suggestions, setSuggestions] = useState<Product[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [history, setHistory] = useState<string[]>([]);
+  const [debouncedQuery, setDebouncedQuery] = useState(inputValue);
+  const [, setHistoryVersion] = useState(0);
   const dropRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    setHistory(searchService.getRecentSearches());
-  }, [isOpen]);
 
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
 
-    if (!inputValue.trim() || inputValue.length < 2) {
-      setSuggestions([]);
-      setIsSearching(false);
-      return;
-    }
-
-    setIsSearching(true);
     debounceRef.current = setTimeout(() => {
-      const results = searchService.search(inputValue, 5);
-      setSuggestions(results);
-      setIsSearching(false);
+      setDebouncedQuery(inputValue);
     }, DEBOUNCE_MS);
 
     return () => {
@@ -53,6 +39,15 @@ const SearchDropdown = ({ isOpen, onClose, inputValue, onSearch }: SearchDropdow
       }
     };
   }, [inputValue]);
+
+  const normalizedInput = inputValue.trim();
+  const normalizedDebouncedQuery = debouncedQuery.trim();
+  const isSearching = normalizedInput.length >= 2 && debouncedQuery !== inputValue;
+  const suggestions = useMemo<Product[]>(
+    () => (normalizedDebouncedQuery.length >= 2 ? searchService.search(debouncedQuery, 5) : []),
+    [debouncedQuery, normalizedDebouncedQuery],
+  );
+  const history = searchService.getRecentSearches();
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -68,23 +63,23 @@ const SearchDropdown = ({ isOpen, onClose, inputValue, onSearch }: SearchDropdow
 
   const clearHistory = useCallback(() => {
     searchService.clearHistory();
-    setHistory([]);
+    setHistoryVersion((version) => version + 1);
   }, []);
 
   const removeHistoryItem = useCallback((keyword: string) => {
     searchService.removeFromHistory(keyword);
-    setHistory(searchService.getRecentSearches());
+    setHistoryVersion((version) => version + 1);
   }, []);
 
-  const handleProductClick = useCallback((_productName: string) => {
+  const handleProductClick = useCallback(() => {
     searchService.addToHistory(inputValue);
-    setHistory(searchService.getRecentSearches());
+    setHistoryVersion((version) => version + 1);
     onClose();
   }, [inputValue, onClose]);
 
   const handleSearchClick = useCallback((query: string) => {
     searchService.addToHistory(query);
-    setHistory(searchService.getRecentSearches());
+    setHistoryVersion((version) => version + 1);
     onSearch(query);
     onClose();
   }, [onSearch, onClose]);
@@ -127,7 +122,7 @@ const SearchDropdown = ({ isOpen, onClose, inputValue, onSearch }: SearchDropdow
                           <Link
                             to={`/product/${product.id}`}
                             className="sd-suggestion-item"
-                            onClick={() => handleProductClick(product.name)}
+                            onClick={handleProductClick}
                             role="option"
                           >
                             <img
@@ -244,5 +239,4 @@ const SearchDropdown = ({ isOpen, onClose, inputValue, onSearch }: SearchDropdow
   );
 };
 
-export { searchService };
 export default SearchDropdown;

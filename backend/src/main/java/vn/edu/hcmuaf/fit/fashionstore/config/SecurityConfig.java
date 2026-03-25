@@ -60,6 +60,9 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
                         
+                        // ─── Content pages ────────────────────────────────────────────────
+                        .requestMatchers("/api/admin/content/**").hasRole("SUPER_ADMIN")
+                        
                         // ─── Products: public read, vendor/admin write ─────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
@@ -99,6 +102,10 @@ public class SecurityConfig {
                         
                         // ─── Addresses: authenticated users ────────────────────────────────
                         .requestMatchers("/api/addresses/**").authenticated()
+                        
+                        // ─── Returns ───────────────────────────────────────────────────────
+                        .requestMatchers(HttpMethod.POST, "/api/returns").authenticated()
+                        .requestMatchers("/api/returns/**").hasRole("SUPER_ADMIN")
                         
                         // ─── Coupons: public read, admin write ─────────────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/coupons/**").permitAll()

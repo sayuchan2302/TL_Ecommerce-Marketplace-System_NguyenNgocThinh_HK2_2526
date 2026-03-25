@@ -141,8 +141,8 @@ const VendorRegister = () => {
 
       setCurrentStep('success');
       addToast(dict.wizard.success.pendingTag, 'success');
-    } catch (err: any) {
-      addToast(err?.message || 'Gửi đăng ký thất bại', 'error');
+    } catch (err: unknown) {
+      addToast((err as Error)?.message || 'Gửi đăng ký thất bại', 'error');
     } finally {
       setSubmitting(false);
     }

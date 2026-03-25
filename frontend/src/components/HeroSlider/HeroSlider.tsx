@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './HeroSlider.css';
 
@@ -43,24 +43,51 @@ const HeroSlider = () => {
   const [isTransitioning, setIsTransitioning] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
+  const [trackWidth, setTrackWidth] = useState(0);
   const startXRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
 
   const maxPos = slides.length + 1;
 
-  const restartTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
+  const restartTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
     timerRef.current = setInterval(() => {
       setIsTransitioning(true);
       setPosition((prev) => Math.min(maxPos, prev + 1));
     }, AUTO_DELAY);
-  };
+  }, [maxPos]);
 
   useEffect(() => {
     restartTimer();
-    return () => { timerRef.current && clearInterval(timerRef.current); };
-  }, [position]);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [restartTimer]);
+
+  useEffect(() => {
+    const node = trackRef.current;
+    if (!node) return;
+
+    const updateTrackWidth = () => {
+      setTrackWidth(node.clientWidth);
+    };
+
+    updateTrackWidth();
+
+    const observer = new ResizeObserver(updateTrackWidth);
+    observer.observe(node);
+    window.addEventListener('resize', updateTrackWidth);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', updateTrackWidth);
+    };
+  }, []);
 
   const next = () => {
     setIsTransitioning(true);
@@ -136,12 +163,7 @@ const HeroSlider = () => {
     }
   };
 
-  const dragOffsetPercent = (() => {
-    if (!isDragging || !trackRef.current) return 0;
-    const width = trackRef.current.clientWidth;
-    if (!width) return 0;
-    return (dragOffset / width) * 100;
-  })();
+  const dragOffsetPercent = isDragging && trackWidth ? (dragOffset / trackWidth) * 100 : 0;
 
   return (
     <section className="hero-slider">

@@ -6,11 +6,14 @@
   --co-vendor-primary: #0d9488;
   --co-vendor-primary-hover: #0f766e;
   --co-vendor-accent: #14b8a6;
+
+  /* Layout tokens */
+  --vendor-sidebar-w: 260px;
 }
 
 .vendor-page {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: var(--vendor-sidebar-w) 1fr;
   height: 100vh;
   min-height: 100vh;
   background: var(--co-gray-100);
@@ -28,6 +31,7 @@
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  z-index: 10;
 }
 
 .vendor-logo {
@@ -91,7 +95,7 @@
 .vendor-header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 40;
   display: grid;
   grid-template-columns: 1.2fr 1.7fr auto;
   align-items: center;
@@ -391,6 +395,8 @@
   .vendor-stats.grid-4 { grid-template-columns: repeat(2, 1fr); }
   .vendor-stats.grid-6 { grid-template-columns: repeat(2, 1fr); }
   .vendor-panels { grid-template-columns: 1fr; }
+  /* On mobile the sidebar collapses — overlay should cover full width */
+  .drawer-overlay, .modal-overlay { left: 0; }
 }
 
 @media (max-width: 768px) {

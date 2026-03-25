@@ -69,12 +69,14 @@ public class StoreService {
         return toResponse(saved);
     }
 
+    @Transactional(readOnly = true)
     public StoreResponse getStoreByOwner(UUID userId) {
         Store store = storeRepository.findByOwnerId(userId)
                 .orElseThrow(() -> new RuntimeException("Store not found"));
         return toResponse(store);
     }
 
+    @Transactional(readOnly = true)
     public StoreResponse getStoreById(UUID storeId) {
         Store store = storeRepository.findByIdAndApprovalStatusAndStatus(
                         storeId,
@@ -85,6 +87,7 @@ public class StoreService {
         return toResponse(store);
     }
 
+    @Transactional(readOnly = true)
     public StoreResponse getStoreBySlug(String slug) {
         Store store = storeRepository.findBySlugAndApprovalStatusAndStatus(
                         slug,
@@ -95,6 +98,7 @@ public class StoreService {
         return toResponse(store);
     }
 
+    @Transactional(readOnly = true)
     public List<StoreResponse> getPendingStores() {
         return storeRepository.findByApprovalStatus(Store.ApprovalStatus.PENDING)
                 .stream()
@@ -102,6 +106,7 @@ public class StoreService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<StoreResponse> getAllStoresForAdmin() {
         return storeRepository.findAll()
                 .stream()
@@ -109,6 +114,7 @@ public class StoreService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<StoreResponse> getAllActiveStores() {
         return storeRepository.findByApprovalStatusAndStatus(
                 Store.ApprovalStatus.APPROVED,
@@ -237,11 +243,14 @@ public class StoreService {
     }
 
     private StoreResponse toResponse(Store store) {
+        // Ensure owner is initialized within transactional context
+        User owner = store.getOwner();
+
         return StoreResponse.builder()
                 .id(store.getId())
-                .ownerId(store.getOwner().getId())
-                .ownerName(store.getOwner().getName())
-                .ownerEmail(store.getOwner().getEmail())
+                .ownerId(owner.getId())
+                .ownerName(owner.getName())
+                .ownerEmail(owner.getEmail())
                 .name(store.getName())
                 .slug(store.getSlug())
                 .description(store.getDescription())

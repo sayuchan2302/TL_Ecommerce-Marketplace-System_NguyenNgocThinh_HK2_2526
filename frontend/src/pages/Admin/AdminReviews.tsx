@@ -2,9 +2,9 @@ import './Admin.css';
 import { Star, CheckCircle, EyeOff, Search, Filter, X, Trash2, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AdminLayout from './AdminLayout';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
+import { AdminStateBlock } from './AdminStateBlocks';
 import { useAdminListState } from './useAdminListState';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
@@ -43,17 +43,7 @@ const getInitials = (name: string) => {
 
 const AdminReviews = () => {
   const { toast, pushToast } = useAdminToast();
-  const [allReviews, setAllReviews] = useState<Review[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setAllReviews(adminReviewService.getAll());
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+  const [allReviews, setAllReviews] = useState<Review[]>(() => adminReviewService.getAll());
 
   const view = useAdminViewState({
     storageKey: ADMIN_VIEW_KEYS.reviews,
@@ -94,7 +84,19 @@ const AdminReviews = () => {
   const [drawerReview, setDrawerReview] = useState<Review | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ ids: string[]; names: string[] } | null>(null);
 
-  const stats = useMemo(() => adminReviewService.getStats(), [allReviews]);
+  const stats = useMemo(() => {
+    const total = allReviews.length;
+    const pending = allReviews.filter((review) => review.status === 'pending').length;
+    const approved = allReviews.filter((review) => review.status === 'approved').length;
+    const averageRating = total ? allReviews.reduce((sum, review) => sum + review.rating, 0) / total : 0;
+
+    return {
+      total,
+      pending,
+      approved,
+      averageRating,
+    };
+  }, [allReviews]);
   const tabCounts = useMemo(() => ({
     all: allReviews.length,
     pending: allReviews.filter((r) => r.status === 'pending').length,
@@ -211,9 +213,7 @@ const AdminReviews = () => {
             <Link to="/admin">Marketplace overview</Link>
           </div>
 
-          {isLoading ? (
-            <AdminTableSkeleton columns={7} rows={6} />
-          ) : filteredItems.length === 0 ? (
+          {filteredItems.length === 0 ? (
             <AdminStateBlock
               type={search.trim() ? 'search-empty' : 'empty'}
               title={search.trim() ? 'Không tìm thấy đánh giá phù hợp' : 'Chưa có đánh giá trong hàng đợi duyệt'}

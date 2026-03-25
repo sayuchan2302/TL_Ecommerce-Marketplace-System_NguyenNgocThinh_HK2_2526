@@ -3,7 +3,13 @@ import type { AuthResponse, User } from '../types';
 const AUTH_KEY = 'coolmate_auth_v1';
 const ADMIN_AUTH_KEY = 'coolmate_admin_auth_v1';
 const REGISTERED_ACCOUNTS_KEY = 'coolmate_registered_accounts_v1';
+const SESSION_REASON_KEY = 'coolmate_auth_reason_v1';
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
+if (!API_BASE) {
+  // eslint-disable-next-line no-console
+  console.warn('[auth] VITE_API_URL is empty. Frontend will use mock auth (customer only).');
+}
 
 interface MockAccount {
   email: string;
@@ -125,6 +131,19 @@ const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
 
 const isBackendJwtToken = (token?: string | null) => Boolean(token && token.split('.').length === 3);
 
+const getExpiry = (token?: string | null): number | null => {
+  const claims = token ? decodeJwtPayload(token) : null;
+  const exp = claims?.exp;
+  return typeof exp === 'number' ? exp : null;
+};
+
+const isJwtExpired = (token?: string | null, skewSeconds = 60) => {
+  const exp = getExpiry(token);
+  if (!exp) return false;
+  const nowSeconds = Date.now() / 1000;
+  return exp - skewSeconds <= nowSeconds;
+};
+
 const mapBackendAuthResponse = (payload: BackendAuthResponse): AuthResponse => {
   const claims = decodeJwtPayload(payload.token);
   const role = payload.role === 'VENDOR' || payload.role === 'SUPER_ADMIN' || payload.role === 'CUSTOMER'
@@ -162,13 +181,17 @@ const loginWithBackend = async (email: string, password: string): Promise<AuthRe
     });
 
     if (!response.ok) {
-      return null;
+      const message = await parseBackendError(response);
+      throw new Error(message);
     }
 
     const payload = await parseJsonSafely<BackendAuthResponse>(response);
     return payload?.token ? mapBackendAuthResponse(payload) : null;
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Dang nhap that bai');
   }
 };
 
@@ -223,42 +246,138 @@ const getAllAccounts = (): MockAccount[] => [...MOCK_ACCOUNTS, ...loadRegistered
 const persist = (data: AuthResponse | null) => {
   if (data) {
     localStorage.setItem(AUTH_KEY, JSON.stringify(data));
+    localStorage.removeItem(SESSION_REASON_KEY);
   } else {
     localStorage.removeItem(AUTH_KEY);
+    localStorage.removeItem(SESSION_REASON_KEY);
   }
 };
 
 const persistAdmin = (data: AuthResponse | null) => {
+  // Legacy admin-only storage is kept only for cleanup/migration.
+  // Backend-authenticated sessions now persist through the main auth key.
+  sessionStorage.removeItem(ADMIN_AUTH_KEY);
   if (data) {
-    sessionStorage.setItem(ADMIN_AUTH_KEY, JSON.stringify(data));
-  } else {
-    sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    persist(data);
   }
+};
+
+const readLegacyAdminSession = (): AuthResponse | null => {
+  try {
+    const raw = sessionStorage.getItem(ADMIN_AUTH_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const getPersistedSession = (): AuthResponse | null => {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch {
+    localStorage.removeItem(AUTH_KEY);
+  }
+
+  const legacyAdminSession = readLegacyAdminSession();
+  if (legacyAdminSession) {
+    persist(legacyAdminSession);
+    sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    return legacyAdminSession;
+  }
+
+  return null;
 };
 
 export const authService = {
   isBackendJwtToken,
+  isJwtExpired,
 
   getSession(): AuthResponse | null {
-    try {
-      const raw = localStorage.getItem(AUTH_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
+    return getPersistedSession();
+  },
+
+  getRefreshToken(): string | null {
+    return this.getSession()?.refreshToken || null;
+  },
+
+  clearSession(reason?: string) {
+    if (reason) {
+      localStorage.setItem(SESSION_REASON_KEY, reason);
     }
+    persist(null);
+    persistAdmin(null);
+  },
+
+  consumeClearReason(): string | null {
+    const reason = localStorage.getItem(SESSION_REASON_KEY);
+    if (reason) {
+      localStorage.removeItem(SESSION_REASON_KEY);
+      return reason;
+    }
+    return null;
+  },
+
+  async refresh(): Promise<AuthResponse> {
+    if (!API_BASE) {
+      throw new Error('Cannot refresh without backend API.');
+    }
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      throw new Error('Missing refresh token.');
+    }
+
+    const response = await fetch(buildApiUrl('/api/auth/refresh'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (!response.ok) {
+      const message = await parseBackendError(response);
+      throw new Error(message);
+    }
+
+    const payload = await parseJsonSafely<BackendAuthResponse>(response);
+    if (!payload?.token) {
+      throw new Error('Refresh response missing token.');
+    }
+
+    const session = mapBackendAuthResponse(payload);
+    persist(session);
+    if (session.user.role === 'VENDOR' || session.user.role === 'SUPER_ADMIN') {
+      persistAdmin(session);
+    }
+    return session;
   },
 
   async login(email: string, password: string): Promise<AuthResponse> {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     if (!email || !password) {
       throw new Error('Vui long nhap email va mat khau');
     }
 
-    const backendSession = await loginWithBackend(email, password);
-    if (backendSession) {
-      persist(backendSession);
-      return backendSession;
+    const forceBackend = Boolean(API_BASE);
+    try {
+      const backendSession = await loginWithBackend(email, password);
+      if (backendSession) {
+        persist(backendSession);
+        if (backendSession.user.role === 'VENDOR' || backendSession.user.role === 'SUPER_ADMIN') {
+          persistAdmin(backendSession);
+        }
+        return backendSession;
+      }
+    } catch (error) {
+      if (forceBackend) {
+        throw error instanceof Error ? error : new Error('Dang nhap that bai');
+      }
+    }
+
+    if (forceBackend) {
+      throw new Error('Dang nhap that bai. Vui long kiem tra lai tai khoan/mat khau.');
     }
 
     const account = getAllAccounts().find(
@@ -282,7 +401,7 @@ export const authService = {
   },
 
   async register(name: string, email: string, password: string): Promise<AuthResponse> {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     if (!name || !email || !password) {
       throw new Error('Vui long nhap day du thong tin');
@@ -299,10 +418,20 @@ export const authService = {
       throw new Error('Email da duoc su dung');
     }
 
-    const backendSession = await registerWithBackend(name, email, password);
-    if (backendSession) {
-      persist(backendSession);
-      return backendSession;
+    try {
+      const backendSession = await registerWithBackend(name, email, password);
+      if (backendSession) {
+        persist(backendSession);
+        return backendSession;
+      }
+    } catch (error) {
+      if (API_BASE) {
+        throw error instanceof Error ? error : new Error('Dang ky that bai. Vui long thu lai.');
+      }
+    }
+
+    if (API_BASE) {
+      throw new Error('Dang ky that bai. Vui long thu lai.');
     }
 
     const newUser: User = {
@@ -330,17 +459,17 @@ export const authService = {
   },
 
   async forgot(email: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 300));
     if (!email) throw new Error('Vui long nhap email');
   },
 
   async reset(newPassword: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 300));
     if (!newPassword) throw new Error('Vui long nhap mat khau moi');
   },
 
-  logout() {
-    persist(null);
+  logout(reason?: string) {
+    this.clearSession(reason);
   },
 
   updateSession(user: User) {
@@ -348,6 +477,9 @@ export const authService = {
     if (!session) return null;
     const next = { ...session, user } as AuthResponse;
     persist(next);
+    if (user.role === 'VENDOR' || user.role === 'SUPER_ADMIN') {
+      persistAdmin(next);
+    }
 
     const registeredAccounts = loadRegisteredAccounts();
     const accountIndex = registeredAccounts.findIndex(
@@ -366,19 +498,18 @@ export const authService = {
   },
 
   getAdminSession(): AuthResponse | null {
-    try {
-      const raw = sessionStorage.getItem(ADMIN_AUTH_KEY);
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+    return getPersistedSession();
   },
 
   async adminLogin(email: string, password: string): Promise<AuthResponse> {
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     if (!email || !password) {
       throw new Error('Vui long nhap email va mat khau');
+    }
+
+    if (!API_BASE) {
+      throw new Error('Admin/seller panel yeu cau backend JWT. Vui long cau hinh VITE_API_URL.');
     }
 
     const backendSession = await loginWithBackend(email, password);
@@ -390,12 +521,17 @@ export const authService = {
       throw new Error('This account cannot access the admin/seller panel.');
     }
 
-    persistAdmin(backendSession);
+    persist(backendSession);
+    sessionStorage.removeItem(ADMIN_AUTH_KEY);
     return backendSession;
   },
 
-  adminLogout() {
+  adminLogout(reason?: string) {
     sessionStorage.removeItem(ADMIN_AUTH_KEY);
+    const session = this.getSession();
+    if (session?.user.role === 'SUPER_ADMIN' || session?.user.role === 'VENDOR') {
+      this.clearSession(reason);
+    }
   },
 
   isAdminAuthenticated(): boolean {

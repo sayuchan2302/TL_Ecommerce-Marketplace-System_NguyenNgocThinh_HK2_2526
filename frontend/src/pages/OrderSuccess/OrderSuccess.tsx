@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle, Package, ArrowRight, Home, Truck, Gift } from 'lucide-react';
 import ProductSection from '../../components/ProductSection/ProductSection';
@@ -7,7 +7,8 @@ import './OrderSuccess.css';
 
 const OrderSuccess = () => {
   const [searchParams] = useSearchParams();
-  const orderId = searchParams.get('id') || Math.floor(Math.random() * 1000000).toString();
+  const [fallbackOrderId] = useState(() => Math.floor(Math.random() * 1000000).toString());
+  const orderId = searchParams.get('id') || fallbackOrderId;
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Confetti animation

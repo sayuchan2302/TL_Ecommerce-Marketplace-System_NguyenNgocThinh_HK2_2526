@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   User,
@@ -40,13 +40,13 @@ import { calculateTier, TIER_CONFIG, getProgressToNextTier, getSpendRequiredForN
 import { formatPrice } from '../../utils/formatters';
 import type { Address } from '../../types';
 import type { Order } from '../../types';
-import type { Coupon } from '../../services/couponService';
 import './Profile.css';
 
 const t = CLIENT_TEXT.profile;
 const tCommon = CLIENT_TEXT.common;
 
 type TabId = 'account' | 'orders' | 'vouchers' | 'addresses' | 'reviews' | 'notifications';
+const VALID_PROFILE_TABS: TabId[] = ['account', 'orders', 'vouchers', 'addresses', 'reviews', 'notifications'];
 
 interface PendingProduct {
   productId: string;
@@ -80,39 +80,24 @@ const Profile = () => {
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
   const [isLoading, setIsLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
-
-  const [activeTab, setActiveTab] = useState<TabId>('account');
+  const [, setAddressVersion] = useState(0);
+  const [, setOrdersVersion] = useState(0);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const activeTab = useMemo(() => {
+    const tabParam = searchParams.get('tab');
+    return VALID_PROFILE_TABS.includes(tabParam as TabId) ? (tabParam as TabId) : 'account';
+  }, [searchParams]);
 
   const handleTabChange = (tab: TabId) => {
-    setActiveTab(tab);
-    // Update URL query param
+    const nextParams = new URLSearchParams(searchParams);
     if (tab === 'account') {
-      searchParams.delete('tab');
+      nextParams.delete('tab');
     } else {
-      searchParams.set('tab', tab);
+      nextParams.set('tab', tab);
     }
-    setSearchParams(searchParams);
+    nextParams.delete('orderId');
+    setSearchParams(nextParams);
   };
-
-  // Sync activeTab with URL query param
-  useEffect(() => {
-    const tabParam = searchParams.get('tab') as TabId | null;
-    if (tabParam && ['account', 'orders', 'vouchers', 'addresses', 'reviews', 'notifications'].includes(tabParam)) {
-      if (tabParam !== activeTab) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setActiveTab(tabParam);
-      }
-    }
-    
-    // Handle orderId from URL - open order detail drawer
-    const orderIdParam = searchParams.get('orderId');
-    if (orderIdParam && activeTab === 'orders') {
-      const foundOrder = orders.find(o => o.id === orderIdParam);
-      if (foundOrder) {
-        setSelectedOrder(foundOrder);
-      }
-    }
-  }, [searchParams, activeTab]);
 
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
@@ -125,16 +110,10 @@ const Profile = () => {
 
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
   const [editingAddress, setEditingAddress] = useState<Address | null>(null);
-  const [savedAddresses, setSavedAddresses] = useState<Address[]>([]);
-
-  useEffect(() => {
-    if (activeTab === 'addresses') {
-      setSavedAddresses(addressService.getAll());
-    }
-  }, [activeTab]);
+  const savedAddresses = activeTab === 'addresses' ? addressService.getAll() : [];
 
   const refreshAddresses = () => {
-    setSavedAddresses(addressService.getAll());
+    setAddressVersion((prev) => prev + 1);
   };
 
   const handleEditAddress = (address: Address) => {
@@ -152,39 +131,14 @@ const Profile = () => {
     setEditingAddress(null);
   };
 
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [vouchers, setVouchers] = useState<Coupon[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const allOrders = orderService.list();
+  const orders = activeTab === 'orders' ? allOrders : [];
+  const vouchers = activeTab === 'vouchers' ? couponService.getAvailableCoupons() : [];
+  const selectedOrder = (() => {
+    const orderId = searchParams.get('orderId') || selectedOrderId;
+    return orderId ? allOrders.find((order) => order.id === orderId) || null : null;
+  })();
   const [orderFilter, setOrderFilter] = useState('Tất cả');
-
-  useEffect(() => {
-    if (activeTab === 'orders') {
-      setOrders(orderService.list());
-    }
-    if (activeTab === 'vouchers') {
-      setVouchers(couponService.getAvailableCoupons());
-    }
-  }, [activeTab]);
-
-  // Sync activeTab with URL query param
-  useEffect(() => {
-    const tabParam = searchParams.get('tab') as TabId | null;
-    if (tabParam && ['account', 'orders', 'vouchers', 'addresses', 'reviews', 'notifications'].includes(tabParam)) {
-      if (tabParam !== activeTab) {
-        setActiveTab(tabParam);
-      }
-    }
-    
-    // Handle orderId from URL - open order detail drawer
-    const orderIdParam = searchParams.get('orderId');
-    if (orderIdParam) {
-      const allOrders = orderService.list();
-      const foundOrder = allOrders.find(o => o.id === orderIdParam);
-      if (foundOrder) {
-        setSelectedOrder(foundOrder);
-      }
-    }
-  }, [searchParams, activeTab]);
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewProduct, setReviewProduct] = useState<PendingProduct | null>(null);
@@ -198,6 +152,17 @@ const Profile = () => {
   const handleCloseReviewModal = () => {
     setIsReviewModalOpen(false);
     setReviewProduct(null);
+  };
+
+  const openOrderDetail = (order: Order) => {
+    setSelectedOrderId(order.id);
+  };
+
+  const closeOrderDetail = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('orderId');
+    setSearchParams(nextParams, { replace: true });
+    setSelectedOrderId(null);
   };
 
   // Placeholder user data
@@ -368,7 +333,7 @@ const Profile = () => {
                       <div className="order-card-meta">
                         <button 
                           className="order-id-link"
-                          onClick={() => setSelectedOrder(order)}
+                          onClick={() => openOrderDetail(order)}
                         >
                           Mã đơn: #{order.id}
                         </button>
@@ -409,7 +374,7 @@ const Profile = () => {
                             onClick={() => {
                               if (confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
                                 orderService.cancel(order.id, 'Khách hàng hủy đơn');
-                                setOrders(orderService.list());
+                                setOrdersVersion((prev) => prev + 1);
                                 addToast('Đã hủy đơn hàng thành công', 'success');
                               }
                             }}
@@ -419,7 +384,7 @@ const Profile = () => {
                         )}
                         <button 
                           className="order-action-btn order-btn-outline"
-                          onClick={() => setSelectedOrder(order)}
+                          onClick={() => openOrderDetail(order)}
                         >
                           Xem chi tiết
                         </button>
@@ -1007,14 +972,14 @@ const Profile = () => {
 
       {/* Order Detail Drawer */}
       {selectedOrder && (
-        <div className="profile-modal-overlay" onClick={() => setSelectedOrder(null)}>
+        <div className="profile-modal-overlay" onClick={closeOrderDetail}>
           <div className="profile-modal order-drawer" onClick={(e) => e.stopPropagation()}>
             <div className="profile-modal-header">
               <div>
                 <p className="profile-modal-eyebrow">Chi tiết đơn hàng</p>
                 <h2>#{selectedOrder.id}</h2>
               </div>
-              <button className="profile-modal-close" onClick={() => setSelectedOrder(null)} aria-label="Đóng">
+              <button className="profile-modal-close" onClick={closeOrderDetail} aria-label="Đóng">
                 <X size={18} />
               </button>
             </div>
@@ -1128,8 +1093,8 @@ const Profile = () => {
                   onClick={() => {
                     if (confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
                       orderService.cancel(selectedOrder.id, 'Khách hàng hủy đơn');
-                      setOrders(orderService.list());
-                      setSelectedOrder(null);
+                      setOrdersVersion((prev) => prev + 1);
+                      closeOrderDetail();
                       addToast('Đã hủy đơn hàng thành công', 'success');
                     }
                   }}
@@ -1139,7 +1104,7 @@ const Profile = () => {
               )}
               <button 
                 className="order-action-btn order-btn-outline"
-                onClick={() => setSelectedOrder(null)}
+                onClick={closeOrderDetail}
               >
                 Đóng
               </button>

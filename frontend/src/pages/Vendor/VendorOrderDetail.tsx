@@ -3,34 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, Copy, CreditCard, FileText, Link2, MapPin, Package, Printer, Truck, User } from 'lucide-react';
 import { startTransition, useEffect, useState } from 'react';
 import VendorLayout from './VendorLayout';
+import { formatVendorOrderDate, getVendorOrderStatusLabel } from './vendorOrderPresentation';
 import { formatCurrency } from '../../services/commissionService';
 import { vendorPortalService, type VendorOrderDetailData } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
-
-const getStatusLabel = (status: string) => {
-  const statusMap: Record<string, string> = {
-    pending: 'Chờ tiếp nhận',
-    confirmed: 'Đã xác nhận',
-    processing: 'Đang đóng gói',
-    shipping: 'Đang giao',
-    delivered: 'Đã giao',
-    completed: 'Hoàn tất',
-    cancelled: 'Đã hủy',
-  };
-  return statusMap[status] || status;
-};
-
-const formatDate = (dateStr: string) => {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
 
 const emptyOrder: VendorOrderDetailData = {
   id: '',
@@ -68,9 +45,9 @@ const VendorOrderDetail = () => {
         const next = await vendorPortalService.getOrderDetail(id);
         if (!active) return;
         startTransition(() => setOrder(next));
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!active) return;
-        addToast(err?.message || 'Không tải được chi tiết đơn hàng con', 'error');
+        addToast((err as Error)?.message || 'Không tải được chi tiết đơn hàng con', 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -82,14 +59,14 @@ const VendorOrderDetail = () => {
     };
   }, [addToast, id]);
 
-  const updateStatus = async (status: 'CONFIRMED' | 'SHIPPED', nextUiStatus: 'confirmed' | 'shipping', message: string) => {
+  const updateStatus = async (status: 'CONFIRMED' | 'SHIPPED', nextUiStatus: 'packing' | 'shipping', message: string) => {
     setIsProcessing(true);
     try {
       await vendorPortalService.updateOrderStatus(id, status);
       setOrder((current) => ({ ...current, status: nextUiStatus }));
       addToast(message, 'success');
-    } catch (err: any) {
-      addToast(err?.message || 'Không thể cập nhật trạng thái đơn hàng con', 'error');
+    } catch (err: unknown) {
+      addToast((err as Error)?.message || 'Không thể cập nhật trạng thái đơn hàng con', 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -124,12 +101,12 @@ const VendorOrderDetail = () => {
             In phiếu giao
           </button>
           {order.status === 'pending' && (
-            <button className="admin-primary-btn vendor-admin-primary" onClick={() => void updateStatus('CONFIRMED', 'confirmed', 'Đã xác nhận đơn hàng con của shop')} disabled={isProcessing}>
+            <button className="admin-primary-btn vendor-admin-primary" onClick={() => void updateStatus('CONFIRMED', 'packing', 'Đã xác nhận đơn hàng con của shop')} disabled={isProcessing}>
               <Check size={16} />
               {isProcessing ? 'Đang xử lý...' : 'Xác nhận đơn'}
             </button>
           )}
-          {order.status === 'confirmed' && (
+          {order.status === 'packing' && (
             <button className="admin-primary-btn vendor-admin-primary" onClick={() => void updateStatus('SHIPPED', 'shipping', 'Đơn hàng đã bàn giao cho đơn vị vận chuyển')} disabled={isProcessing}>
               <Truck size={16} />
               {isProcessing ? 'Đang xử lý...' : 'Bàn giao vận chuyển'}
@@ -150,11 +127,11 @@ const VendorOrderDetail = () => {
             <div className="admin-stat-card">
               <div className="admin-stat-label">Mã đơn hàng con</div>
               <div className="admin-stat-value vendor-stat-inline">{order.id} <button className="admin-icon-btn subtle" onClick={() => void handleCopyOrderId()}><Copy size={14} /></button></div>
-              <div className="admin-stat-sub">{formatDate(order.createdAt)}</div>
+              <div className="admin-stat-sub">{formatVendorOrderDate(order.createdAt, true)}</div>
             </div>
             <div className="admin-stat-card info">
               <div className="admin-stat-label">Trạng thái</div>
-              <div className="admin-stat-value">{getStatusLabel(order.status)}</div>
+              <div className="admin-stat-value">{getVendorOrderStatusLabel(order.status)}</div>
               <div className="admin-stat-sub">Chỉ phản ánh phần vận hành của shop</div>
             </div>
             <div className="admin-stat-card warning">

@@ -1,58 +1,94 @@
-import { useState } from 'react';
-import { Check, FileImage, RefreshCw, Upload } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Check, RefreshCw } from 'lucide-react';
 import './Returns.css';
 import { useToast } from '../../contexts/ToastContext';
-import { returnItems } from '../../mocks/products';
 import { CLIENT_TEXT } from '../../utils/texts';
-import { adminReturnService, type ReturnReason, type ReturnResolution } from '../Admin/adminReturnService';
+import { apiRequest } from '../../services/apiClient';
+import { returnService, type ReturnResolution, type ReturnReason } from '../../services/returnService';
 
 const t = CLIENT_TEXT.returns;
 
-type ReturnItem = {
+interface BackendOrderItem {
   id: string;
-  name: string;
-  variant: string;
-  price: number;
-  image: string;
-  selected: boolean;
-};
+  productName?: string;
+  variantName?: string;
+  productImage?: string;
+  quantity?: number;
+}
+
+interface BackendOrder {
+  id: string;
+  items?: BackendOrderItem[];
+}
+
+type SelectableItem = BackendOrderItem & { selected: boolean };
 
 const Returns = () => {
   const { addToast } = useToast();
-  const [items, setItems] = useState<ReturnItem[]>(returnItems);
-  const [reason, setReason] = useState<ReturnReason>('size');
-  const [resolution, setResolution] = useState<ReturnResolution>('exchange');
+  const [orders, setOrders] = useState<BackendOrder[]>([]);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>('');
+  const [items, setItems] = useState<SelectableItem[]>([]);
+  const [reason, setReason] = useState<ReturnReason>('SIZE');
+  const [resolution, setResolution] = useState<ReturnResolution>('EXCHANGE');
   const [note, setNote] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submittedId, setSubmittedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        const data = await apiRequest<BackendOrder[]>('/api/orders', {}, { auth: true });
+        setOrders(data);
+        if (data.length > 0) {
+          setSelectedOrderId(data[0].id);
+          setItems((data[0].items || []).map(i => ({ ...i, selected: false })));
+        }
+      } catch (error) {
+        addToast('Khong tai duoc don hang de tao yeu cau doi tra', 'error');
+      }
+    };
+    void loadOrders();
+  }, [addToast]);
+
+  useEffect(() => {
+    const order = orders.find(o => o.id === selectedOrderId);
+    setItems((order?.items || []).map(i => ({ ...i, selected: false })));
+  }, [selectedOrderId, orders]);
 
   const toggleItem = (id: string) => {
     setItems(prev => prev.map(i => i.id === id ? { ...i, selected: !i.selected } : i));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const selectedItems = useMemo(() => items.filter(i => i.selected), [items]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const selectedItems = items.filter(i => i.selected);
+    if (!selectedOrderId) {
+      addToast('Vui long chon don hang', 'error');
+      return;
+    }
     if (selectedItems.length === 0) {
       addToast(t.validation.selectOne, 'error');
       return;
     }
-    setUploading(true);
-    setTimeout(() => {
-      adminReturnService.submit({
-        orderId: 'guest',
-        customerName: 'Khách hàng',
-        customerEmail: '',
-        customerPhone: '',
-        items: selectedItems.map(({ id, name, variant, price, image }) => ({ id, name, variant, price, image })),
+    setSubmitting(true);
+    try {
+      const res = await returnService.submit({
+        orderId: selectedOrderId,
         reason,
         note: note.trim(),
         resolution,
+        items: selectedItems.map(i => ({ orderItemId: i.id, quantity: i.quantity || 1 })),
       });
-      setUploading(false);
-      setSubmitted(true);
+      setSubmittedId(res.id);
       addToast(t.submitted, 'success');
-    }, 600);
+      setNote('');
+      setItems(items.map(i => ({ ...i, selected: false })));
+    } catch (error) {
+      addToast('Tao yeu cau doi tra that bai', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -70,6 +106,20 @@ const Returns = () => {
         <form className="returns-grid" onSubmit={handleSubmit}>
           <div className="returns-card">
             <h3>{t.product.title}</h3>
+
+            <label className="returns-field">
+              <span>Chon don hang</span>
+              <select
+                value={selectedOrderId}
+                onChange={(e) => setSelectedOrderId(e.target.value)}
+                className="returns-select"
+              >
+                {orders.map(order => (
+                  <option key={order.id} value={order.id}>{order.id}</option>
+                ))}
+              </select>
+            </label>
+
             <div className="returns-items">
               {items.map(item => (
                 <label key={item.id} className={`returns-item ${item.selected ? 'selected' : ''}`}>
@@ -78,14 +128,15 @@ const Returns = () => {
                     checked={item.selected}
                     onChange={() => toggleItem(item.id)}
                   />
-                  <img src={item.image} alt={item.name} />
+                  {item.productImage && <img src={item.productImage} alt={item.productName} />}
                   <div className="item-info">
-                    <p className="item-name">{item.name}</p>
-                    <p className="item-variant">{item.variant}</p>
-                    <p className="item-price">{item.price.toLocaleString('vi-VN')}đ</p>
+                    <p className="item-name">{item.productName}</p>
+                    <p className="item-variant">{item.variantName}</p>
+                    <p className="item-price">{(item.quantity || 0)} x {(item.quantity || 1)}</p>
                   </div>
                 </label>
               ))}
+              {items.length === 0 && <p className="returns-empty">Khong tim thay san pham trong don hang.</p>}
             </div>
           </div>
 
@@ -96,10 +147,10 @@ const Returns = () => {
                 <label>{t.info.reason}</label>
                 <div className="reason-grid">
                   {[
-                    { id: 'size' as ReturnReason, label: t.info.reasons.size },
-                    { id: 'defect' as ReturnReason, label: t.info.reasons.defect },
-                    { id: 'change' as ReturnReason, label: t.info.reasons.change },
-                    { id: 'other' as ReturnReason, label: t.info.reasons.other },
+                    { id: 'SIZE' as ReturnReason, label: t.info.reasons.size },
+                    { id: 'DEFECT' as ReturnReason, label: t.info.reasons.defect },
+                    { id: 'CHANGE' as ReturnReason, label: t.info.reasons.change },
+                    { id: 'OTHER' as ReturnReason, label: t.info.reasons.other },
                   ].map(opt => (
                     <button
                       type="button"
@@ -123,70 +174,31 @@ const Returns = () => {
               </div>
 
               <div>
-                <label>{t.info.image}</label>
-                <div className="upload-box">
-                  <div className="upload-left">
-                    <FileImage size={18} />
-                    <div>
-                      <p className="upload-title">{t.info.upload.title}</p>
-                      <p className="upload-hint">{t.info.upload.hint}</p>
-                    </div>
-                  </div>
-                  <button type="button" className="btn-upload">
-                    <Upload size={16} /> {t.info.upload.button}
-                  </button>
+                <label>{t.info.resolution}</label>
+                <div className="reason-grid">
+                  {[
+                    { id: 'EXCHANGE' as ReturnResolution, label: t.info.resolutionOptions.exchange },
+                    { id: 'REFUND' as ReturnResolution, label: t.info.resolutionOptions.refund },
+                  ].map(opt => (
+                    <button
+                      type="button"
+                      key={opt.id}
+                      className={`reason-chip ${resolution === opt.id ? 'active' : ''}`}
+                      onClick={() => setResolution(opt.id)}
+                    >
+                      {resolution === opt.id && <Check size={14} />} {opt.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="returns-card">
-            <h3>{t.resolution.title}</h3>
-            <div className="resolution-list">
-              <label className="resolution-item">
-                <input
-                  type="radio"
-                  name="resolution"
-                  checked={resolution === 'exchange'}
-                  onChange={() => setResolution('exchange')}
-                />
-                <div>
-                  <p className="resolution-title">{t.resolution.changeSize}</p>
-                  <p className="resolution-desc">{t.resolution.changeSizeDesc}</p>
-                </div>
-              </label>
-              <label className="resolution-item">
-                <input
-                  type="radio"
-                  name="resolution"
-                  checked={resolution === 'refund'}
-                  onChange={() => setResolution('refund')}
-                />
-                <div>
-                  <p className="resolution-title">{t.resolution.refund}</p>
-                  <p className="resolution-desc">{t.resolution.refundDesc}</p>
-                </div>
-              </label>
+            <div className="returns-actions">
+              <button type="submit" className="returns-submit" disabled={submitting}>
+                {submitting ? t.submitting : t.submit}
+              </button>
+              {submittedId && <p className="returns-success">Da gui yeu cau #{submittedId}</p>}
             </div>
-          </div>
-
-          <div className="returns-card summary">
-            <div className="summary-row">
-              <span>{t.summary.selectedItems}</span>
-              <strong>{t.product.title}: {items.filter(i => i.selected).length}</strong>
-            </div>
-            <div className="summary-row">
-              <span>{t.summary.reason}</span>
-              <strong>{t.info.reasons[reason as keyof typeof t.info.reasons]}</strong>
-            </div>
-            <button type="submit" className="btn-submit" disabled={uploading}>
-              {uploading ? t.summary.submitting : t.summary.submit}
-            </button>
-            {submitted && (
-              <div className="submitted-note">
-                <Check size={16} /> {t.summary.submitted}
-              </div>
-            )}
           </div>
         </form>
       </div>

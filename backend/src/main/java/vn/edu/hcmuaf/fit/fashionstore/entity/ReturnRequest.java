@@ -10,6 +10,7 @@ import lombok.experimental.SuperBuilder;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -44,12 +45,14 @@ public class ReturnRequest extends BaseEntity {
     private ReturnStatus status = ReturnStatus.PENDING;
 
     @ElementCollection
-    @CollectionTable(name = "return_item_images", joinColumns = @JoinColumn(name = "return_request_id"))
-    @Column(name = "image_url")
-    private List<String> images = new ArrayList<>();
+    @CollectionTable(name = "return_items", joinColumns = @JoinColumn(name = "return_request_id"))
+    private List<ReturnItemSnapshot> items = new ArrayList<>();
 
     @Column(name = "admin_note", columnDefinition = "TEXT")
     private String adminNote;
+
+    @Column(name = "updated_by")
+    private String updatedBy;
 
     public enum ReturnReason {
         SIZE, DEFECT, CHANGE, OTHER
@@ -61,5 +64,30 @@ public class ReturnRequest extends BaseEntity {
 
     public enum ReturnStatus {
         PENDING, APPROVED, REJECTED, COMPLETED
+    }
+
+    @Embeddable
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ReturnItemSnapshot {
+        @Column(name = "order_item_id")
+        private UUID orderItemId;
+
+        @Column(name = "product_name")
+        private String productName;
+
+        @Column(name = "variant_name")
+        private String variantName;
+
+        @Column(name = "image_url")
+        private String imageUrl;
+
+        @Column(name = "quantity")
+        private Integer quantity;
+
+        @Column(name = "unit_price")
+        private Double unitPrice;
     }
 }

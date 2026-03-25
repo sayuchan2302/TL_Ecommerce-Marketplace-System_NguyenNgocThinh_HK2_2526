@@ -2,14 +2,7 @@ import { apiRequest } from './apiClient';
 import { calculateCommission } from './commissionService';
 import { storeService } from './storeService';
 
-type VendorStatus =
-  | 'pending'
-  | 'confirmed'
-  | 'processing'
-  | 'shipping'
-  | 'delivered'
-  | 'completed'
-  | 'cancelled';
+import type { FulfillmentStatus } from '../pages/Admin/orderWorkflow';
 
 interface BackendPage<T> {
   content?: T[];
@@ -100,7 +93,7 @@ export interface VendorOrderSummary {
   customer: string;
   email: string;
   total: number;
-  status: VendorStatus;
+  status: FulfillmentStatus;
   date: string;
   items: number;
   commissionFee: number;
@@ -110,7 +103,7 @@ export interface VendorOrderSummary {
 
 export interface VendorOrderDetailData {
   id: string;
-  status: VendorStatus;
+  status: FulfillmentStatus;
   createdAt: string;
   updatedAt?: string;
   customer: {
@@ -233,18 +226,17 @@ const MOCK_DAILY_DATA = [
   { date: '24/05', revenue: 3250000, orders: 8 },
 ];
 
-const mapBackendStatus = (status?: string): VendorStatus => {
+const mapBackendStatus = (status?: string): FulfillmentStatus => {
   switch ((status || '').toUpperCase()) {
     case 'CONFIRMED':
-      return 'confirmed';
     case 'PROCESSING':
-      return 'processing';
+      return 'packing';
     case 'SHIPPED':
       return 'shipping';
     case 'DELIVERED':
-      return 'completed';
+      return 'done';
     case 'CANCELLED':
-      return 'cancelled';
+      return 'canceled';
     default:
       return 'pending';
   }
@@ -341,7 +333,7 @@ const getRecentOrdersFallback = (): VendorOrderSummary[] => [
     customer: 'Tran Thu B',
     email: 'tranthub@email.com',
     total: 780000,
-    status: 'processing',
+    status: 'packing',
     date: '2024-05-20T09:15:00Z',
     items: 1,
     commissionFee: 39000,

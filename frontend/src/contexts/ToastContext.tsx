@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,6 +22,10 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
   const addToast = useCallback((message: string, type: ToastType = 'success') => {
     const id = uuidv4();
     setToasts((prev) => [...prev, { id, message, type }]);
@@ -29,11 +34,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     setTimeout(() => {
       removeToast(id);
     }, 3000);
-  }, []);
-
-  const removeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
+  }, [removeToast]);
 
   return (
     <ToastContext.Provider value={{ addToast, removeToast }}>

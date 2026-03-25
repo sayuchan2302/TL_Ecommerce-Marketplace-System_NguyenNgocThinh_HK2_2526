@@ -1,9 +1,22 @@
 import './Vendor.css';
 import { startTransition, useEffect, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Filter, Link2, Search, ShieldCheck, Truck } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Filter, Link2, ShieldCheck, Truck } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
+import {
+  PanelFloatingBar,
+  PanelSearchField,
+  PanelStatsGrid,
+  PanelTableFooter,
+  PanelTabs,
+  PanelViewSummary,
+} from '../../components/Panel/PanelPrimitives';
+import {
+  formatVendorOrderDate,
+  getVendorOrderStatusLabel,
+  getVendorOrderStatusTone,
+} from './vendorOrderPresentation';
 import { formatCurrency } from '../../services/commissionService';
 import { vendorPortalService, type VendorOrderSummary } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
@@ -28,37 +41,6 @@ type PendingAction = {
   selectedItems: string[];
 };
 
-const getStatusLabel = (status: string) => {
-  const statusMap: Record<string, string> = {
-    pending: 'Chờ xác nhận',
-    confirmed: 'Đã xác nhận',
-    processing: 'Đang xử lý',
-    shipping: 'Đang giao',
-    delivered: 'Đã giao',
-    completed: 'Hoàn thành',
-    cancelled: 'Đã hủy',
-  };
-  return statusMap[status] || status;
-};
-
-const getStatusTone = (status: string) => {
-  const toneMap: Record<string, string> = {
-    pending: 'pending',
-    confirmed: 'teal',
-    processing: 'teal',
-    shipping: 'teal',
-    delivered: 'success',
-    completed: 'success',
-    cancelled: 'error',
-  };
-  return toneMap[status] || 'neutral';
-};
-
-const formatDate = (dateStr: string) => {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-};
-
 const VendorOrders = () => {
   const { addToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -80,9 +62,9 @@ const VendorOrders = () => {
         const next = await vendorPortalService.getOrders();
         if (!active) return;
         startTransition(() => setOrders(next));
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!active) return;
-        addToast(err?.message || 'Không tải được danh sách đơn hàng con', 'error');
+        addToast((err as Error)?.message || 'Không tải được danh sách đơn hàng con', 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -99,9 +81,9 @@ const VendorOrders = () => {
 
     if (activeTab !== 'all') {
       if (activeTab === 'processing') {
-        next = next.filter((order) => order.status === 'confirmed' || order.status === 'processing');
+        next = next.filter((order) => order.status === 'packing');
       } else if (activeTab === 'completed') {
-        next = next.filter((order) => order.status === 'completed' || order.status === 'delivered');
+        next = next.filter((order) => order.status === 'done');
       } else {
         next = next.filter((order) => order.status === activeTab);
       }
@@ -122,10 +104,10 @@ const VendorOrders = () => {
   const tabCounts = useMemo(() => ({
     all: orders.length,
     pending: orders.filter((order) => order.status === 'pending').length,
-    processing: orders.filter((order) => order.status === 'confirmed' || order.status === 'processing').length,
+    processing: orders.filter((order) => order.status === 'packing').length,
     shipping: orders.filter((order) => order.status === 'shipping').length,
-    completed: orders.filter((order) => order.status === 'completed' || order.status === 'delivered').length,
-    cancelled: orders.filter((order) => order.status === 'cancelled').length,
+    completed: orders.filter((order) => order.status === 'done').length,
+    cancelled: orders.filter((order) => order.status === 'canceled').length,
   }), [orders]);
 
   const totalPages = Math.max(Math.ceil(filteredOrders.length / perPage), 1);
@@ -199,7 +181,7 @@ const VendorOrders = () => {
     setOrders((current) =>
       current.map((order) => {
         if (order.id !== orderId) return order;
-        if (status === 'CONFIRMED') return { ...order, status: 'confirmed' };
+        if (status === 'CONFIRMED') return { ...order, status: 'packing' };
         return { ...order, status: 'shipping' };
       }),
     );
@@ -215,8 +197,8 @@ const VendorOrders = () => {
       await Promise.all(ids.map((id) => performStatusUpdate(id, pendingAction.nextStatus)));
       setSelected(new Set());
       addToast('Đã cập nhật trạng thái đơn hàng con', 'success');
-    } catch (err: any) {
-      addToast(err?.message || 'Không thể cập nhật trạng thái đơn hàng con', 'error');
+    } catch (err: unknown) {
+      addToast((err as Error)?.message || 'Không thể cập nhật trạng thái đơn hàng con', 'error');
     } finally {
       setUpdatingId(null);
       setPendingAction(null);
@@ -224,7 +206,54 @@ const VendorOrders = () => {
   };
 
   const actionablePendingIds = Array.from(selected).filter((id) => orders.find((order) => order.id === id)?.status === 'pending');
-  const actionableConfirmedIds = Array.from(selected).filter((id) => orders.find((order) => order.id === id)?.status === 'confirmed');
+  const actionablePackingIds = Array.from(selected).filter((id) => orders.find((order) => order.id === id)?.status === 'packing');
+
+  const statItems = [
+    {
+      key: 'all',
+      label: 'Tổng đơn hàng con',
+      value: tabCounts.all,
+      sub: 'Toàn bộ fulfillment của shop',
+      onClick: () => handleTabChange('all'),
+    },
+    {
+      key: 'pending',
+      label: 'Chờ xác nhận',
+      value: tabCounts.pending,
+      sub: 'Cần shop kiểm tra ngay',
+      tone: 'warning',
+      onClick: () => handleTabChange('pending'),
+    },
+    {
+      key: 'shipping',
+      label: 'Đang giao',
+      value: tabCounts.shipping,
+      sub: 'Đang bàn giao cho đối tác vận chuyển',
+      tone: 'info',
+      onClick: () => handleTabChange('shipping'),
+    },
+    {
+      key: 'completed',
+      label: 'Hoàn thành',
+      value: tabCounts.completed,
+      sub: 'Đơn đã kết toán cho shop',
+      tone: 'success',
+      onClick: () => handleTabChange('completed'),
+    },
+  ] as const;
+
+  const tabItems = TABS.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    count: tabCounts[tab.key],
+  }));
+
+  const summaryChips = [
+    ...(activeTab !== 'all'
+      ? [{ key: 'status', label: `Trạng thái: ${TABS.find((tab) => tab.key === activeTab)?.label || 'Tất cả'}` }]
+      : []),
+    ...(searchQuery.trim() ? [{ key: 'query', label: `Từ khóa: ${searchQuery.trim()}` }] : []),
+  ];
 
   return (
     <VendorLayout
@@ -232,17 +261,14 @@ const VendorOrders = () => {
       breadcrumbs={[{ label: 'Đơn hàng shop' }, { label: 'Xử lý đơn hàng con' }]}
       actions={(
         <>
-          <div className="admin-search">
-            <Search size={16} />
-            <input
-              placeholder="Tìm theo mã đơn, tên khách hoặc email"
-              value={searchQuery}
-              onChange={(event) => {
-                setSearchQuery(event.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
+          <PanelSearchField
+            placeholder="Tìm theo mã đơn, tên khách hoặc email"
+            value={searchQuery}
+            onChange={(value) => {
+              setSearchQuery(value);
+              setPage(1);
+            }}
+          />
           <button className="admin-ghost-btn" onClick={() => void shareCurrentView()}>
             <Link2 size={16} />
             Chia sẻ bộ lọc
@@ -254,49 +280,11 @@ const VendorOrders = () => {
         </>
       )}
     >
-      <div className="admin-stats grid-4">
-        <button type="button" className="admin-stat-card vendor-stat-button" onClick={() => handleTabChange('all')}>
-          <div className="admin-stat-label">Tổng đơn hàng con</div>
-          <div className="admin-stat-value">{tabCounts.all}</div>
-          <div className="admin-stat-sub">Toàn bộ fulfillment của shop</div>
-        </button>
-        <button type="button" className="admin-stat-card warning vendor-stat-button" onClick={() => handleTabChange('pending')}>
-          <div className="admin-stat-label">Chờ xác nhận</div>
-          <div className="admin-stat-value">{tabCounts.pending}</div>
-          <div className="admin-stat-sub">Cần shop kiểm tra ngay</div>
-        </button>
-        <button type="button" className="admin-stat-card info vendor-stat-button" onClick={() => handleTabChange('shipping')}>
-          <div className="admin-stat-label">Đang giao</div>
-          <div className="admin-stat-value">{tabCounts.shipping}</div>
-          <div className="admin-stat-sub">Đang bàn giao cho đối tác vận chuyển</div>
-        </button>
-        <button type="button" className="admin-stat-card success vendor-stat-button" onClick={() => handleTabChange('completed')}>
-          <div className="admin-stat-label">Hoàn thành</div>
-          <div className="admin-stat-value">{tabCounts.completed}</div>
-          <div className="admin-stat-sub">Đơn đã kết toán cho shop</div>
-        </button>
-      </div>
+      <PanelStatsGrid items={[...statItems]} accentClassName="vendor-stat-button" />
 
-      <div className="admin-tabs">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            className={`admin-tab ${activeTab === tab.key ? 'active vendor-active-tab' : ''}`}
-            onClick={() => handleTabChange(tab.key)}
-          >
-            <span>{tab.label}</span>
-            <span className="admin-tab-count">{tabCounts[tab.key]}</span>
-          </button>
-        ))}
-      </div>
+      <PanelTabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} accentClassName="vendor-active-tab" />
 
-      {hasViewContext && (
-        <div className="admin-view-summary">
-          <span className="summary-chip">Trạng thái: {TABS.find((tab) => tab.key === activeTab)?.label || 'Tất cả'}</span>
-          {searchQuery.trim() && <span className="summary-chip">Từ khóa: {searchQuery.trim()}</span>}
-          <button className="summary-clear" onClick={resetCurrentView}>Xóa bộ lọc</button>
-        </div>
-      )}
+      {hasViewContext && <PanelViewSummary chips={summaryChips} clearLabel="Xóa bộ lọc" onClear={resetCurrentView} />}
 
       <section className="admin-panels single">
         <div className="admin-panel">
@@ -360,7 +348,7 @@ const VendorOrders = () => {
                     </div>
                     <div role="cell">
                       <div className="admin-bold">{order.id}</div>
-                      <div className="admin-muted small">{formatDate(order.date)}</div>
+                      <div className="admin-muted small">{formatVendorOrderDate(order.date)}</div>
                     </div>
                     <div role="cell">
                       <div className="admin-bold">{order.customer}</div>
@@ -370,7 +358,9 @@ const VendorOrders = () => {
                     <div role="cell"><span className="badge amber">-{formatCurrency(order.commissionFee)}</span></div>
                     <div role="cell"><span className="badge green">{formatCurrency(order.vendorPayout)}</span></div>
                     <div role="cell">
-                      <span className={`admin-pill ${getStatusTone(order.status)}`}>{getStatusLabel(order.status)}</span>
+                      <span className={`admin-pill ${getVendorOrderStatusTone(order.status)}`}>
+                        {getVendorOrderStatusLabel(order.status)}
+                      </span>
                     </div>
                     <div role="cell" className="vendor-order-ops">
                       {order.status === 'shipping' ? <Truck size={14} /> : <ShieldCheck size={14} />}
@@ -386,7 +376,7 @@ const VendorOrders = () => {
                           Xác nhận
                         </button>
                       )}
-                      {order.status === 'confirmed' && (
+                      {order.status === 'packing' && (
                         <button
                           className="admin-primary-btn vendor-admin-primary vendor-inline-btn"
                           onClick={() => askStatusUpdate([order.id], 'SHIPPED')}
@@ -403,63 +393,37 @@ const VendorOrders = () => {
                 ))}
               </div>
 
-              <div className="table-footer">
-                <span className="table-footer-meta">Hiển thị {startIndex}-{endIndex} trên {filteredOrders.length} đơn hàng con</span>
-                <div className="pagination">
-                  <button className="page-btn" disabled={safePage === 1} onClick={() => setPage((current) => Math.max(current - 1, 1))}>
-                    Trước
-                  </button>
-                  {Array.from({ length: totalPages }).map((_, index) => (
-                    <button
-                      key={index + 1}
-                      className={`page-btn ${safePage === index + 1 ? 'active vendor-active-page' : ''}`}
-                      onClick={() => setPage(index + 1)}
-                    >
-                      {index + 1}
-                    </button>
-                  ))}
-                  <button
-                    className="page-btn"
-                    disabled={safePage === totalPages}
-                    onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
-                  >
-                    Sau
-                  </button>
-                </div>
-              </div>
+              <PanelTableFooter
+                meta={`Hiển thị ${startIndex}-${endIndex} trên ${filteredOrders.length} đơn hàng con`}
+                page={safePage}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                activePageClassName="vendor-active-page"
+                nextLabel="Sau"
+              />
             </>
           )}
         </div>
       </section>
 
-      <AnimatePresence>
-        {selected.size > 0 && (
-          <motion.div
-            className="admin-floating-bar vendor-floating-bar"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 22 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
-          >
-            <div className="admin-floating-content">
-              <span>Đã chọn {selected.size} đơn hàng con</span>
-              <div className="admin-actions">
-                {actionablePendingIds.length > 0 && (
-                  <button className="admin-ghost-btn" onClick={() => askStatusUpdate(actionablePendingIds, 'CONFIRMED')}>
-                    Xác nhận đã chọn
-                  </button>
-                )}
-                {actionableConfirmedIds.length > 0 && (
-                  <button className="admin-ghost-btn" onClick={() => askStatusUpdate(actionableConfirmedIds, 'SHIPPED')}>
-                    Bàn giao đã chọn
-                  </button>
-                )}
-                <button className="admin-ghost-btn" onClick={() => setSelected(new Set())}>Bỏ chọn</button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <PanelFloatingBar show={selected.size > 0} className="vendor-floating-bar">
+        <div className="admin-floating-content">
+          <span>Đã chọn {selected.size} đơn hàng con</span>
+          <div className="admin-actions">
+            {actionablePendingIds.length > 0 && (
+              <button className="admin-ghost-btn" onClick={() => askStatusUpdate(actionablePendingIds, 'CONFIRMED')}>
+                Xác nhận đã chọn
+              </button>
+            )}
+            {actionablePackingIds.length > 0 && (
+              <button className="admin-ghost-btn" onClick={() => askStatusUpdate(actionablePackingIds, 'SHIPPED')}>
+                Bàn giao đã chọn
+              </button>
+            )}
+            <button className="admin-ghost-btn" onClick={() => setSelected(new Set())}>Bỏ chọn</button>
+          </div>
+        </div>
+      </PanelFloatingBar>
 
       <AdminConfirmDialog
         open={Boolean(pendingAction)}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X, ChevronDown } from 'lucide-react';
 import { addressService } from '../../services/addressService';
 import { useAddressLocation } from '../../hooks/useAddressLocation';
@@ -21,71 +21,61 @@ export interface AddressData {
   isDefault: boolean;
 }
 
-const AddressModal = ({ isOpen, onClose, onSave, editingAddress }: AddressModalProps) => {
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [detail, setDetail] = useState('');
-  const [isDefault, setIsDefault] = useState(false);
-  const [addressId, setAddressId] = useState<string | null>(null);
+const buildInitialDraft = (editingAddress?: Address | null): AddressData => ({
+  fullName: editingAddress?.fullName || '',
+  phone: editingAddress?.phone || '',
+  province: editingAddress?.province || '',
+  district: editingAddress?.district || '',
+  ward: editingAddress?.ward || '',
+  detail: editingAddress?.detail || '',
+  isDefault: editingAddress?.isDefault || false,
+});
 
-  const addressLocation = useAddressLocation({ loadOnMount: isOpen });
+const AddressModalForm = ({ onClose, onSave, editingAddress }: Omit<AddressModalProps, 'isOpen'>) => {
+  const initialDraft = useMemo(() => buildInitialDraft(editingAddress), [editingAddress]);
+  const [draft, setDraft] = useState<AddressData>(initialDraft);
+  const addressLocation = useAddressLocation({ loadOnMount: true });
 
   useEffect(() => {
-    if (isOpen) {
-      if (editingAddress) {
-        setName(editingAddress.fullName);
-        setPhone(editingAddress.phone);
-        setDetail(editingAddress.detail);
-        setIsDefault(editingAddress.isDefault);
-        setAddressId(editingAddress.id);
-        addressLocation.setLocationByNames(
-          editingAddress.province,
-          editingAddress.district,
-          editingAddress.ward
-        );
-      } else {
-        setName('');
-        setPhone('');
-        setDetail('');
-        setIsDefault(false);
-        setAddressId(null);
-        addressLocation.clearSelection();
-      }
+    if (!editingAddress) {
+      addressLocation.clearSelection();
+      return;
     }
-  }, [isOpen, editingAddress, addressLocation.clearSelection, addressLocation.setLocationByNames]);
+
+    addressLocation.setLocationByNames(
+      editingAddress.province,
+      editingAddress.district,
+      editingAddress.ward,
+    );
+  }, [addressLocation, editingAddress]);
+
+  const updateDraft = <K extends keyof AddressData>(key: K, value: AddressData[K]) => {
+    setDraft((prev) => ({ ...prev, [key]: value }));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const addressData = {
-      fullName: name,
-      phone,
+      fullName: draft.fullName,
+      phone: draft.phone,
       province: addressLocation.selectedProvinceName,
       district: addressLocation.selectedDistrictName,
       ward: addressLocation.selectedWardName,
-      detail,
-      isDefault,
+      detail: draft.detail,
+      isDefault: draft.isDefault,
     };
 
-    if (addressId) {
-      addressService.update(addressId, addressData);
+    if (editingAddress?.id) {
+      addressService.update(editingAddress.id, addressData);
     } else {
       addressService.add(addressData);
     }
-    
-    if (onSave) onSave();
-    setName('');
-    setPhone('');
-    setDetail('');
-    setIsDefault(false);
-    setAddressId(null);
+
+    onSave?.();
     addressLocation.clearSelection();
     onClose();
   };
-
-  const isEditing = !!editingAddress;
-
-  if (!isOpen) return null;
 
   return (
     <div className="profile-modal-overlay" onClick={onClose}>
@@ -93,7 +83,7 @@ const AddressModal = ({ isOpen, onClose, onSave, editingAddress }: AddressModalP
         <div className="profile-modal-header">
           <div>
             <p className="profile-modal-eyebrow">Địa chỉ giao hàng</p>
-            <h2>{isEditing ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}</h2>
+            <h2>{editingAddress ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}</h2>
           </div>
           <button className="profile-modal-close" onClick={onClose} aria-label="Đóng">
             <X size={18} />
@@ -102,37 +92,34 @@ const AddressModal = ({ isOpen, onClose, onSave, editingAddress }: AddressModalP
 
         <div className="profile-modal-body">
           <form className="profile-modal-form" onSubmit={handleSubmit}>
-            {/* Name */}
             <div className="modal-input-group">
               <span className="modal-floating-label">Họ và tên người nhận</span>
               <input
                 type="text"
                 className="modal-input"
                 style={{ paddingLeft: '16px' }}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={draft.fullName}
+                onChange={(e) => updateDraft('fullName', e.target.value)}
                 autoComplete="name"
                 name="fullName"
                 required
               />
             </div>
 
-            {/* Phone */}
             <div className="modal-input-group">
               <span className="modal-floating-label">Số điện thoại</span>
               <input
                 type="tel"
                 className="modal-input"
                 style={{ paddingLeft: '16px' }}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                value={draft.phone}
+                onChange={(e) => updateDraft('phone', e.target.value)}
                 autoComplete="tel"
                 name="phone"
                 required
               />
             </div>
 
-            {/* Province Select */}
             <div className="modal-input-group">
               <span className="modal-floating-label">Tỉnh / Thành phố</span>
               <select
@@ -144,16 +131,15 @@ const AddressModal = ({ isOpen, onClose, onSave, editingAddress }: AddressModalP
                 <option value="">
                   {addressLocation.loadingProvinces ? 'Đang tải...' : '-- Chọn Tỉnh / Thành phố --'}
                 </option>
-                {addressLocation.provinces.map((p) => (
-                  <option key={p.code} value={p.code}>
-                    {p.name}
+                {addressLocation.provinces.map((province) => (
+                  <option key={province.code} value={province.code}>
+                    {province.name}
                   </option>
                 ))}
               </select>
               <ChevronDown className="modal-select-arrow" size={16} aria-hidden="true" />
             </div>
 
-            {/* District Select */}
             <div className="modal-input-group">
               <span className="modal-floating-label">Quận / Huyện</span>
               <select
@@ -166,16 +152,15 @@ const AddressModal = ({ isOpen, onClose, onSave, editingAddress }: AddressModalP
                 <option value="">
                   {addressLocation.loadingDistricts ? 'Đang tải...' : '-- Chọn Quận / Huyện --'}
                 </option>
-                {addressLocation.districts.map((d) => (
-                  <option key={d.code} value={d.code}>
-                    {d.name}
+                {addressLocation.districts.map((district) => (
+                  <option key={district.code} value={district.code}>
+                    {district.name}
                   </option>
                 ))}
               </select>
               <ChevronDown className="modal-select-arrow" size={16} aria-hidden="true" />
             </div>
 
-            {/* Ward Select */}
             <div className="modal-input-group">
               <span className="modal-floating-label">Phường / Xã</span>
               <select
@@ -188,16 +173,15 @@ const AddressModal = ({ isOpen, onClose, onSave, editingAddress }: AddressModalP
                 <option value="">
                   {addressLocation.loadingWards ? 'Đang tải...' : '-- Chọn Phường / Xã --'}
                 </option>
-                {addressLocation.wards.map((w) => (
-                  <option key={w.code} value={w.code}>
-                    {w.name}
+                {addressLocation.wards.map((ward) => (
+                  <option key={ward.code} value={ward.code}>
+                    {ward.name}
                   </option>
                 ))}
               </select>
               <ChevronDown className="modal-select-arrow" size={16} aria-hidden="true" />
             </div>
 
-            {/* Detail Address */}
             <div className="modal-input-group">
               <span className="modal-floating-label">Địa chỉ cụ thể</span>
               <input
@@ -205,30 +189,42 @@ const AddressModal = ({ isOpen, onClose, onSave, editingAddress }: AddressModalP
                 className="modal-input"
                 style={{ paddingLeft: '16px' }}
                 placeholder="Số nhà, tên đường..."
-                value={detail}
-                onChange={(e) => setDetail(e.target.value)}
+                value={draft.detail}
+                onChange={(e) => updateDraft('detail', e.target.value)}
                 required
               />
             </div>
 
-            {/* Default Address Checkbox */}
             <label className="address-default-check">
               <input
                 type="checkbox"
-                checked={isDefault}
-                onChange={(e) => setIsDefault(e.target.checked)}
+                checked={draft.isDefault}
+                onChange={(e) => updateDraft('isDefault', e.target.checked)}
               />
               <span className="address-check-custom"></span>
               Đặt làm địa chỉ mặc định
             </label>
 
             <button type="submit" className="modal-submit-btn">
-              {isEditing ? 'CẬP NHẬT' : 'LƯU ĐỊA CHỈ'}
+              {editingAddress ? 'CẬP NHẬT' : 'LƯU ĐỊA CHỈ'}
             </button>
           </form>
         </div>
       </div>
     </div>
+  );
+};
+
+const AddressModal = ({ isOpen, onClose, onSave, editingAddress }: AddressModalProps) => {
+  if (!isOpen) return null;
+
+  return (
+    <AddressModalForm
+      key={editingAddress?.id || 'new-address'}
+      onClose={onClose}
+      onSave={onSave}
+      editingAddress={editingAddress}
+    />
   );
 };
 

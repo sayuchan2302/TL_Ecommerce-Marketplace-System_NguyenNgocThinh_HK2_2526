@@ -1,0 +1,13 @@
+package vn.edu.hcmuaf.fit.fashionstore.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import vn.edu.hcmuaf.fit.fashionstore.entity.ReturnRequest;
+
+import java.util.UUID;
+
+public interface ReturnRequestRepository extends JpaRepository<ReturnRequest, UUID> {
+    Page<ReturnRequest> findByStatus(ReturnRequest.ReturnStatus status, Pageable pageable);
+    Page<ReturnRequest> findByUserId(UUID userId, Pageable pageable);
+}

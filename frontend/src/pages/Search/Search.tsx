@@ -225,9 +225,9 @@ const Search = () => {
                           selectedPriceRanges={view.priceRanges}
                           selectedSizes={view.sizes}
                           selectedColors={view.colors}
-                          onTogglePrice={(id, _checked) => view.togglePrice(id)}
-                          onToggleSize={(size, _checked) => view.toggleSize(size)}
-                          onToggleColor={(color, _checked) => view.toggleColor(color)}
+                          onTogglePrice={(id) => view.togglePrice(id)}
+                          onToggleSize={(size) => view.toggleSize(size)}
+                          onToggleColor={(color) => view.toggleColor(color)}
                           onReset={() => view.reset()}
                         />
                       </div>

@@ -5,6 +5,8 @@ import './Auth.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 
+const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+
 const Register = () => {
   const { register } = useAuth();
   const { addToast } = useToast();
@@ -27,18 +29,19 @@ const Register = () => {
     return next;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const v = validate();
-    setErrors(v);
-    if (Object.keys(v).length) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     try {
       setLoading(true);
       await register(name.trim(), email.trim(), password.trim());
       addToast('Tạo tài khoản thành công', 'success');
       navigate('/', { replace: true });
-    } catch (err: any) {
-      addToast(err?.message || 'Đăng ký thất bại', 'error');
+    } catch (error: unknown) {
+      addToast(getErrorMessage(error, 'Đăng ký thất bại'), 'error');
     } finally {
       setLoading(false);
     }
@@ -56,7 +59,7 @@ const Register = () => {
             <input
               className="auth-input"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(event) => setName(event.target.value)}
               placeholder="Nguyễn Văn A"
             />
             {errors.name && <div className="auth-error">{errors.name}</div>}
@@ -68,7 +71,7 @@ const Register = () => {
               className="auth-input"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="you@example.com"
             />
             {errors.email && <div className="auth-error">{errors.email}</div>}
@@ -80,7 +83,7 @@ const Register = () => {
               className="auth-input"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"
             />
             {errors.password && <div className="auth-error">{errors.password}</div>}
@@ -92,7 +95,7 @@ const Register = () => {
               className="auth-input"
               type="password"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              onChange={(event) => setConfirm(event.target.value)}
               placeholder="••••••••"
             />
             {errors.confirm && <div className="auth-error">{errors.confirm}</div>}

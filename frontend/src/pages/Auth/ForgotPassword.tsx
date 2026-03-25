@@ -5,25 +5,29 @@ import './Auth.css';
 import { useToast } from '../../contexts/ToastContext';
 import { authService } from '../../services/authService';
 
+const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+
 const ForgotPassword = () => {
   const { addToast } = useToast();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     if (!email.trim()) {
       setError('Vui lòng nhập email');
       return;
     }
+
     setError(null);
+
     try {
       setLoading(true);
       await authService.forgot(email.trim());
       addToast('Đã gửi hướng dẫn đặt lại mật khẩu (mock)', 'success');
-    } catch (err: any) {
-      addToast(err?.message || 'Gửi yêu cầu thất bại', 'error');
+    } catch (errorValue: unknown) {
+      addToast(getErrorMessage(errorValue, 'Gửi yêu cầu thất bại'), 'error');
     } finally {
       setLoading(false);
     }
@@ -42,7 +46,7 @@ const ForgotPassword = () => {
               className="auth-input"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="you@example.com"
             />
             {error && <div className="auth-error">{error}</div>}

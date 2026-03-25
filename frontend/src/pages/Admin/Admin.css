@@ -40,11 +40,14 @@
   --co-admin-danger-text: #dc2626;
   --co-admin-info-bg: #eff6ff;
   --co-admin-info-text: #1d4ed8;
+
+  /* Layout tokens */
+  --admin-sidebar-w: 260px;
 }
 
 .admin-page {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: var(--admin-sidebar-w) 1fr;
   height: 100vh;
   min-height: 100vh;
   background: var(--co-gray-100);
@@ -62,6 +65,7 @@
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  z-index: 10;
 }
 
 .admin-logo {
@@ -129,14 +133,20 @@
   animation: adminPageIn 180ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
 }
 
+.page-transition {
+  will-change: transform, opacity;
+  min-height: 100%;
+  overflow: visible;
+}
+
 @keyframes adminPageIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 .admin-header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 40;
   display: grid;
   grid-template-columns: 1.2fr 1.7fr auto;
   align-items: center;
@@ -404,13 +414,14 @@ body {
 .admin-table-row.orders {
   grid-template-columns:
     48px
-    minmax(124px, 0.95fr)
-    minmax(268px, 2fr)
-    minmax(132px, 0.95fr)
-    minmax(156px, 1.08fr)
-    minmax(176px, 1.18fr)
-    minmax(142px, 0.98fr)
-    minmax(136px, 0.98fr);
+    minmax(124px, 0.9fr)
+    minmax(240px, 1.7fr)
+    minmax(220px, 1.55fr)
+    minmax(132px, 0.9fr)
+    minmax(156px, 1.05fr)
+    minmax(176px, 1.12fr)
+    minmax(142px, 0.95fr)
+    minmax(136px, 0.95fr);
 }
 .admin-table-row.orders .admin-actions { justify-content: flex-end; justify-self: end; }
 .admin-table-row.orders .order-total { justify-self: center; text-align: center; }
@@ -1000,7 +1011,17 @@ body {
 .product-cell .thumb-wrapper { display: inline-block; }
 
 /* Modal & Drawer shared styles */
-.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.35); backdrop-filter: blur(2px); z-index: 70; display: flex; align-items: center; justify-content: center; }
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .modal-overlay { animation: fadeIn 0.18s ease-out; }
 .modal { width: 60vw; max-width: 900px; background: white; border-radius: 16px; border: 1px solid var(--co-gray-200); box-shadow: 0 20px 40px rgba(15,23,42,0.18); display: flex; flex-direction: column; max-height: 90vh; animation: modalIn 0.22s ease-out; }
 .modal.large { width: 60vw; }
@@ -1027,8 +1048,29 @@ body {
 .tag-input input { border: none; outline: none; min-width: 120px; font-size: 13px; }
 
 /* Drawer tweaks (shared) */
-.drawer-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.35); backdrop-filter: blur(2px); z-index: 110; }
-.drawer { position: fixed; top: 0; right: 0; width: 40vw; max-width: 520px; height: 100vh; background: white; border-left: 1px solid var(--co-gray-200); box-shadow: -12px 0 30px rgba(15,23,42,0.12); z-index: 120; display: flex; flex-direction: column; animation: slideIn 0.2s ease; }
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.54);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 110;
+}
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 40vw;
+  max-width: 520px;
+  height: 100vh;
+  background: white;
+  border-left: 1px solid var(--co-gray-200);
+  box-shadow: -12px 0 40px rgba(15, 23, 42, 0.18);
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
 .drawer-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid var(--co-gray-200); }
 .drawer-eyebrow { margin: 0; text-transform: uppercase; letter-spacing: 0.5px; font-size: 12px; color: #6b7280; }
 .drawer-header h3 { margin: 2px 0 0; font-size: 18px; font-weight: 800; color: var(--co-admin-text); }
@@ -1211,6 +1253,32 @@ input:disabled, .disabled-input { background: var(--co-gray-100); color: var(--c
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.order-product-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.order-product-name,
+.order-product-meta,
+.order-product-extra {
+  margin: 0;
+}
+
+.order-product-name,
+.order-product-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-product-extra {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--co-admin-blue);
 }
 
 .customer-name {

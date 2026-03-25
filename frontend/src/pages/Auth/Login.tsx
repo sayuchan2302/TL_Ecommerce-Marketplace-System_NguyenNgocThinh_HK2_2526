@@ -1,21 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import './Auth.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 
+const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+
 const Login = () => {
   const { login } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectTo = (location.state as any)?.from || '/';
+  const redirectTo = (location.state as { from?: string } | null)?.from || '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const reason = params.get('reason');
+    if (reason === 'session-expired') {
+      addToast('Hết phiên, đăng nhập lại', 'error');
+    }
+  }, [location.search, addToast]);
 
   const validate = () => {
     const next: typeof errors = {};
@@ -24,18 +34,19 @@ const Login = () => {
     return next;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const v = validate();
-    setErrors(v);
-    if (Object.keys(v).length) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     try {
       setLoading(true);
       await login(email.trim(), password.trim());
       addToast('Đăng nhập thành công', 'success');
       navigate(redirectTo, { replace: true });
-    } catch (err: any) {
-      addToast(err?.message || 'Đăng nhập thất bại', 'error');
+    } catch (error: unknown) {
+      addToast(getErrorMessage(error, 'Đăng nhập thất bại'), 'error');
     } finally {
       setLoading(false);
     }
@@ -45,7 +56,7 @@ const Login = () => {
     <div className="auth-page">
       <div className="auth-card">
         <h1 className="auth-title">Đăng nhập</h1>
-        <p className="auth-subtitle">Đăng nhập để tích luỹ quyền lợi và xem đơn hàng của bạn.</p>
+        <p className="auth-subtitle">Đăng nhập để tích lũy quyền lợi và xem đơn hàng của bạn.</p>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-field">
@@ -54,7 +65,7 @@ const Login = () => {
               className="auth-input"
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="you@example.com"
               name="email"
               autoComplete="email"
@@ -69,7 +80,7 @@ const Login = () => {
               className="auth-input"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"
               name="password"
               autoComplete="current-password"
@@ -78,7 +89,7 @@ const Login = () => {
           </div>
 
           <div className="auth-link-row">
-            <span></span>
+            <span />
             <Link to="/forgot">Quên mật khẩu?</Link>
           </div>
 

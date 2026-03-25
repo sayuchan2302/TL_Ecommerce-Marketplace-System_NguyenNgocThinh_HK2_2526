@@ -5,6 +5,8 @@ import './Auth.css';
 import { useToast } from '../../contexts/ToastContext';
 import { authService } from '../../services/authService';
 
+const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+
 const ResetPassword = () => {
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -21,18 +23,19 @@ const ResetPassword = () => {
     return next;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const v = validate();
-    setErrors(v);
-    if (Object.keys(v).length) return;
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const nextErrors = validate();
+    setErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
     try {
       setLoading(true);
       await authService.reset(password.trim());
       addToast('Đặt lại mật khẩu thành công (mock)', 'success');
       navigate('/login', { replace: true });
-    } catch (err: any) {
-      addToast(err?.message || 'Đặt lại mật khẩu thất bại', 'error');
+    } catch (error: unknown) {
+      addToast(getErrorMessage(error, 'Đặt lại mật khẩu thất bại'), 'error');
     } finally {
       setLoading(false);
     }
@@ -51,7 +54,7 @@ const ResetPassword = () => {
               className="auth-input"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               placeholder="••••••••"
             />
             {errors.password && <div className="auth-error">{errors.password}</div>}
@@ -63,7 +66,7 @@ const ResetPassword = () => {
               className="auth-input"
               type="password"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              onChange={(event) => setConfirm(event.target.value)}
               placeholder="••••••••"
             />
             {errors.confirm && <div className="auth-error">{errors.confirm}</div>}

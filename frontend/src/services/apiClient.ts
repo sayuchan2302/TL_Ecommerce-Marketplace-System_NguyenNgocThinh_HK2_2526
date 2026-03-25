@@ -21,14 +21,6 @@ const buildUrl = (path: string) => {
   return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`;
 };
 
-const getStoredToken = () =>
-  authService.getSession()?.token || authService.getAdminSession()?.token || null;
-
-export const hasBackendJwt = () => {
-  const token = getStoredToken();
-  return Boolean(token && token.split('.').length === 3);
-};
-
 const parseErrorMessage = async (response: Response) => {
   try {
     const payload = await response.clone().json();
@@ -45,10 +37,55 @@ const parseErrorMessage = async (response: Response) => {
   }
 };
 
+const redirectToLogin = (reason = 'session-expired') => {
+  authService.logout(reason);
+  authService.adminLogout(reason);
+  if (typeof window !== 'undefined') {
+    const current = window.location.pathname + window.location.search;
+    const target = `/login?reason=${encodeURIComponent(reason)}&redirect=${encodeURIComponent(current)}`;
+    window.location.href = target;
+  }
+};
+
+let refreshPromise: Promise<unknown> | null = null;
+
+const ensureAuthToken = async (): Promise<string> => {
+  const stored = authService.getSession() || authService.getAdminSession();
+  const token = stored?.token;
+
+  if (!token || !authService.isBackendJwtToken(token)) {
+    throw new ApiError('Current session is not using a backend JWT.', 401);
+  }
+
+  if (!authService.isJwtExpired(token)) {
+    return token;
+  }
+
+  if (!authService.getRefreshToken()) {
+    throw new ApiError('Session expired. Please log in again.', 401);
+  }
+
+  if (!refreshPromise) {
+    refreshPromise = authService.refresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  const refreshed = await refreshPromise as { token: string };
+  return refreshed.token;
+};
+
+export const hasBackendJwt = () => {
+  const stored = authService.getSession() || authService.getAdminSession();
+  const token = stored?.token;
+  return Boolean(token && authService.isBackendJwtToken(token) && !authService.isJwtExpired(token));
+};
+
 export const apiRequest = async <T>(
   path: string,
   init: RequestInit = {},
   options: { auth?: boolean } = {},
+  attemptedRefresh = false,
 ): Promise<T> => {
   const headers = new Headers(init.headers || {});
   const needsJson = init.body !== undefined && !headers.has('Content-Type');
@@ -58,10 +95,8 @@ export const apiRequest = async <T>(
   }
 
   if (options.auth) {
-    if (!hasBackendJwt()) {
-      throw new ApiError('Current session is not using a backend JWT.', 401);
-    }
-    headers.set('Authorization', `Bearer ${getStoredToken()}`);
+    const token = await ensureAuthToken();
+    headers.set('Authorization', `Bearer ${token}`);
   }
 
   const response = await fetch(buildUrl(path), {
@@ -70,10 +105,26 @@ export const apiRequest = async <T>(
   });
 
   if (!response.ok) {
-    if (options.auth && response.status === 401) {
-      authService.logout();
-      authService.adminLogout();
+    if (options.auth && response.status === 401 && !attemptedRefresh) {
+      try {
+        if (!refreshPromise) {
+          refreshPromise = authService.refresh().finally(() => {
+            refreshPromise = null;
+          });
+        }
+        await refreshPromise;
+        return apiRequest<T>(path, init, options, true);
+      } catch (error) {
+        redirectToLogin('session-expired');
+        const { message, payload } = await parseErrorMessage(response);
+        throw new ApiError(message, response.status, payload);
+      }
     }
+
+    if (options.auth && response.status === 401) {
+      redirectToLogin('session-expired');
+    }
+
     const { message, payload } = await parseErrorMessage(response);
     throw new ApiError(message, response.status, payload);
   }

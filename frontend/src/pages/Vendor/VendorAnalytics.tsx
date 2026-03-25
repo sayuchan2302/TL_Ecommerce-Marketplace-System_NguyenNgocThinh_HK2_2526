@@ -57,9 +57,9 @@ const VendorAnalytics = () => {
         const next = await vendorPortalService.getAnalytics();
         if (!active) return;
         setAnalytics(next);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!active) return;
-        addToast(err?.message || 'Không tải được thống kê của shop', 'error');
+        addToast((err as Error)?.message || 'Không tải được thống kê của shop', 'error');
       } finally {
         if (active) setLoading(false);
       }

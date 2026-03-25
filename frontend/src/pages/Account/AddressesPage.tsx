@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import './Account.css';
 import { addressService } from '../../services/addressService';
 import type { Address } from '../../types';
@@ -15,13 +15,9 @@ const emptyForm: Omit<Address, 'id'> = {
 };
 
 const AddressesPage = () => {
-  const [addresses, setAddresses] = useState<Address[]>([]);
+  const [addresses, setAddresses] = useState<Address[]>(() => addressService.getAll());
   const [form, setForm] = useState<Omit<Address, 'id'>>(emptyForm);
   const { addToast } = useToast();
-
-  useEffect(() => {
-    setAddresses(addressService.getAll());
-  }, []);
 
   const refresh = () => setAddresses(addressService.getAll());
 

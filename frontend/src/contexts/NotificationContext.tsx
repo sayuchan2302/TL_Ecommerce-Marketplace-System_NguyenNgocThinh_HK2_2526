@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { notificationService, type Notification } from '../services/notificationService';
 
@@ -14,19 +15,16 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export const NotificationProvider = ({ children }: { children: ReactNode }) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<Notification[]>(() => notificationService.getAll());
 
   const refreshNotifications = useCallback(() => {
-    const all = notificationService.getAll();
-    const unread = notificationService.getUnreadCount();
-    setNotifications(all);
-    setUnreadCount(unread);
+    setNotifications(notificationService.getAll());
   }, []);
 
-  useEffect(() => {
-    refreshNotifications();
-  }, [refreshNotifications]);
+  const unreadCount = useMemo(
+    () => notifications.reduce((count, notification) => count + (notification.read ? 0 : 1), 0),
+    [notifications],
+  );
 
   const markAsRead = useCallback((id: string) => {
     notificationService.markAsRead(id);

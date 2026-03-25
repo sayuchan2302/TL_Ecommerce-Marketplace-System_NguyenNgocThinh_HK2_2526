@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import VendorLayout from './VendorLayout';
+import { Suspense } from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import VendorDashboard from './VendorDashboard';
 import VendorOrders from './VendorOrders';
 import VendorOrderDetail from './VendorOrderDetail';
@@ -10,28 +9,14 @@ import VendorSettings from './VendorSettings';
 import VendorStorefront from './VendorStorefront';
 import VendorPromotions from './VendorPromotions';
 import VendorReviews from './VendorReviews';
-import { AdminShellContext, type AdminShellState } from '../Admin/AdminShellContext';
-
-const defaultShellState: AdminShellState = {
-  title: 'Tổng quan shop',
-};
+import VendorLayout from './VendorLayout';
+import PageFallback from '../../components/Transitions/PageFallback';
 
 const VendorWorkspace = () => {
-  const [shellState, setShellState] = useState<AdminShellState>(defaultShellState);
-  const location = useLocation();
-  const routeKey = location.pathname.split('/')[2] || 'dashboard';
-
   return (
-    <VendorLayout
-      title={shellState.title}
-      actions={shellState.actions}
-      hideTopbarTitle={shellState.hideTopbarTitle}
-      breadcrumbs={
-        shellState.breadcrumbs?.map((label) => ({ label }))
-      }
-    >
-      <AdminShellContext.Provider value={setShellState}>
-        <div key={routeKey} className="admin-route-transition">
+    <VendorLayout title="Tổng quan shop" hideTopbarTitle>
+      <div className="admin-route-transition">
+        <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route index element={<Navigate to="/vendor/dashboard" replace />} />
             <Route path="dashboard" element={<VendorDashboard />} />
@@ -45,8 +30,8 @@ const VendorWorkspace = () => {
             <Route path="settings" element={<VendorSettings />} />
             <Route path="*" element={<Navigate to="/vendor/dashboard" replace />} />
           </Routes>
-        </div>
-      </AdminShellContext.Provider>
+        </Suspense>
+      </div>
     </VendorLayout>
   );
 };

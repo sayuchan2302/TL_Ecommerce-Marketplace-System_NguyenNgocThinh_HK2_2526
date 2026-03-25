@@ -1,64 +1,70 @@
 import './Admin.css';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, Plus, Edit2, Trash2, X, Save, FileText, Shield } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { useAdminToast } from './useAdminToast';
 import { ADMIN_DICTIONARY } from './adminDictionary';
-
-interface ContentItem {
-  id: string;
-  title: string;
-  content: string;
-  type: 'faq' | 'policy';
-  order: number;
-}
-
-const initialContent: ContentItem[] = [
-  { id: '1', title: 'Làm sao để đặt hàng?', content: 'Bạn có thể đặt hàng trực tiếp trên website bằng cách chọn sản phẩm, chọn size/màu và thêm vào giỏ hàng.', type: 'faq', order: 1 },
-  { id: '2', title: 'Thời gian giao hàng bao lâu?', content: 'Thời gian giao hàng từ 2-5 ngày tùy khu vực. Đơn hàng nội thành TP.HCM giao trong 2-3 ngày.', type: 'faq', order: 2 },
-  { id: '3', title: 'Có thể đổi trả sản phẩm không?', content: 'Coolmate hỗ trợ đổi trả trong 60 ngày với bất kỳ lý do gì. Bạn chỉ cần mang sản phẩm đến cửa hàng hoặc liên hệ hotline.', type: 'faq', order: 3 },
-  { id: '4', title: 'Chính sách bảo hành', content: 'Tất cả sản phẩm được bảo hành 12 tháng về chất lượng vải và đường may. Lỗi sản xuất được đổi mới miễn phí.', type: 'policy', order: 1 },
-  { id: '5', title: 'Chính sách vận chuyển', content: 'Miễn phí vận chuyển cho đơn hàng từ 300.000đ. Giao hàng nhanh qua GHN, GHTK với mã theo dõi trực tiếp.', type: 'policy', order: 2 },
-];
+import { contentService, type ContentPage, type ContentType } from '../../services/contentService';
 
 const AdminContent = () => {
   const t = ADMIN_DICTIONARY.content;
   const { pushToast } = useAdminToast();
   const [activeTab, setActiveTab] = useState<'faq' | 'policy'>('faq');
-  const [items, setItems] = useState<ContentItem[]>(initialContent);
+  const [items, setItems] = useState<ContentPage[]>([]);
   const [search, setSearch] = useState('');
-  const [editingItem, setEditingItem] = useState<ContentItem | null>(null);
+  const [editingItem, setEditingItem] = useState<ContentPage | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({ title: '', content: '' });
+  const [loading, setLoading] = useState(false);
 
-  const filteredItems = items.filter(
-    (item) =>
-      item.type === activeTab &&
-      (item.title.toLowerCase().includes(search.toLowerCase()) ||
-        item.content.toLowerCase().includes(search.toLowerCase()))
-  );
+  const mapTabToType = (tab: 'faq' | 'policy'): ContentType => (tab === 'faq' ? 'FAQ' : 'POLICY');
 
-  const handleSave = () => {
+  const fetchData = async (tab: 'faq' | 'policy') => {
+    try {
+      setLoading(true);
+      const list = await contentService.list(mapTabToType(tab));
+      setItems(list);
+    } catch (error) {
+      pushToast(t.messages.loadFailed || 'Khong tai duoc noi dung');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchData(activeTab);
+  }, [activeTab]);
+
+  const filteredItems = useMemo(() => items
+    .filter(item =>
+      item.title.toLowerCase().includes(search.toLowerCase()) ||
+      item.body.toLowerCase().includes(search.toLowerCase()))
+    , [items, search]);
+
+  const handleSave = async () => {
     if (!formData.title.trim() || !formData.content.trim()) {
-      pushToast('Vui lòng nhập đầy đủ tiêu đề và nội dung.');
+      pushToast('Vui long nhap day du tieu de va noi dung.');
       return;
     }
 
     if (editingItem) {
-      setItems(items.map((item) =>
-        item.id === editingItem.id ? { ...item, title: formData.title, content: formData.content } : item
-      ));
+      const updated = await contentService.update(editingItem.id, {
+        title: formData.title,
+        body: formData.content,
+        type: mapTabToType(activeTab),
+        displayOrder: editingItem.displayOrder,
+      });
+      setItems(items.map((item) => (item.id === editingItem.id ? updated : item)));
       pushToast(t.messages.saved);
     } else {
-      const newItem: ContentItem = {
-        id: String(Date.now()),
+      const created = await contentService.create({
         title: formData.title,
-        content: formData.content,
-        type: activeTab,
-        order: items.filter((i) => i.type === activeTab).length + 1,
-      };
-      setItems([...items, newItem]);
+        body: formData.content,
+        type: mapTabToType(activeTab),
+        displayOrder: items.length + 1,
+      });
+      setItems([...items, created]);
       pushToast(t.messages.addSuccess);
     }
     setEditingItem(null);
@@ -66,16 +72,16 @@ const AdminContent = () => {
     setFormData({ title: '', content: '' });
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm(t.messages.deleteConfirm)) {
-      setItems(items.filter((item) => item.id !== id));
-      pushToast(t.messages.saved);
-    }
+  const handleDelete = async (id: string) => {
+    if (!confirm(t.messages.deleteConfirm)) return;
+    await contentService.remove(id);
+    setItems(items.filter((item) => item.id !== id));
+    pushToast(t.messages.saved);
   };
 
-  const openEdit = (item: ContentItem) => {
+  const openEdit = (item: ContentPage) => {
     setEditingItem(item);
-    setFormData({ title: item.title, content: item.content });
+    setFormData({ title: item.title, content: item.body });
   };
 
   const closeForm = () => {
@@ -97,7 +103,7 @@ const AdminContent = () => {
           <div className="admin-search">
             <Search size={16} />
             <input
-              placeholder="Tìm nội dung..."
+              placeholder="Tim noi dung..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -122,11 +128,12 @@ const AdminContent = () => {
       </div>
 
       <div className="admin-content-list">
-        {filteredItems.length === 0 ? (
+        {loading && <p className="admin-muted">Dang tai noi dung...</p>}
+        {!loading && filteredItems.length === 0 ? (
           <div className="admin-empty-state">
-            <p>Chưa có nội dung nào</p>
+            <p>Chua co noi dung nao</p>
             <button className="admin-primary-btn" onClick={() => setIsCreating(true)}>
-              <Plus size={16} /> Thêm nội dung đầu tiên
+              <Plus size={16} /> Them noi dung dau tien
             </button>
           </div>
         ) : (
@@ -140,7 +147,7 @@ const AdminContent = () => {
             >
               <div className="admin-content-card-body">
                 <h4>{item.title}</h4>
-                <p className="admin-muted">{item.content}</p>
+                <p className="admin-muted">{item.body}</p>
               </div>
               <div className="admin-content-card-actions">
                 <button
@@ -218,89 +225,6 @@ const AdminContent = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <style>{`
-        .admin-content-list {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          margin-top: 20px;
-        }
-        .admin-content-card {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          padding: 16px;
-          background: white;
-          border: 1px solid var(--co-gray-200);
-          border-radius: 12px;
-          gap: 16px;
-        }
-        .admin-content-card-body {
-          flex: 1;
-        }
-        .admin-content-card-body h4 {
-          margin: 0 0 8px;
-          font-size: 16px;
-          font-weight: 600;
-          color: var(--co-admin-text);
-        }
-        .admin-content-card-body p {
-          margin: 0;
-          font-size: 14px;
-          color: var(--co-gray-600);
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        .admin-content-card-actions {
-          display: flex;
-          gap: 8px;
-        }
-        .content-form-input {
-          width: 100%;
-          padding: 10px 12px;
-          border: 1px solid var(--co-gray-200);
-          border-radius: 12px;
-          font-size: 14px;
-        }
-        .content-form-input:focus {
-          outline: none;
-          border-color: var(--co-admin-primary);
-        }
-        .content-form-textarea {
-          width: 100%;
-          padding: 10px 12px;
-          border: 1px solid var(--co-gray-200);
-          border-radius: 12px;
-          font-size: 14px;
-          resize: vertical;
-          font-family: inherit;
-        }
-        .content-form-textarea:focus {
-          outline: none;
-          border-color: var(--co-admin-primary);
-        }
-        .admin-empty-state {
-          text-align: center;
-          padding: 40px;
-          color: var(--co-gray-500);
-        }
-        .admin-empty-state p {
-          margin-bottom: 16px;
-        }
-        .admin-tabs {
-          display: flex;
-          gap: 8px;
-          margin-top: 20px;
-        }
-        .admin-tab {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-      `}</style>
     </AdminLayout>
   );
 };

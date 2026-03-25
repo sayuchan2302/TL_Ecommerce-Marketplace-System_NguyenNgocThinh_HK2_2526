@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { authService } from '../services/authService';
@@ -10,26 +11,50 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   refreshSession: (next: AuthResponse) => void;
   register: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: (reason?: string) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const requiresBackendRole = (role?: User['role']) => role === 'VENDOR' || role === 'SUPER_ADMIN';
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<AuthResponse | null>(null);
+  const [session, setSession] = useState<AuthResponse | null>(() => authService.getSession() || authService.getAdminSession());
 
   useEffect(() => {
-    const stored = authService.getSession();
-    if (!stored) return;
+    const init = async () => {
+      const stored = authService.getSession() || authService.getAdminSession();
+      if (!stored) {
+        setSession(null);
+        return;
+      }
 
-    const role = stored.user?.role;
-    const requiresBackendJwt = role === 'VENDOR' || role === 'SUPER_ADMIN';
-    if (requiresBackendJwt && !authService.isBackendJwtToken(stored.token)) {
-      authService.logout();
-      return;
-    }
+      const needsBackend = requiresBackendRole(stored.user?.role);
+      const hasValidBackendJwt = authService.isBackendJwtToken(stored.token) && !authService.isJwtExpired(stored.token);
 
-    setSession(stored);
+      if (needsBackend && !hasValidBackendJwt) {
+        if (authService.getRefreshToken()) {
+          try {
+            const refreshed = await authService.refresh();
+            setSession(refreshed);
+            return;
+          } catch {
+            authService.logout('session-expired');
+            authService.adminLogout('session-expired');
+            setSession(null);
+            return;
+          }
+        }
+        authService.logout('session-expired');
+        authService.adminLogout('session-expired');
+        setSession(null);
+        return;
+      }
+
+      setSession(stored);
+    };
+
+    void init();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -46,8 +71,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(res);
   };
 
-  const logout = () => {
-    authService.logout();
+  const logout = (reason?: string) => {
+    authService.logout(reason);
+    authService.adminLogout(reason);
     setSession(null);
   };
 

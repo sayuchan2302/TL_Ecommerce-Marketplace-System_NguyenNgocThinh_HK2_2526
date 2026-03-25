@@ -195,7 +195,7 @@ const StoreProfile = () => {
               <div className="loading-spinner"></div>
             </div>
           ) : products.length > 0 ? (
-            <ProductGrid customResults={products as any} />
+            <ProductGrid customResults={products} />
           ) : (
             <div className="store-no-products">
               <p>Cửa hàng chưa có sản phẩm nào.</p>

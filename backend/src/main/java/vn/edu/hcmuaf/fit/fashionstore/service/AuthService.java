@@ -1,5 +1,7 @@
 package vn.edu.hcmuaf.fit.fashionstore.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,6 +22,8 @@ import vn.edu.hcmuaf.fit.fashionstore.security.JwtService;
 
 @Service
 public class AuthService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthService.class);
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -42,6 +46,7 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
+            logger.warn("Register attempt with existing email={}", request.getEmail());
             throw new BadCredentialsException("Email already registered");
         }
 
@@ -69,9 +74,14 @@ public class AuthService {
     }
 
     public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+        } catch (BadCredentialsException ex) {
+            logger.warn("Login failed for email={} : {}", request.getEmail(), ex.getMessage());
+            throw new BadCredentialsException("Invalid credentials");
+        }
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
@@ -88,6 +98,7 @@ public class AuthService {
         UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
         if (!jwtService.isTokenValid(refreshToken, userDetails)) {
+            logger.warn("Refresh token invalid for email={}", email);
             throw new BadCredentialsException("Invalid refresh token");
         }
 

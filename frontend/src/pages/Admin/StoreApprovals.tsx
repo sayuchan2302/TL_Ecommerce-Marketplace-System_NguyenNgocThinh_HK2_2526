@@ -4,8 +4,15 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Ban, Check, Eye, Link2, RotateCcw, Search, Store, User, X } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import AdminConfirmDialog from './AdminConfirmDialog';
-import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
-import { PanelStatsGrid, PanelTabs, PanelViewSummary } from '../../components/Panel/PanelPrimitives';
+import { AdminStateBlock } from './AdminStateBlocks';
+import {
+  PanelDrawerFooter,
+  PanelDrawerHeader,
+  PanelDrawerSection,
+  PanelStatsGrid,
+  PanelTabs,
+  PanelViewSummary,
+} from '../../components/Panel/PanelPrimitives';
 import { useToast } from '../../contexts/ToastContext';
 import { storeService, type StoreProfile } from '../../services/storeService';
 
@@ -116,6 +123,8 @@ const seedGovernanceStores = (): StoreProfile[] => [
   },
 ];
 
+const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+
 const StoreApprovals = () => {
   const { addToast } = useToast();
   const [stores, setStores] = useState<ManagedStore[]>([]);
@@ -138,8 +147,8 @@ const StoreApprovals = () => {
         const adminStores = await storeService.getAdminStores();
         const combined = [...seededStores, ...adminStores.filter((store) => !seededStores.some((seed) => seed.id === store.id))];
         setStores(combined.map(mapStore));
-      } catch (err: any) {
-        addToast(err?.message || 'Không tải được danh sách gian hàng', 'error');
+      } catch (err: unknown) {
+        addToast(getErrorMessage(err, 'Không tải được danh sách gian hàng'), 'error');
       } finally {
         setLoading(false);
       }
@@ -208,8 +217,8 @@ const StoreApprovals = () => {
       setSelected(new Set());
       setConfirmState(null);
       addToast('Đã phê duyệt gian hàng đã chọn', 'success');
-    } catch (err: any) {
-      addToast(err?.message || 'Phê duyệt gian hàng thất bại', 'error');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, 'Phê duyệt gian hàng thất bại'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -228,8 +237,8 @@ const StoreApprovals = () => {
       setDetailStore((current) => current ? { ...current, approvalStatus: 'REJECTED', rejectionReason: rejectReason.trim(), status: 'INACTIVE', operatingStatus: 'INACTIVE', liveProductCount: 0 } : null);
       setSelected((prev) => { const next = new Set(prev); next.delete(detailStore.id); return next; });
       addToast('Đã từ chối hồ sơ gian hàng', 'info');
-    } catch (err: any) {
-      addToast(err?.message || 'Từ chối hồ sơ gian hàng thất bại', 'error');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, 'Từ chối hồ sơ gian hàng thất bại'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -267,8 +276,8 @@ const StoreApprovals = () => {
       addToast(confirmState.mode === 'suspend' ? 'Đã tạm khóa gian hàng đã chọn' : 'Đã mở lại gian hàng đã chọn', confirmState.mode === 'suspend' ? 'info' : 'success');
       setSelected(new Set());
       setConfirmState(null);
-    } catch (err: any) {
-      addToast(err?.message || 'Không thể cập nhật trạng thái gian hàng', 'error');
+    } catch (err: unknown) {
+      addToast(getErrorMessage(err, 'Không thể cập nhật trạng thái gian hàng'), 'error');
     } finally {
       setActionLoading(false);
     }
@@ -304,7 +313,7 @@ const StoreApprovals = () => {
             <h2>Danh sách gian hàng</h2>
             <span className="admin-muted">Operator theo dõi vòng đời gian hàng: duyệt hồ sơ, khóa vận hành, mở lại hoạt động và rà soát tín hiệu kinh doanh cơ bản.</span>
           </div>
-          {loading ? <AdminTableSkeleton columns={7} rows={6} /> : null}
+          {loading ? null : null}
           {!loading && filteredStores.length === 0 ? (
             <AdminStateBlock type={search.trim() ? 'search-empty' : 'empty'} title={search.trim() ? 'Không tìm thấy gian hàng phù hợp' : 'Chưa có hồ sơ gian hàng'} description={search.trim() ? 'Thử đổi từ khóa hoặc đặt lại bộ lọc để xem lại danh sách gian hàng.' : 'Danh sách gian hàng sẽ hiển thị tại đây để operator quản lý vòng đời vận hành.'} actionLabel="Đặt lại bộ lọc" onAction={resetCurrentView} />
           ) : null}
@@ -372,21 +381,21 @@ const StoreApprovals = () => {
         <>
           <div className="drawer-overlay" onClick={() => { setDetailStore(null); setRejectReason(''); }} />
           <div className="drawer store-drawer">
-            <div className="drawer-header">
-              <div><p className="drawer-eyebrow">Hồ sơ gian hàng</p><h3>{detailStore.name}</h3></div>
-              <button className="admin-icon-btn" onClick={() => { setDetailStore(null); setRejectReason(''); }} aria-label="Đóng hồ sơ gian hàng"><X size={16} /></button>
-            </div>
+            <PanelDrawerHeader
+              eyebrow="Hồ sơ gian hàng"
+              title={detailStore.name}
+              onClose={() => { setDetailStore(null); setRejectReason(''); }}
+              closeLabel="Đóng hồ sơ gian hàng"
+            />
             <div className="drawer-body">
-              <section className="drawer-section">
-                <h4>Tổng quan gian hàng</h4>
+              <PanelDrawerSection title="Tổng quan gian hàng">
                 <div className="store-drawer-hero">
                   <div className="store-avatar large">{detailStore.logo ? <img src={detailStore.logo} alt={detailStore.name} /> : <Store size={22} />}</div>
                   <div><div className="admin-bold">{detailStore.name}</div><div className="admin-muted">{detailStore.slug}</div></div>
                   <div className="store-hero-pills"><span className={`admin-pill ${approvalTone(detailStore.approvalStatus)}`}>{approvalLabel(detailStore.approvalStatus)}</span><span className={`admin-pill ${operatingTone(detailStore.operatingStatus)}`}>{operatingLabel(detailStore.operatingStatus)}</span></div>
                 </div>
-              </section>
-              <section className="drawer-section">
-                <h4>Hồ sơ và chủ sở hữu</h4>
+              </PanelDrawerSection>
+              <PanelDrawerSection title="Hồ sơ và chủ sở hữu">
                 <div className="admin-card-list">
                   <div className="admin-card-row"><span className="admin-bold"><User size={14} style={{ verticalAlign: -2, marginRight: 6 }} /> Chủ sở hữu</span><span className="admin-muted">{detailStore.applicantName || 'Chưa đồng bộ chủ sở hữu'}</span></div>
                   <div className="admin-card-row"><span className="admin-bold">Email liên hệ</span><span className="admin-muted">{detailStore.applicantEmail || detailStore.contactEmail || 'Chưa có email'}</span></div>
@@ -394,9 +403,8 @@ const StoreApprovals = () => {
                   <div className="admin-card-row"><span className="admin-bold">Kho lấy hàng</span><span className="admin-muted">{detailStore.warehouseAddress}</span></div>
                   <div className="admin-card-row"><span className="admin-bold">Tỷ lệ hoa hồng</span><span className="admin-muted">{detailStore.commissionRate || 5}%</span></div>
                 </div>
-              </section>
-              <section className="drawer-section">
-                <h4>Tín hiệu kinh doanh</h4>
+              </PanelDrawerSection>
+              <PanelDrawerSection title="Tín hiệu kinh doanh">
                 <div className="store-signal-grid">
                   <div className="store-signal-card"><span className="admin-muted small">Sản phẩm</span><strong>{detailStore.liveProductCount}/{detailStore.productCount}</strong><span className="admin-muted small">đang hiển thị / tổng SKU</span></div>
                   <div className="store-signal-card"><span className="admin-muted small">Đơn hàng</span><strong>{detailStore.totalOrders.toLocaleString('vi-VN')}</strong><span className="admin-muted small">đơn đã ghi nhận</span></div>
@@ -405,20 +413,19 @@ const StoreApprovals = () => {
                   <div className="store-signal-card"><span className="admin-muted small">Phản hồi</span><strong>{detailStore.responseRate}%</strong><span className="admin-muted small">tỉ lệ phản hồi ước tính</span></div>
                   <div className="store-signal-card"><span className="admin-muted small">Ngày tạo</span><strong>{new Date(detailStore.createdAt).toLocaleDateString('vi-VN')}</strong><span className="admin-muted small">mốc khởi tạo hồ sơ</span></div>
                 </div>
-              </section>
-              <section className="drawer-section"><h4>Mô tả gian hàng</h4><p className="admin-muted store-description">{detailStore.description || 'Chưa có mô tả gian hàng.'}</p></section>
-              <section className="drawer-section">
-                <h4>Ghi chú kiểm duyệt</h4>
+              </PanelDrawerSection>
+              <PanelDrawerSection title="Mô tả gian hàng"><p className="admin-muted store-description">{detailStore.description || 'Chưa có mô tả gian hàng.'}</p></PanelDrawerSection>
+              <PanelDrawerSection title="Ghi chú kiểm duyệt">
                 {detailStore.approvalStatus === 'PENDING' || detailStore.approvalStatus === 'REJECTED' ? <textarea className="admin-textarea store-reject-note" rows={4} placeholder="Nhập ghi chú hoặc lý do từ chối hồ sơ gian hàng" value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} /> : <div className="admin-card-list"><div className="admin-card-row"><span className="admin-bold">Ghi chú hiện tại</span><span className="admin-muted">{detailStore.rejectionReason || 'Chưa có ghi chú kiểm duyệt. Gian hàng đang hoạt động bình thường.'}</span></div></div>}
-              </section>
+              </PanelDrawerSection>
             </div>
-            <div className="drawer-footer">
+            <PanelDrawerFooter>
               <button className="admin-ghost-btn" onClick={() => { setDetailStore(null); setRejectReason(''); }}>Đóng</button>
               {detailStore.approvalStatus === 'PENDING' ? <button className="admin-ghost-btn danger" disabled={actionLoading} onClick={() => void rejectStore()}><X size={14} />Từ chối hồ sơ</button> : null}
               {detailStore.approvalStatus === 'PENDING' ? <button className="admin-primary-btn" disabled={actionLoading} onClick={() => openConfirm('approve', [detailStore.id])}><Check size={14} />Duyệt gian hàng</button> : null}
               {detailStore.approvalStatus === 'APPROVED' && detailStore.operatingStatus === 'ACTIVE' ? <button className="admin-ghost-btn danger" onClick={() => openConfirm('suspend', [detailStore.id])}><Ban size={14} />Tạm khóa gian hàng</button> : null}
               {detailStore.approvalStatus === 'APPROVED' && detailStore.operatingStatus === 'SUSPENDED' ? <button className="admin-primary-btn" onClick={() => openConfirm('reactivate', [detailStore.id])}><RotateCcw size={14} />Mở lại gian hàng</button> : null}
-            </div>
+            </PanelDrawerFooter>
           </div>
         </>
       ) : null}

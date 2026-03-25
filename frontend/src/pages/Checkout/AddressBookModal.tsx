@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, CheckCircle2 } from 'lucide-react';
 import { addressService } from '../../services/addressService';
 import type { Address } from '../../types';
@@ -10,27 +10,17 @@ interface AddressBookModalProps {
   onSelectAddress: (address: Address) => void;
 }
 
-const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModalProps) => {
-  const [addresses, setAddresses] = useState<Address[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      const addrs = addressService.getAll();
-      setAddresses(addrs);
-      const defaultAddr = addrs.find(a => a.isDefault);
-      setSelectedId(defaultAddr?.id || null);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
+const AddressBookModalContent = ({ onClose, onSelectAddress }: Omit<AddressBookModalProps, 'isOpen'>) => {
+  const addresses = addressService.getAll();
+  const defaultAddressId = addresses.find((address) => address.isDefault)?.id || null;
+  const [selectedId, setSelectedId] = useState<string | null>(defaultAddressId);
 
   const handleSelect = () => {
-    const selected = addresses.find(a => a.id === selectedId);
-    if (selected) {
-      onSelectAddress(selected);
-      onClose();
-    }
+    const selected = addresses.find((address) => address.id === selectedId);
+    if (!selected) return;
+
+    onSelectAddress(selected);
+    onClose();
   };
 
   return (
@@ -48,22 +38,22 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
             <div className="empty-address-msg">Bạn chưa có địa chỉ nào trong sổ.</div>
           ) : (
             <div className="address-list">
-              {addresses.map(addr => (
-                <button 
-                  key={addr.id} 
-                  className={`address-item ${selectedId === addr.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedId(addr.id)}
-                  aria-pressed={selectedId === addr.id}
+              {addresses.map((address) => (
+                <button
+                  key={address.id}
+                  className={`address-item ${selectedId === address.id ? 'selected' : ''}`}
+                  onClick={() => setSelectedId(address.id)}
+                  aria-pressed={selectedId === address.id}
                 >
                   <div className="address-item-header">
-                    <span className="address-name">{addr.fullName}</span>
-                    {addr.isDefault && <span className="address-badge">Mặc định</span>}
+                    <span className="address-name">{address.fullName}</span>
+                    {address.isDefault && <span className="address-badge">Mặc định</span>}
                   </div>
-                  <div className="address-phone">{addr.phone}</div>
+                  <div className="address-phone">{address.phone}</div>
                   <div className="address-full">
-                    {addressService.formatFullAddress(addr)}
+                    {addressService.formatFullAddress(address)}
                   </div>
-                  {selectedId === addr.id && (
+                  {selectedId === address.id && (
                     <div className="address-check-icon">
                       <CheckCircle2 fill="var(--co-blue)" color="white" size={24} />
                     </div>
@@ -75,16 +65,24 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
         </div>
 
         <div className="address-modal-footer">
-          <button 
-            className="address-confirm-btn" 
-            onClick={handleSelect}
-            disabled={!selectedId}
-          >
+          <button className="address-confirm-btn" onClick={handleSelect} disabled={!selectedId}>
             Xác nhận
           </button>
         </div>
       </div>
     </div>
+  );
+};
+
+const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModalProps) => {
+  if (!isOpen) return null;
+
+  return (
+    <AddressBookModalContent
+      key={`address-book-${isOpen ? 'open' : 'closed'}`}
+      onClose={onClose}
+      onSelectAddress={onSelectAddress}
+    />
   );
 };
 

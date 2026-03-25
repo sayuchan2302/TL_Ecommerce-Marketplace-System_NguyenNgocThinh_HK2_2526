@@ -1,0 +1,53 @@
+.page-fallback {
+  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.page-fallback-row {
+  height: 18px;
+  border-radius: 10px;
+  background: #e5e7eb;
+}
+
+.page-fallback-row.short {
+  width: 70%;
+}
+
+.page-fallback-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.page-fallback-card {
+  height: 110px;
+  border-radius: 12px;
+  background: #e5e7eb;
+}
+
+.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: shimmer 1.2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}

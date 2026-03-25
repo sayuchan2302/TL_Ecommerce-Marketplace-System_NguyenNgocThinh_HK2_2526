@@ -3,7 +3,7 @@ import {
   ChevronRight, Package, Truck, CheckCircle2, XCircle, Clock,
   MapPin, Phone, CreditCard, ArrowLeft, RotateCcw, Copy, X, AlertTriangle
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { orderService } from '../../services/orderService';
 import { formatPrice } from '../../utils/formatters';
@@ -34,17 +34,10 @@ const OrderDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { addToast } = useToast();
-  const [order, setOrder] = useState<Order | null>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [selectedReason, setSelectedReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
-
-  useEffect(() => {
-    if (id) {
-      const foundOrder = orderService.getById(id);
-      setOrder(foundOrder);
-    }
-  }, [id]);
+  const order = useMemo<Order | null>(() => (id ? orderService.getById(id) : null), [id]);
 
   const handleCancelOrder = () => {
     if (!order) return;

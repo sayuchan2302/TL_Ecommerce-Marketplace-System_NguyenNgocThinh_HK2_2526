@@ -28,9 +28,9 @@ const VendorStorefront = () => {
         const next = await vendorPortalService.getSettings();
         if (!active) return;
         setSettings(next);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!active) return;
-        addToast(err?.message || 'Không tải được gian hàng công khai', 'error');
+        addToast((err as Error)?.message || 'Không tải được gian hàng công khai', 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -61,8 +61,8 @@ const VendorStorefront = () => {
     try {
       await vendorPortalService.updateSettings(settings.storeInfo);
       addToast('Đã lưu bộ mặt gian hàng', 'success');
-    } catch (err: any) {
-      addToast(err?.message || 'Lưu gian hàng thất bại', 'error');
+    } catch (err: unknown) {
+      addToast((err as Error)?.message || 'Lưu gian hàng thất bại', 'error');
     } finally {
       setSaving(false);
     }

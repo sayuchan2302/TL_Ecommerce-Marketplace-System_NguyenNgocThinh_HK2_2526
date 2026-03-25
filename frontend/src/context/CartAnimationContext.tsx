@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import './CartAnimation.css';

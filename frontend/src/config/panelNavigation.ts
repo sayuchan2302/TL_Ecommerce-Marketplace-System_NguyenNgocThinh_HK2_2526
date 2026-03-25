@@ -6,6 +6,7 @@ export const adminPanelNav: PanelNavItem[] = [
   { label: 'Gian hàng', to: '/admin/stores' },
   { label: 'Khách hàng', to: '/admin/users' },
   { label: 'Đơn hàng', to: '/admin/orders' },
+  { label: 'Hoàn đơn', to: '/admin/returns' },
   { label: 'Tài chính', to: '/admin/financials' },
   { label: 'Khuyến mãi', to: '/admin/promotions' },
   { label: 'Đánh giá', to: '/admin/reviews' },

@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, Plus, Pencil, Pause, Play, X, Tag, Trash2 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
-import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
+import { AdminStateBlock } from './AdminStateBlocks';
 import AdminConfirmDialog from './AdminConfirmDialog';
 import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
@@ -232,9 +232,7 @@ const AdminPromotions = () => {
             <h2>Kho voucher</h2>
             <span className="admin-muted">{filteredItems.length} chiến dịch hiển thị</span>
           </div>
-          {isLoading ? (
-            <AdminTableSkeleton columns={9} rows={6} />
-          ) : filteredItems.length === 0 ? (
+          {isLoading ? null : filteredItems.length === 0 ? (
             <AdminStateBlock
               type={search.trim() ? 'search-empty' : 'empty'}
               title={search.trim() ? 'Không tìm thấy chiến dịch phù hợp' : 'Chưa có chiến dịch toàn sàn'}

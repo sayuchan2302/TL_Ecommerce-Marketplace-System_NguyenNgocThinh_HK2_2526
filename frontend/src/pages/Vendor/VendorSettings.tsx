@@ -2,6 +2,7 @@ import './Vendor.css';
 import { useEffect, useState } from 'react';
 import { Bell, CreditCard, MapPin, Save, Store, Truck } from 'lucide-react';
 import VendorLayout from './VendorLayout';
+import { PanelSectionHeader, PanelStatsGrid, PanelTabs } from '../../components/Panel/PanelPrimitives';
 import { vendorPortalService, type VendorSettingsData } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
@@ -37,9 +38,9 @@ const VendorSettings = () => {
         const next = await vendorPortalService.getSettings();
         if (!active) return;
         setSettings(next);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!active) return;
-        addToast(err?.message || 'Không tải được cấu hình vận hành shop', 'error');
+        addToast((err as Error)?.message || 'Không tải được cấu hình vận hành shop', 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -68,8 +69,8 @@ const VendorSettings = () => {
         },
       }));
       addToast('Đã lưu cấu hình shop', 'success');
-    } catch (err: any) {
-      addToast(err?.message || 'Lưu cấu hình thất bại', 'error');
+    } catch (err: unknown) {
+      addToast((err as Error)?.message || 'Lưu cấu hình thất bại', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -84,6 +85,38 @@ const VendorSettings = () => {
       },
     }));
   };
+
+  const statItems = [
+    {
+      key: 'store',
+      label: 'Gian hàng',
+      value: settings.storeInfo.name || 'Chưa đặt tên',
+      sub: 'Tên hiển thị trên storefront',
+    },
+    {
+      key: 'bank',
+      label: 'Đối soát',
+      value: settings.bankInfo.verified ? 'Đã xác minh' : 'Chưa xác minh',
+      sub: 'Tài khoản nhận tiền của shop',
+      tone: 'success',
+    },
+    {
+      key: 'notifications',
+      label: 'Thông báo',
+      value: `${Object.values(settings.notifications).filter(Boolean).length}/5`,
+      sub: 'Kênh cảnh báo đang bật',
+      tone: 'info',
+    },
+    {
+      key: 'shipping',
+      label: 'Đơn vị vận chuyển',
+      value: [settings.shipping.ghn, settings.shipping.ghtk, settings.shipping.express].filter(Boolean).length,
+      sub: 'Đơn vị hiện sẵn sàng xử lý',
+      tone: 'warning',
+    },
+  ] as const;
+
+  const tabItems = TABS.map((tab) => ({ key: tab.id, label: tab.label }));
 
   return (
     <VendorLayout
@@ -104,44 +137,22 @@ const VendorSettings = () => {
         />
       ) : (
         <>
-          <div className="admin-stats grid-4">
-            <div className="admin-stat-card">
-              <div className="admin-stat-label">Gian hàng</div>
-              <div className="admin-stat-value">{settings.storeInfo.name || 'Chưa đặt tên'}</div>
-              <div className="admin-stat-sub">Tên hiển thị trên storefront</div>
-            </div>
-            <div className="admin-stat-card success">
-              <div className="admin-stat-label">Đối soát</div>
-              <div className="admin-stat-value">{settings.bankInfo.verified ? 'Đã xác minh' : 'Chưa xác minh'}</div>
-              <div className="admin-stat-sub">Tài khoản nhận tiền của shop</div>
-            </div>
-            <div className="admin-stat-card info">
-              <div className="admin-stat-label">Thông báo</div>
-              <div className="admin-stat-value">{Object.values(settings.notifications).filter(Boolean).length}/5</div>
-              <div className="admin-stat-sub">Kênh cảnh báo đang bật</div>
-            </div>
-            <div className="admin-stat-card warning">
-              <div className="admin-stat-label">Đơn vị vận chuyển</div>
-              <div className="admin-stat-value">{[settings.shipping.ghn, settings.shipping.ghtk, settings.shipping.express].filter(Boolean).length}</div>
-              <div className="admin-stat-sub">Đơn vị hiện sẵn sàng xử lý</div>
-            </div>
-          </div>
+          <PanelStatsGrid items={[...statItems]} />
 
-          <div className="admin-tabs">
-            {TABS.map((tab) => (
-              <button key={tab.id} className={`admin-tab ${activeTab === tab.id ? 'active vendor-active-tab' : ''}`} onClick={() => setActiveTab(tab.id)}>
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
+          <PanelTabs
+            items={tabItems}
+            activeKey={activeTab}
+            onChange={(key) => setActiveTab(key as SettingsTab)}
+            accentClassName="vendor-active-tab"
+          />
 
           <section className="admin-panels single">
             {activeTab === 'store' && (
               <div className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2><Store size={16} /> Hồ sơ gian hàng công khai</h2>
-                  <span className="admin-muted">Thông tin hiển thị trên storefront và các điểm “Bán bởi”.</span>
-                </div>
+                <PanelSectionHeader
+                  title={<><Store size={16} /> Hồ sơ gian hàng công khai</>}
+                  description="Thông tin hiển thị trên storefront và các điểm “Bán bởi”."
+                />
                 <div className="form-grid">
                   <label className="form-field">
                     <span>Tên gian hàng</span>
@@ -169,10 +180,10 @@ const VendorSettings = () => {
 
             {activeTab === 'bank' && (
               <div className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2><CreditCard size={16} /> Tài khoản nhận tiền</h2>
-                  <span className="admin-muted">Dùng cho payout sau khi trừ phí sàn và đối soát đơn hàng.</span>
-                </div>
+                <PanelSectionHeader
+                  title={<><CreditCard size={16} /> Tài khoản nhận tiền</>}
+                  description="Dùng cho payout sau khi trừ phí sàn và đối soát đơn hàng."
+                />
                 <div className="admin-card-list">
                   <div className="admin-card-row">
                     <span className="admin-bold">Ngân hàng</span>
@@ -196,10 +207,10 @@ const VendorSettings = () => {
 
             {activeTab === 'notifications' && (
               <div className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2><Bell size={16} /> Thông báo vận hành</h2>
-                  <span className="admin-muted">Chọn tín hiệu mà shop muốn được cảnh báo.</span>
-                </div>
+                <PanelSectionHeader
+                  title={<><Bell size={16} /> Thông báo vận hành</>}
+                  description="Chọn tín hiệu mà shop muốn được cảnh báo."
+                />
                 <div className="admin-card-list">
                   {[
                     ['newOrder', 'Đơn hàng mới', 'Nhận thông báo khi shop phát sinh đơn hàng mới cần tiếp nhận'],
@@ -229,10 +240,10 @@ const VendorSettings = () => {
 
             {activeTab === 'shipping' && (
               <div className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2><Truck size={16} /> Vận chuyển và kho lấy hàng</h2>
-                  <span className="admin-muted">Đơn vị giao nhận sẵn sàng và thông tin kho của shop.</span>
-                </div>
+                <PanelSectionHeader
+                  title={<><Truck size={16} /> Vận chuyển và kho lấy hàng</>}
+                  description="Đơn vị giao nhận sẵn sàng và thông tin kho của shop."
+                />
                 <div className="admin-card-list">
                   <div className="admin-card-row">
                     <span className="admin-bold">Đơn vị hoạt động</span>

@@ -18,35 +18,10 @@ import {
 import { motion } from 'framer-motion';
 import { startTransition, useEffect, useState } from 'react';
 import VendorLayout from './VendorLayout';
+import { getVendorOrderStatusLabel, getVendorOrderStatusTone } from './vendorOrderPresentation';
 import { calculateCommission, formatCurrency } from '../../services/commissionService';
 import { vendorPortalService, type VendorDashboardData, type VendorOrderSummary } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
-
-const getStatusLabel = (status: string) => {
-  const statusMap: Record<string, string> = {
-    pending: 'Chờ xác nhận',
-    confirmed: 'Đã xác nhận',
-    processing: 'Đang xử lý',
-    shipping: 'Đang giao',
-    delivered: 'Đã giao',
-    completed: 'Hoàn thành',
-    cancelled: 'Đã hủy',
-  };
-  return statusMap[status] || status;
-};
-
-const getStatusTone = (status: string) => {
-  const toneMap: Record<string, string> = {
-    pending: 'pending',
-    confirmed: 'teal',
-    processing: 'teal',
-    shipping: 'teal',
-    delivered: 'success',
-    completed: 'success',
-    cancelled: 'error',
-  };
-  return toneMap[status] || 'neutral';
-};
 
 const initialData: VendorDashboardData = {
   stats: {
@@ -76,9 +51,9 @@ const VendorDashboard = () => {
         const next = await vendorPortalService.getDashboardData();
         if (!active) return;
         startTransition(() => setData(next));
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!active) return;
-        addToast(err?.message || 'Không tải được bảng điều khiển gian hàng', 'error');
+        addToast((err as Error)?.message || 'Không tải được bảng điều khiển gian hàng', 'error');
       } finally {
         if (active) {
           setLoading(false);
@@ -167,7 +142,7 @@ const VendorDashboard = () => {
           item.id === order.id
             ? {
                 ...item,
-                status: 'confirmed',
+                status: 'packing',
               }
             : item,
         ),
@@ -312,8 +287,8 @@ const VendorDashboard = () => {
                   <div role="cell" style={{ color: '#d97706', fontSize: 13 }}>-{formatCurrency(order.commissionFee)}</div>
                   <div role="cell" style={{ color: '#0d9488', fontWeight: 700 }}>{formatCurrency(order.vendorPayout)}</div>
                   <div role="cell">
-                    <span className={`vendor-pill ${getStatusTone(order.status)}`}>
-                      {getStatusLabel(order.status)}
+                    <span className={`vendor-pill ${getVendorOrderStatusTone(order.status)}`}>
+                      {getVendorOrderStatusLabel(order.status)}
                     </span>
                   </div>
                   <div role="cell" className="vendor-actions">

@@ -1,10 +1,10 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
-import type { ReactElement } from 'react';
 import { motion, AnimatePresence, type Transition } from 'framer-motion';
 import { Shield, AlertCircle } from 'lucide-react';
-import type { UserRole } from '../../types/auth';
+import type { ReactElement } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
+import type { UserRole } from '../../types/auth';
 
 type AnimationPreset = 'fade' | 'slide' | 'scale' | 'none';
 
@@ -33,16 +33,18 @@ const UnauthenticatedFallback = ({ from }: UnauthenticatedFallbackProps) => (
       <Shield className="w-8 h-8 text-neutral-400" strokeWidth={1.5} />
     </div>
     <div className="text-center">
-      <h2 className="text-lg font-medium text-neutral-900">Yêu cầu đăng nhập</h2>
-      <p className="text-sm text-neutral-500 mt-1">Vui lòng đăng nhập để tiếp tục</p>
+      <h2 className="text-lg font-medium text-neutral-900">Yeu cau dang nhap</h2>
+      <p className="text-sm text-neutral-500 mt-1">Vui long dang nhap de tiep tuc</p>
     </div>
     <motion.button
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
-      onClick={() => window.location.href = `/login?redirect=${encodeURIComponent(from)}`}
+      onClick={() => {
+        window.location.href = `/login?redirect=${encodeURIComponent(from)}`;
+      }}
       className="px-6 py-2.5 bg-neutral-900 text-white text-sm font-medium rounded-full hover:bg-neutral-800 transition-colors"
     >
-      Đăng nhập ngay
+      Dang nhap ngay
     </motion.button>
   </motion.div>
 );
@@ -54,9 +56,9 @@ interface UnauthorizedFallbackProps {
 
 const UnauthorizedFallback = ({ requiredRole, currentRole }: UnauthorizedFallbackProps) => {
   const roleLabels: Record<UserRole, string> = {
-    CUSTOMER: 'Khách hàng',
-    VENDOR: 'Người bán',
-    SUPER_ADMIN: 'Quản trị viên',
+    CUSTOMER: 'Khach hang',
+    VENDOR: 'Nguoi ban',
+    SUPER_ADMIN: 'Quan tri vien',
   };
 
   return (
@@ -70,21 +72,22 @@ const UnauthorizedFallback = ({ requiredRole, currentRole }: UnauthorizedFallbac
         <AlertCircle className="w-8 h-8 text-amber-500" strokeWidth={1.5} />
       </div>
       <div className="text-center max-w-sm">
-        <h2 className="text-lg font-medium text-neutral-900">Không có quyền truy cập</h2>
+        <h2 className="text-lg font-medium text-neutral-900">Khong co quyen truy cap</h2>
         <p className="text-sm text-neutral-500 mt-1">
-          {currentRole 
-            ? `Bạn đang đăng nhập với tài khoản "${roleLabels[currentRole]}".`
-            : 'Bạn không có quyền truy cập trang này.'
-          }
+          {currentRole
+            ? `Ban dang dang nhap voi tai khoan "${roleLabels[currentRole]}".`
+            : 'Ban khong co quyen truy cap trang nay.'}
         </p>
         {requiredRole === 'VENDOR' && (
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => window.location.href = '/vendor/register'}
+            onClick={() => {
+              window.location.href = '/vendor/register';
+            }}
             className="mt-4 px-6 py-2.5 bg-neutral-900 text-white text-sm font-medium rounded-full hover:bg-neutral-800 transition-colors"
           >
-            Đăng ký kênh người bán
+            Dang ky kenh nguoi ban
           </motion.button>
         )}
       </div>
@@ -132,6 +135,10 @@ const ProtectedRoute = ({
   const location = useLocation();
   const currentPath = location.pathname + location.search;
 
+  const redirectToLogin = (reason = 'session-expired') => (
+    <Navigate to={`/login?reason=${encodeURIComponent(reason)}&redirect=${encodeURIComponent(currentPath)}`} replace />
+  );
+
   if (!isAuthenticated) {
     if (fallbackPath) {
       return <Navigate to={fallbackPath} replace state={{ from: currentPath }} />;
@@ -141,7 +148,7 @@ const ProtectedRoute = ({
 
   if (allowedRoles && allowedRoles.length > 0) {
     const userRole = user?.role;
-    
+
     if (!userRole || !allowedRoles.includes(userRole)) {
       if (fallbackPath) {
         return <Navigate to={fallbackPath} replace />;
@@ -156,7 +163,19 @@ const ProtectedRoute = ({
   const requiresBackendJwt =
     Boolean(allowedRoles?.includes('VENDOR')) || Boolean(allowedRoles?.includes('SUPER_ADMIN'));
 
-  if (requiresBackendJwt && !authService.isBackendJwtToken(token)) {
+  if (requiresBackendJwt) {
+    const invalidJwt = !authService.isBackendJwtToken(token) || authService.isJwtExpired(token);
+    if (invalidJwt) {
+      authService.logout('session-expired');
+      authService.adminLogout('session-expired');
+      return redirectToLogin('session-expired');
+    }
+  }
+
+  if (requireVendorApproval && user?.role === 'VENDOR' && !user.isApprovedVendor) {
+    if (fallbackPath) {
+      return <Navigate to={fallbackPath} replace />;
+    }
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -167,41 +186,16 @@ const ProtectedRoute = ({
           <AlertCircle className="w-8 h-8 text-amber-500" strokeWidth={1.5} />
         </div>
         <div className="text-center max-w-sm">
-          <h2 className="text-lg font-medium text-neutral-900">Phiên đăng nhập không hợp lệ</h2>
+          <h2 className="text-lg font-medium text-neutral-900">Cua hang cho phe duyet</h2>
           <p className="text-sm text-neutral-500 mt-1">
-            Panel người bán/quản trị viên chỉ chấp nhận đăng nhập bằng backend JWT thật. Vui lòng đăng nhập lại.
+            Cua hang cua ban dang cho quan tri vien phe duyet. Vui long cho trong giay lat.
           </p>
         </div>
       </motion.div>
     );
   }
 
-  if (requireVendorApproval && user?.role === 'VENDOR') {
-    if (!user?.isApprovedVendor) {
-      if (fallbackPath) {
-        return <Navigate to={fallbackPath} replace />;
-      }
-      return (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center justify-center min-h-[60vh] gap-4 px-4"
-        >
-          <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center">
-            <AlertCircle className="w-8 h-8 text-amber-500" strokeWidth={1.5} />
-          </div>
-          <div className="text-center max-w-sm">
-            <h2 className="text-lg font-medium text-neutral-900">Cửa hàng chờ phê duyệt</h2>
-            <p className="text-sm text-neutral-500 mt-1">
-              Cửa hàng của bạn đang chờ quản trị viên phê duyệt. Vui lòng chờ trong giây lát.
-            </p>
-          </div>
-        </motion.div>
-      );
-    }
-  }
-
-  const content = (
+  return (
     <AnimatePresence mode="wait">
       <motion.div
         key={location.pathname}
@@ -215,8 +209,6 @@ const ProtectedRoute = ({
       </motion.div>
     </AnimatePresence>
   );
-
-  return content;
 };
 
 export default ProtectedRoute;

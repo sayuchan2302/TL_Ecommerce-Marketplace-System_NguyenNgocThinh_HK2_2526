@@ -1,58 +1,37 @@
 import './Admin.css';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Search, X, Check, XCircle,
-  ChevronRight, Eye, Trash2, Package, ArrowUpDown, Filter, Link2
+  Eye, Package
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
-import { AdminStateBlock, AdminTableSkeleton } from './AdminStateBlocks';
+import { AdminStateBlock } from './AdminStateBlocks';
 import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminPagination } from './AdminPagination';
-import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
 import { ADMIN_DICTIONARY } from './adminDictionary';
-import {
-  adminReturnService,
-  reasonLabel,
-  resolutionLabel,
-  type ReturnRequest,
-  type ReturnStatus,
-} from './adminReturnService';
-import { AdminToast } from './AdminStateBlocks';
+import { returnService, type ReturnRequest, type ReturnStatus } from '../../services/returnService';
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-const getInitials = (name: string) => {
-  const parts = name.trim().split(' ');
-  return parts.length >= 2 ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase() : name.slice(0, 2).toUpperCase();
-};
-
-// ── Status helpers ─────────────────────────────────────────────────────────
 const statusConfig: Record<ReturnStatus, { label: string; pillClass: string }> = {
-  pending:   { label: ADMIN_DICTIONARY.returns.status.pending,  pillClass: 'admin-pill pending'  },
-  approved:  { label: ADMIN_DICTIONARY.returns.status.approved, pillClass: 'admin-pill success'  },
-  rejected:  { label: ADMIN_DICTIONARY.returns.status.rejected, pillClass: 'admin-pill danger'   },
-  completed: { label: ADMIN_DICTIONARY.returns.status.completed, pillClass: 'admin-pill neutral'  },
+  PENDING:   { label: ADMIN_DICTIONARY.returns.status.pending,  pillClass: 'admin-pill pending'  },
+  APPROVED:  { label: ADMIN_DICTIONARY.returns.status.approved, pillClass: 'admin-pill success'  },
+  REJECTED:  { label: ADMIN_DICTIONARY.returns.status.rejected, pillClass: 'admin-pill danger'   },
+  COMPLETED: { label: ADMIN_DICTIONARY.returns.status.completed, pillClass: 'admin-pill neutral'  },
 };
 
-const StatusBadge = ({ status }: { status: ReturnStatus }) => {
-  const { label, pillClass } = statusConfig[status];
-  return <span className={pillClass}>{label}</span>;
-};
-
-const TABS = [
+const TABS: Array<{ key: 'all' | Lowercase<ReturnStatus>; label: string }> = [
   { key: 'all', label: ADMIN_DICTIONARY.returns.tabs.all },
   { key: 'pending', label: ADMIN_DICTIONARY.returns.tabs.pending },
   { key: 'approved', label: ADMIN_DICTIONARY.returns.tabs.approved },
   { key: 'completed', label: ADMIN_DICTIONARY.returns.tabs.completed },
   { key: 'rejected', label: ADMIN_DICTIONARY.returns.tabs.rejected },
-] as const;
+];
 
 type TabKey = typeof TABS[number]['key'];
 
-// ── Main Component ─────────────────────────────────────────────────────────
 const AdminReturns = () => {
   const t = ADMIN_DICTIONARY.returns;
   const c = ADMIN_DICTIONARY.common;
@@ -65,42 +44,65 @@ const AdminReturns = () => {
   });
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [allReturns, setAllReturns] = useState<ReturnRequest[]>(() => adminReturnService.getAll());
+  const [allReturns, setAllReturns] = useState<ReturnRequest[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [drawerItem, setDrawerItem] = useState<ReturnRequest | null>(null);
+  const [drawerNote, setDrawerNote] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
   const { toast, pushToast } = useAdminToast();
 
-  const statusFilter: 'all' | ReturnStatus =
-    (view.status === 'pending' || view.status === 'approved' || view.status === 'completed' || view.status === 'rejected')
-      ? view.status
-      : 'all';
+  const statusFilter: ReturnStatus | null =
+    view.status === 'pending' ? 'PENDING'
+      : view.status === 'approved' ? 'APPROVED'
+        : view.status === 'completed' ? 'COMPLETED'
+          : view.status === 'rejected' ? 'REJECTED'
+            : null;
 
-  const { search, isLoading, filteredItems, pagedItems, page, totalPages, startIndex, endIndex, next, prev, setPage, setSearch } =
-    useAdminListState<ReturnRequest>({
-      items: allReturns,
-      searchValue: view.search,
-      onSearchChange: view.setSearch,
-      getSearchText: (item) => `${item.id} ${item.customerName} ${item.orderId}`,
-      filterPredicate: statusFilter === 'all' ? undefined : (item) => item.status === statusFilter,
-      pageSize: 10,
-    });
+  const loadReturns = async (pageIndex = 0) => {
+    try {
+      setIsLoading(true);
+      const res = await returnService.listAdmin({
+        status: statusFilter || undefined,
+        page: pageIndex,
+        size: 20,
+      });
+      setAllReturns(res.content);
+      setTotalPages(res.totalPages || 1);
+      setPage(res.number || 0);
+    } catch {
+      pushToast(ADMIN_DICTIONARY.messages.loadFailed);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const [drawerItem, setDrawerItem] = useState<ReturnRequest | null>(null);
-  const [drawerNote, setDrawerNote] = useState('');
+  useEffect(() => {
+    void loadReturns(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
 
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const filteredItems = useMemo(() => {
+    const searchText = (view.search || '').toLowerCase();
+    return allReturns.filter((item) =>
+      item.id.toLowerCase().includes(searchText) ||
+      item.orderId.toLowerCase().includes(searchText) ||
+      (item.customerName || '').toLowerCase().includes(searchText)
+    );
+  }, [allReturns, view.search]);
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
-  const stats = adminReturnService.getStats();
+  const pagedItems = filteredItems;
 
   const tabCounts: Record<TabKey, number> = {
     all: allReturns.length,
-    pending: allReturns.filter((r) => r.status === 'pending').length,
-    approved: allReturns.filter((r) => r.status === 'approved').length,
-    completed: allReturns.filter((r) => r.status === 'completed').length,
-    rejected: allReturns.filter((r) => r.status === 'rejected').length,
+    pending: allReturns.filter((r) => r.status === 'PENDING').length,
+    approved: allReturns.filter((r) => r.status === 'APPROVED').length,
+    completed: allReturns.filter((r) => r.status === 'COMPLETED').length,
+    rejected: allReturns.filter((r) => r.status === 'REJECTED').length,
   };
 
-  // ── Actions ───────────────────────────────────────────────────────────────
   const changeTab = (key: TabKey) => {
     setSelected(new Set());
     view.setStatus(key);
@@ -117,60 +119,27 @@ const AdminReturns = () => {
     setSelected(next);
   };
 
-  const bulkStatusUpdate = (status: ReturnStatus) => {
-    let updatedCount = 0;
-    selected.forEach(id => {
-      const result = adminReturnService.updateStatus(id, status);
-      if (result) updatedCount++;
-    });
-    if (updatedCount > 0) {
-      const latest = adminReturnService.getAll();
-      setAllReturns(latest);
-      setSelected(new Set());
-      pushToast(ADMIN_DICTIONARY.messages.returns.bulkUpdated(updatedCount, statusConfig[status].label));
-    }
-  };
-
-  const bulkDelete = () => {
-    selected.forEach(id => adminReturnService.delete(id));
-    setAllReturns(adminReturnService.getAll());
-    setSelected(new Set());
-    pushToast(ADMIN_DICTIONARY.messages.returns.bulkDeleted(selected.size));
-  };
-
-  const openDrawer = (item: ReturnRequest) => {
-    setDrawerItem(item);
-    setDrawerNote(item.adminNote || '');
-  };
-
-  const closeDrawer = () => {
-    setDrawerItem(null);
-    setDrawerNote('');
-  };
-
-  const applyStatus = (id: string, status: ReturnStatus) => {
-    const updated = adminReturnService.updateStatus(id, status, drawerNote.trim() || undefined);
-    if (updated) {
+  const applyStatus = async (id: string, status: ReturnStatus) => {
+    try {
+      const updated = await returnService.updateStatus(id, status, drawerNote.trim() || undefined);
       setAllReturns((prev) => prev.map((r) => (r.id === id ? updated : r)));
       if (drawerItem?.id === id) setDrawerItem(updated);
       pushToast(ADMIN_DICTIONARY.messages.returns.statusUpdated(statusConfig[status].label));
+    } catch {
+      pushToast(ADMIN_DICTIONARY.messages.actionFailed);
     }
   };
 
-  const confirmDelete = () => {
-    if (!deleteTarget) return;
-    adminReturnService.delete(deleteTarget.id);
-    setAllReturns((prev) => prev.filter((r) => r.id !== deleteTarget.id));
-    if (drawerItem?.id === deleteTarget.id) closeDrawer();
-    setDeleteTarget(null);
-    pushToast(ADMIN_DICTIONARY.messages.returns.deleted);
+  const formatDate = (iso?: string) =>
+    iso ? new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '';
+
+  const resetCurrentView = () => {
+    setSelected(new Set());
+    view.resetCurrentView();
+    setDrawerItem(null);
+    setDrawerNote('');
+    void loadReturns(page);
   };
-
-  const formatDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
-  // ── Render ─────────────────────────────────────────────────────────────────
-  const statusCounts = useMemo(() => stats, [stats]);
 
   const shareCurrentView = async () => {
     try {
@@ -179,14 +148,6 @@ const AdminReturns = () => {
     } catch {
       pushToast(ADMIN_DICTIONARY.messages.copyFailed);
     }
-  };
-
-  const resetCurrentView = () => {
-    setSelected(new Set());
-    view.resetCurrentView();
-    setSearch('');
-    setAllReturns(adminReturnService.getAll());
-    pushToast(ADMIN_DICTIONARY.messages.returns.resetView);
   };
 
   return (
@@ -198,400 +159,184 @@ const AdminReturns = () => {
             <Search size={16} />
             <input
               placeholder={t.searchPlaceholder}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={view.search}
+              onChange={(e) => view.setSearch(e.target.value)}
             />
           </div>
-          <button className="admin-ghost-btn" onClick={() => pushToast(ADMIN_DICTIONARY.messages.advancedFilterComingSoon)}>
-            <Filter size={16} /> {c.filter}
-          </button>
-          <button className="admin-ghost-btn" onClick={shareCurrentView}>
-            <Link2 size={16} /> {ADMIN_DICTIONARY.actions.shareView}
-          </button>
-          <button className="admin-ghost-btn" onClick={resetCurrentView}>
-            {ADMIN_DICTIONARY.actions.resetView}
-          </button>
+          <button className="admin-secondary-btn" onClick={shareCurrentView}><LinkIcon /> {c.share}</button>
+          <button className="admin-secondary-btn" onClick={resetCurrentView}><RefreshIcon /> {c.reset}</button>
         </>
       }
     >
-      {/* ── Stat Cards ──────────────────────────────────────────────────── */}
-      <div className="admin-stats grid-4">
-        <div className="admin-stat-card">
-          <div className="admin-stat-label">{t.stats.total}</div>
-          <div className="admin-stat-value">{statusCounts.total}</div>
-          <div className="admin-stat-sub">{t.statsSub.total}</div>
-        </div>
-        <div
-          className={`admin-stat-card ${stats.pending > 0 ? 'warning' : ''}`}
-          onClick={() => changeTab('pending')}
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="admin-stat-label">{t.stats.pending}</div>
-          <div className="admin-stat-value">{statusCounts.pending}</div>
-          <div className="admin-stat-sub">{t.statsSub.pending}</div>
-        </div>
-        <div
-          className="admin-stat-card success"
-          onClick={() => changeTab('approved')}
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="admin-stat-label">{t.stats.approved}</div>
-          <div className="admin-stat-value">{statusCounts.approved}</div>
-          <div className="admin-stat-sub">{t.statsSub.approved}</div>
-        </div>
-        <div
-          className="admin-stat-card"
-          onClick={() => changeTab('completed')}
-          style={{ cursor: 'pointer' }}
-        >
-          <div className="admin-stat-label">{t.stats.completed}</div>
-          <div className="admin-stat-value">{statusCounts.completed}</div>
-          <div className="admin-stat-sub">{t.statsSub.completed}</div>
-        </div>
-      </div>
-
-      {/* ── Tabs ────────────────────────────────────────────────────────── */}
       <div className="admin-tabs">
-        {TABS.map((tab) => (
+        {TABS.map(tab => (
           <button
             key={tab.key}
-            className={`admin-tab ${statusFilter === tab.key ? 'active' : ''}`}
+            className={`admin-tab ${view.status === tab.key ? 'active' : ''}`}
             onClick={() => changeTab(tab.key)}
           >
             <span>{tab.label}</span>
-            <span className="admin-tab-count">{tabCounts[tab.key]}</span>
+            <span className="admin-pill neutral">{tabCounts[tab.key]}</span>
           </button>
         ))}
       </div>
 
-      {view.hasViewContext && (
-        <div className="admin-view-summary">
-          <span className="summary-chip">{c.statusLabel}: {TABS.find(tab => tab.key === statusFilter)?.label}</span>
-          {search.trim() && <span className="summary-chip">{c.keyword}: {search.trim()}</span>}
-          <button className="summary-clear" onClick={resetCurrentView}>{c.clearFilters}</button>
-        </div>
-      )}
+      {isLoading && <p className="admin-muted">{c.loading}</p>}
 
-      {/* ── Table ───────────────────────────────────────────────────────── */}
-      {isLoading ? (
-        <AdminTableSkeleton rows={5} columns={6} />
-      ) : filteredItems.length === 0 ? (
+      {!isLoading && pagedItems.length === 0 && (
         <AdminStateBlock
-          type={search.trim() ? 'search-empty' : 'empty'}
-          title={search.trim() ? t.empty.searchTitle : t.empty.defaultTitle}
-          description={search.trim() ? t.empty.searchDescription : t.empty.defaultDescription}
-          actionLabel={ADMIN_DICTIONARY.actions.resetFilters}
+          icon={Package}
+          title={t.empty.title}
+          description={t.empty.description}
+          actionLabel={c.reset}
           onAction={resetCurrentView}
         />
-      ) : (
+      )}
+
+      {!isLoading && pagedItems.length > 0 && (
         <>
-          <div className="admin-table" role="table" aria-label="Danh sách đổi trả">
-            <div className="admin-table-row admin-table-head returns-row" role="row">
-              <div role="columnheader">
+          <div className="admin-table">
+            <div className="admin-table-head">
+              <div className="admin-table-cell checkbox">
                 <input
                   type="checkbox"
-                  checked={selected.size === filteredItems.length && filteredItems.length > 0}
-                  onChange={e => toggleAll(e.target.checked)}
+                  checked={selected.size === pagedItems.length}
+                  onChange={(e) => toggleAll(e.target.checked)}
                 />
               </div>
-              <div role="columnheader" className="sortable">
-                <button className="sort-trigger">{t.columns.requestId} <ArrowUpDown size={14} /></button>
-              </div>
-              <div role="columnheader">{t.columns.customer}</div>
-              <div role="columnheader">{t.columns.orderId}</div>
-              <div role="columnheader">{t.columns.reason}</div>
-              <div role="columnheader" className="sortable">
-                <button className="sort-trigger">{t.columns.createdAt} <ArrowUpDown size={14} /></button>
-              </div>
-              <div role="columnheader">{t.columns.status}</div>
-              <div role="columnheader">{t.columns.actions}</div>
+              <div className="admin-table-cell grow">{t.columns.request}</div>
+              <div className="admin-table-cell">{t.columns.customer}</div>
+              <div className="admin-table-cell">{t.columns.reason}</div>
+              <div className="admin-table-cell">{t.columns.status}</div>
+              <div className="admin-table-cell right">{t.columns.actions}</div>
             </div>
 
-            {pagedItems.map((item, idx) => (
-              <motion.div
-                key={item.id}
-                className="admin-table-row returns-row"
-                role="row"
-                initial={{ opacity: 0, y: 4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: Math.min(idx * 0.02, 0.15) }}
-                whileHover={{ y: -1 }}
-                onClick={() => openDrawer(item)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div role="cell" onClick={e => e.stopPropagation()}>
+            {pagedItems.map(item => (
+              <div key={item.id} className="admin-table-row">
+                <div className="admin-table-cell checkbox">
                   <input
                     type="checkbox"
                     checked={selected.has(item.id)}
-                    onChange={e => toggleOne(item.id, e.target.checked)}
+                    onChange={(e) => toggleOne(item.id, e.target.checked)}
                   />
                 </div>
-                <div role="cell" className="admin-bold">{item.id}</div>
-                <div role="cell" className="customer-info-cell">
-                  <div className="customer-avatar initials">{getInitials(item.customerName)}</div>
-                  <div className="customer-text">
-                    <p className="admin-bold customer-name">{item.customerName}</p>
-                    <p className="admin-muted customer-email">{item.customerEmail || item.customerPhone}</p>
-                  </div>
+                <div className="admin-table-cell grow">
+                  <div className="admin-cell-title">{item.id}</div>
+                  <div className="admin-muted">{formatDate(item.createdAt)} • {item.orderId}</div>
                 </div>
-                <div role="cell" className="admin-muted">{item.orderId}</div>
-                <div role="cell">{reasonLabel(item.reason)}</div>
-                <div role="cell" className="admin-muted">{formatDate(item.createdAt)}</div>
-                <div role="cell"><StatusBadge status={item.status} /></div>
-                <div role="cell" className="admin-actions" onClick={(e) => e.stopPropagation()}>
-                  <button className="admin-icon-btn subtle" title="Xem chi tiết" onClick={() => openDrawer(item)}>
-                    <Eye size={15} />
-                  </button>
-                  {item.status === 'pending' && (
-                    <>
-                      <button
-                        className="admin-icon-btn success"
-                        title="Duyệt"
-                        onClick={() => applyStatus(item.id, 'approved')}
-                      >
-                        <Check size={15} />
-                      </button>
-                      <button
-                        className="admin-icon-btn subtle danger-icon"
-                        title={ADMIN_DICTIONARY.actionTitles.hide}
-                        aria-label={ADMIN_DICTIONARY.actionTitles.hide}
-                        onClick={() => applyStatus(item.id, 'rejected')}
-                      >
-                        <XCircle size={15} />
-                      </button>
-                    </>
-                  )}
-                  {item.status === 'approved' && (
-                    <button
-                      className="admin-icon-btn"
-                      title="Đánh dấu hoàn tất"
-                      onClick={() => applyStatus(item.id, 'completed')}
-                    >
-                      <Check size={15} />
-                    </button>
-                  )}
-                  <button
-                    className="admin-icon-btn subtle danger-icon"
-                    title={ADMIN_DICTIONARY.actionTitles.delete}
-                    aria-label={ADMIN_DICTIONARY.actionTitles.delete}
-                    onClick={() => setDeleteTarget({ id: item.id, name: item.id })}
-                  >
-                    <Trash2 size={15} />
+                <div className="admin-table-cell">
+                  <div className="admin-cell-title">{item.customerName}</div>
+                  <div className="admin-muted">{item.customerPhone}</div>
+                </div>
+                <div className="admin-table-cell admin-muted">{item.reason}</div>
+                <div className="admin-table-cell">
+                  <span className={statusConfig[item.status].pillClass}>{statusConfig[item.status].label}</span>
+                </div>
+                <div className="admin-table-cell right">
+                  <button className="admin-icon-btn" onClick={() => setDrawerItem(item)} title={c.view}>
+                    <Eye size={16} />
                   </button>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
 
-          {/* Pagination */}
-          {!isLoading && filteredItems.length > 0 && (
-            <AdminPagination
-              page={page}
-              totalPages={totalPages}
-              startIndex={startIndex}
-              endIndex={endIndex}
-              total={filteredItems.length}
-              onPageChange={setPage}
-              onPrev={prev}
-              onNext={next}
-              selectedNoun={t.selectedNoun}
-            />
-          )}
+          <AdminPagination
+            page={page + 1}
+            totalPages={totalPages}
+            onPageChange={(next) => void loadReturns(next - 1)}
+          />
         </>
       )}
 
-      {/* ── Detail Drawer ────────────────────────────────────────────────── */}
       <AnimatePresence>
         {drawerItem && (
-          <>
-            <motion.div
-              className="drawer-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={closeDrawer}
-            />
-            <motion.div
-              className="drawer"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-            >
-              {/* Drawer Header */}
-              <div className="drawer-header">
-                <div>
-                  <p className="drawer-eyebrow">{t.drawerTitle}</p>
-                  <h3>{drawerItem.id}</h3>
-                </div>
-                <button className="admin-icon-btn" onClick={closeDrawer}><X size={18} /></button>
-              </div>
-
-              <div className="drawer-body">
-                {/* Status */}
-                <section className="drawer-section">
-                  <h4>Trạng thái</h4>
-                  <StatusBadge status={drawerItem.status} />
-                </section>
-
-                {/* Customer Info */}
-                <section className="drawer-section">
-                  <h4>Khách hàng</h4>
-                  <div className="admin-card-row">
-                    <span className="admin-muted small">Tên</span>
-                    <span className="admin-bold">{drawerItem.customerName}</span>
-                  </div>
-                  {drawerItem.customerPhone && (
-                    <div className="admin-card-row">
-                      <span className="admin-muted small">SĐT</span>
-                      <span>{drawerItem.customerPhone}</span>
-                    </div>
-                  )}
-                  <div className="admin-card-row">
-                    <span className="admin-muted small">Mã đơn</span>
-                    <span><ChevronRight size={12} /> {drawerItem.orderId}</span>
-                  </div>
-                </section>
-
-                {/* Return Address */}
-                <section className="drawer-section">
-                  <h4>{ADMIN_DICTIONARY.returns.returnAddress.title}</h4>
-                  <div className="return-address-card">
-                    <p className="admin-bold">{ADMIN_DICTIONARY.returns.returnAddress.warehouse}</p>
-                    <p className="admin-muted">{ADMIN_DICTIONARY.returns.returnAddress.line1}</p>
-                    <p className="admin-muted">{ADMIN_DICTIONARY.returns.returnAddress.line2}</p>
-                  </div>
-                </section>
-
-                {/* Return Details */}
-                <section className="drawer-section">
-                  <h4>Chi tiết yêu cầu</h4>
-                  <div className="admin-card-row">
-                    <span className="admin-muted small">Lý do</span>
-                    <span className="admin-bold">{reasonLabel(drawerItem.reason)}</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-muted small">Giải pháp</span>
-                    <span>{resolutionLabel(drawerItem.resolution)}</span>
-                  </div>
-                  {drawerItem.note && (
-                    <div style={{ marginTop: 8 }}>
-                      <p className="admin-muted small">Ghi chú khách:</p>
-                      <p style={{ marginTop: 4, fontStyle: 'italic', fontSize: '13px', color: '#475569' }}>{drawerItem.note}</p>
-                    </div>
-                  )}
-                </section>
-
-                {/* Items */}
-                <section className="drawer-section">
-                  <h4>Sản phẩm đổi trả</h4>
-                  {drawerItem.items.map((item) => (
-                    <div key={item.id} className="admin-order-item">
-                      <img src={item.image} alt={item.name} className="admin-order-item-img" />
-                      <div>
-                        <p className="admin-bold">{item.name}</p>
-                        <p className="admin-muted small">{item.variant}</p>
-                        <p className="admin-muted small">{item.price.toLocaleString('vi-VN')} đ</p>
-                      </div>
-                    </div>
-                  ))}
-                </section>
-
-                {/* Admin Note */}
-                <section className="drawer-section">
-                  <h4>Ghi chú nội bộ</h4>
-                  <textarea
-                    className="confirm-reason-input"
-                    placeholder="Ghi chú dành cho nội bộ..."
-                    value={drawerNote}
-                    onChange={(e) => setDrawerNote(e.target.value)}
-                    rows={3}
-                  />
-                </section>
-
-                {/* Actions */}
-                {(drawerItem.status === 'pending' || drawerItem.status === 'approved') && (
-                  <section className="drawer-section">
-                    <h4>Hành động xử lý</h4>
-                    <div className="admin-actions" style={{ marginTop: '10px' }}>
-                      {drawerItem.status === 'pending' && (
-                        <>
-                          <button
-                            className="admin-primary-btn"
-                            onClick={() => applyStatus(drawerItem.id, 'approved')}
-                          >
-                            <Check size={14} /> Duyệt yêu cầu
-                          </button>
-                          <button
-                            className="admin-ghost-btn danger"
-                            onClick={() => applyStatus(drawerItem.id, 'rejected')}
-                          >
-                            <XCircle size={14} /> Từ chối
-                          </button>
-                        </>
-                      )}
-                      {drawerItem.status === 'approved' && (
-                        <button
-                          className="admin-primary-btn"
-                          onClick={() => applyStatus(drawerItem.id, 'completed')}
-                        >
-                          <Package size={14} /> Đánh dấu hoàn tất
-                        </button>
-                      )}
-                    </div>
-                  </section>
-                )}
-              </div>
-            </motion.div>
-          </>
+          <motion.div
+            className="drawer-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setDrawerItem(null)}
+          />
         )}
       </AnimatePresence>
 
-      {/* ── Delete Confirm ───────────────────────────────────────────────── */}
-      <AdminConfirmDialog
-        open={Boolean(deleteTarget)}
-        title="Xóa yêu cầu đổi trả"
-        description="Bạn có chắc chắn muốn xóa yêu cầu đổi trả này?"
-        selectedItems={deleteTarget ? [deleteTarget.name] : undefined}
-        selectedNoun="yêu cầu"
-        confirmLabel="Xóa"
-        danger
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={confirmDelete}
-      />
-
-      {/* ── Floating Bulk Actions ────────────────────────────────────────── */}
       <AnimatePresence>
-        {selected.size > 0 && (
+        {drawerItem && (
           <motion.div
-            className="admin-floating-bar"
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 22 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className="drawer"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
           >
-            <div className="admin-floating-content">
-              <span>{c.selected(selected.size, 'yêu cầu')}</span>
-              <div className="admin-actions">
-                <button className="admin-ghost-btn" onClick={() => bulkStatusUpdate('approved')}>
-                  <Check size={14} /> Duyệt hàng loạt
-                </button>
-                <button className="admin-ghost-btn" onClick={() => bulkStatusUpdate('rejected')}>
-                  <XCircle size={14} /> Từ chối
-                </button>
-                <button className="admin-ghost-btn danger" onClick={bulkDelete}>
-                  <Trash2 size={14} /> Xóa
-                </button>
+            <div className="drawer-header">
+              <div>
+                <p className="drawer-eyebrow">{drawerItem.orderId}</p>
+                <h3>{drawerItem.customerName}</h3>
+                <p className="admin-muted">{drawerItem.customerPhone}</p>
+              </div>
+              <button className="admin-icon-btn" onClick={() => setDrawerItem(null)}><X size={18} /></button>
+            </div>
+            <div className="drawer-body">
+              <section className="drawer-section">
+                <h4>{t.details.items}</h4>
+                <div className="admin-return-items">
+                  {drawerItem.items.map((item) => (
+                    <div key={item.orderItemId} className="admin-return-item">
+                      {item.imageUrl && <img src={item.imageUrl} alt={item.productName} />}
+                      <div>
+                        <p className="admin-cell-title">{item.productName}</p>
+                        <p className="admin-muted">{item.variantName}</p>
+                        <p className="admin-muted">x{item.quantity}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="drawer-section">
+                <h4>{t.details.reason}</h4>
+                <p>{drawerItem.reason}</p>
+                {drawerItem.note && <p className="admin-muted">{drawerItem.note}</p>}
+              </section>
+
+              <section className="drawer-section">
+                <h4>{t.details.adminNote}</h4>
+                <textarea
+                  value={drawerNote}
+                  onChange={(e) => setDrawerNote(e.target.value)}
+                  className="content-form-textarea"
+                  rows={4}
+                />
+              </section>
+
+              <div className="drawer-actions">
+                {drawerItem.status === 'PENDING' && (
+                  <>
+                    <button className="admin-secondary-btn" onClick={() => applyStatus(drawerItem.id, 'REJECTED')}>
+                      <XCircle size={16} /> {t.actions.reject}
+                    </button>
+                    <button className="admin-primary-btn" onClick={() => applyStatus(drawerItem.id, 'APPROVED')}>
+                      <Check size={16} /> {t.actions.approve}
+                    </button>
+                  </>
+                )}
+                {drawerItem.status === 'APPROVED' && (
+                  <button className="admin-primary-btn" onClick={() => applyStatus(drawerItem.id, 'COMPLETED')}>
+                    <Check size={16} /> {t.actions.complete}
+                  </button>
+                )}
               </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ── Toast ───────────────────────────────────────────────────────── */}
-      <AdminToast toast={toast} />
     </AdminLayout>
   );
 };
+
+const LinkIcon = () => <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M10.59 13.41a1 1 0 0 0 1.41 0l3.3-3.29a1 1 0 0 0-1.42-1.42l-3.3 3.3a1 1 0 0 0 0 1.41Zm-5.3-2.12A5 5 0 0 1 9 7h2a1 1 0 0 0 0-2H9a7 7 0 0 0-6.24 9.93a1 1 0 0 0 1.8-.86A5 5 0 0 1 5.29 11.29Zm14 3.54A5 5 0 0 1 15 17h-2a1 1 0 0 0 0 2h2a7 7 0 0 0 6.24-9.93a1 1 0 1 0-1.8.86a5 5 0 0 1-.15 4.9Z"/></svg>;
+const RefreshIcon = () => <svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M13 3a9 9 0 1 0 8.95 8.07a1 1 0 1 0-1.99-.14A7 7 0 1 1 13 5h1.59l-1.3 1.29a1 1 0 1 0 1.42 1.42l3-3a1 1 0 0 0 0-1.42l-3-3a1 1 0 1 0-1.42 1.42L14.59 3Z"/></svg>;
 
 export default AdminReturns;

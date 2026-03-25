@@ -1,13 +1,14 @@
 import './Admin.css';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, Search, Bell, Settings, ChevronRight, LogOut, Home } from 'lucide-react';
-import { useContext, useLayoutEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ADMIN_DICTIONARY } from './adminDictionary';
 import { authService } from '../../services/authService';
 import { useToast } from '../../contexts/ToastContext';
 import { adminPanelNav } from '../../config/panelNavigation';
 import { AdminShellContext } from './AdminShellContext';
+import PageTransition from '../../components/Transitions/PageTransition';
 
 export interface PanelNavItem {
   label: string;
@@ -35,6 +36,7 @@ interface AdminLayoutProps {
 }
 
 const defaultNavItems: PanelNavItem[] = adminPanelNav;
+const AdminLayoutLevelContext = createContext(false);
 
 const AdminLayout = ({
   title,
@@ -54,7 +56,8 @@ const AdminLayout = ({
   fallbackUserName,
   fallbackUserEmail,
 }: AdminLayoutProps) => {
-  const setEmbeddedShell = useContext(AdminShellContext);
+  const isNested = useContext(AdminLayoutLevelContext);
+  const setShellState = useContext(AdminShellContext);
   const location = useLocation();
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -89,21 +92,19 @@ const AdminLayout = ({
 
   const crumbs = breadcrumbs?.length ? breadcrumbs : inferBreadcrumbs();
 
-  useLayoutEffect(() => {
-    if (!setEmbeddedShell) return;
-    setEmbeddedShell({
-      title,
-      actions,
-      hideTopbarTitle,
-      breadcrumbs: crumbs,
-    });
-  }, [location.pathname, setEmbeddedShell]);
+  useEffect(() => {
+    if (setShellState) {
+      setShellState({ title, actions, hideTopbarTitle, breadcrumbs });
+    }
+  }, [actions, breadcrumbs, hideTopbarTitle, setShellState, title]);
 
-  if (setEmbeddedShell) {
+  if (isNested) {
+    // When wrapped by a parent AdminLayout, only render content; shell (sidebar/header) handled by parent.
     return <>{children}</>;
   }
 
   return (
+    <AdminLayoutLevelContext.Provider value={true}>
     <div className="admin-page">
       <aside className="admin-sidebar">
         <div className="admin-logo">
@@ -197,10 +198,11 @@ const AdminLayout = ({
             {!hideTopbarTitle ? <h1>{title}</h1> : <div className="admin-topbar-title-spacer" />}
             <div className="admin-topbar-actions">{actions}</div>
           </div>
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </main>
     </div>
+    </AdminLayoutLevelContext.Provider>
   );
 };
 

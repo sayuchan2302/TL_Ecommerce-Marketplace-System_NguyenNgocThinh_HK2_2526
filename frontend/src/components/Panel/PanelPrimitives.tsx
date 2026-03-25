@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Search, X } from 'lucide-react';
 
 export interface PanelStatItem {
   key: string;
@@ -89,3 +91,143 @@ export const PanelViewSummary = ({ chips, clearLabel, onClear }: PanelViewSummar
     </div>
   );
 };
+
+interface PanelSectionHeaderProps {
+  title: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+}
+
+export const PanelSectionHeader = ({ title, description, action }: PanelSectionHeaderProps) => (
+  <div className="admin-panel-head">
+    <div>
+      <h2>{title}</h2>
+      {description ? <span className="admin-muted">{description}</span> : null}
+    </div>
+    {action}
+  </div>
+);
+
+interface PanelTableFooterProps {
+  meta: ReactNode;
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  activePageClassName?: string;
+  prevLabel?: ReactNode;
+  nextLabel?: ReactNode;
+}
+
+export const PanelTableFooter = ({
+  meta,
+  page,
+  totalPages,
+  onPageChange,
+  activePageClassName = '',
+  prevLabel = 'Trước',
+  nextLabel = 'Tiếp',
+}: PanelTableFooterProps) => (
+  <div className="table-footer">
+    <span className="table-footer-meta">{meta}</span>
+    <div className="pagination">
+      <button className="page-btn" onClick={() => onPageChange(Math.max(page - 1, 1))} disabled={page === 1}>
+        {prevLabel}
+      </button>
+      {Array.from({ length: totalPages }).map((_, index) => (
+        <button
+          key={index + 1}
+          className={`page-btn ${page === index + 1 ? `active ${activePageClassName}`.trim() : ''}`}
+          onClick={() => onPageChange(index + 1)}
+        >
+          {index + 1}
+        </button>
+      ))}
+      <button
+        className="page-btn"
+        onClick={() => onPageChange(Math.min(page + 1, totalPages))}
+        disabled={page === totalPages}
+      >
+        {nextLabel}
+      </button>
+    </div>
+  </div>
+);
+
+interface PanelFloatingBarProps {
+  show: boolean;
+  children: ReactNode;
+  className?: string;
+}
+
+export const PanelFloatingBar = ({ show, children, className = '' }: PanelFloatingBarProps) => (
+  <AnimatePresence>
+    {show ? (
+      <motion.div
+        className={['admin-floating-bar', className].filter(Boolean).join(' ')}
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 22 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+      >
+        {children}
+      </motion.div>
+    ) : null}
+  </AnimatePresence>
+);
+
+interface PanelSearchFieldProps {
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+}
+
+export const PanelSearchField = ({ placeholder, value, onChange }: PanelSearchFieldProps) => (
+  <div className="admin-search">
+    <Search size={16} />
+    <input placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />
+  </div>
+);
+
+interface PanelDrawerSectionProps {
+  title: ReactNode;
+  children: ReactNode;
+}
+
+export const PanelDrawerSection = ({ title, children }: PanelDrawerSectionProps) => (
+  <section className="drawer-section">
+    <h4>{title}</h4>
+    {children}
+  </section>
+);
+
+interface PanelDrawerHeaderProps {
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  onClose: () => void;
+  closeLabel?: string;
+}
+
+export const PanelDrawerHeader = ({
+  eyebrow,
+  title,
+  onClose,
+  closeLabel = 'Đóng',
+}: PanelDrawerHeaderProps) => (
+  <div className="drawer-header">
+    <div>
+      {eyebrow ? <p className="drawer-eyebrow">{eyebrow}</p> : null}
+      <h3>{title}</h3>
+    </div>
+    <button className="admin-icon-btn" onClick={onClose} aria-label={closeLabel}>
+      <X size={16} />
+    </button>
+  </div>
+);
+
+interface PanelDrawerFooterProps {
+  children: ReactNode;
+}
+
+export const PanelDrawerFooter = ({ children }: PanelDrawerFooterProps) => (
+  <div className="drawer-footer">{children}</div>
+);

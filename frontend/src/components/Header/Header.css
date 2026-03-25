@@ -906,10 +906,6 @@
     .mobile-sub-menu {
       animation: none;
     }
-    @keyframes slideDown {
-      from { opacity: 1; }
-      to { opacity: 1; }
-    }
   }
 
   .mobile-sub-menu a {

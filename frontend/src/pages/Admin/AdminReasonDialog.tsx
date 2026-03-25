@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 interface AdminReasonDialogProps {
@@ -18,7 +18,7 @@ interface AdminReasonDialogProps {
   onCancel: () => void;
 }
 
-const AdminReasonDialog = ({
+const AdminReasonDialogContent = ({
   open,
   title,
   description,
@@ -38,12 +38,6 @@ const AdminReasonDialog = ({
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) {
-      setReason(defaultValue);
-    }
-  }, [open, defaultValue]);
-
-  useEffect(() => {
     if (!open) return;
 
     const dialog = dialogRef.current;
@@ -56,21 +50,20 @@ const AdminReasonDialog = ({
 
     firstElement?.focus();
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Tab') {
-        if (e.shiftKey) {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Tab') {
+        if (event.shiftKey) {
           if (document.activeElement === firstElement) {
-            e.preventDefault();
+            event.preventDefault();
             lastElement?.focus();
           }
-        } else {
-          if (document.activeElement === lastElement) {
-            e.preventDefault();
-            firstElement?.focus();
-          }
+        } else if (document.activeElement === lastElement) {
+          event.preventDefault();
+          firstElement?.focus();
         }
       }
-      if (e.key === 'Escape') {
+
+      if (event.key === 'Escape') {
         onCancel();
       }
     };
@@ -84,69 +77,71 @@ const AdminReasonDialog = ({
   const hiddenCount = Math.max(0, selectedList.length - visibleItems.length);
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            className="drawer-overlay"
-            onClick={onCancel}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+    <>
+      <motion.div
+        className="drawer-overlay"
+        onClick={onCancel}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18 }}
+      />
+      <motion.div
+        ref={dialogRef}
+        className="confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        initial={{ opacity: 0, y: 10, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 10, scale: 0.98 }}
+        transition={{ duration: 0.2 }}
+      >
+        <h3>{title}</h3>
+        <p>{description}</p>
+
+        {selectedList.length > 0 && (
+          <div className="confirm-selection-block">
+            <p className="confirm-selection-count">Đã chọn {selectedList.length} {selectedNoun}:</p>
+            <ul className="confirm-selection-list">
+              {visibleItems.map((item, index) => (
+                <li key={`${item}-${index}`}>{item}</li>
+              ))}
+            </ul>
+            {hiddenCount > 0 && <p className="confirm-selection-more">+{hiddenCount} {selectedNoun} khác</p>}
+          </div>
+        )}
+
+        <label className="form-field confirm-reason-field">
+          <span>{fieldLabel}</span>
+          <textarea
+            rows={3}
+            className="confirm-reason-input"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder={placeholder}
           />
-          <motion.div
-            ref={dialogRef}
-            className="confirm-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={title}
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
+        </label>
+
+        <div className="confirm-modal-actions">
+          <button className="admin-ghost-btn" onClick={onCancel}>{cancelLabel}</button>
+          <button
+            className={`admin-primary-btn ${danger ? 'danger' : ''}`.trim()}
+            onClick={() => onConfirm(reason.trim())}
+            disabled={!reason.trim()}
           >
-            <h3>{title}</h3>
-            <p>{description}</p>
-
-            {selectedList.length > 0 && (
-              <div className="confirm-selection-block">
-                <p className="confirm-selection-count">Đã chọn {selectedList.length} {selectedNoun}:</p>
-                <ul className="confirm-selection-list">
-                  {visibleItems.map((item, idx) => (
-                    <li key={`${item}-${idx}`}>{item}</li>
-                  ))}
-                </ul>
-                {hiddenCount > 0 && <p className="confirm-selection-more">+{hiddenCount} {selectedNoun} khác</p>}
-              </div>
-            )}
-
-            <label className="form-field confirm-reason-field">
-              <span>{fieldLabel}</span>
-              <textarea
-                rows={3}
-                className="confirm-reason-input"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder={placeholder}
-              />
-            </label>
-
-            <div className="confirm-modal-actions">
-              <button className="admin-ghost-btn" onClick={onCancel}>{cancelLabel}</button>
-              <button
-                className={`admin-primary-btn ${danger ? 'danger' : ''}`.trim()}
-                onClick={() => onConfirm(reason.trim())}
-                disabled={!reason.trim()}
-              >
-                {confirmLabel}
-              </button>
-            </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            {confirmLabel}
+          </button>
+        </div>
+      </motion.div>
+    </>
   );
 };
+
+const AdminReasonDialog = (props: AdminReasonDialogProps) => (
+  <AnimatePresence>
+    {props.open ? <AdminReasonDialogContent key={`${props.title}-${props.defaultValue}`} {...props} /> : null}
+  </AnimatePresence>
+);
 
 export default AdminReasonDialog;

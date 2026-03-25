@@ -1,5 +1,5 @@
 import './Admin.css';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Eye, EyeOff, FolderPlus, Pencil, Plus, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import AdminLayout from './AdminLayout';
@@ -126,12 +126,12 @@ const AdminCategories = () => {
     [categories, isLeaf],
   );
 
-  const passesFilter = (item: Category) => {
+  const passesFilter = useCallback((item: Category) => {
     if (activeFilter === 'visible') return item.status === 'visible';
     if (activeFilter === 'hidden') return item.status === 'hidden';
     if (activeFilter === 'leaf') return isLeaf.has(item.id);
     return true;
-  };
+  }, [activeFilter, isLeaf]);
 
   const query = search.trim().toLowerCase();
   const searchMatches = useMemo(() => {
@@ -170,7 +170,7 @@ const AdminCategories = () => {
     });
 
     return visible;
-  }, [byId, categories, childMap, searchMatches, activeFilter, isLeaf]);
+  }, [byId, categories, childMap, passesFilter, searchMatches]);
 
   const flatFilteredCategories = useMemo(() => {
     return categories
@@ -180,7 +180,7 @@ const AdminCategories = () => {
         if (levelDiff !== 0) return levelDiff;
         return a.order - b.order || a.name.localeCompare(b.name, 'vi');
       });
-  }, [activeFilter, byId, categories, searchMatches, isLeaf]);
+  }, [byId, categories, passesFilter, searchMatches]);
 
   const hasViewContext = activeFilter !== 'all' || Boolean(query);
   const currentFilterLabel =
@@ -366,6 +366,20 @@ const AdminCategories = () => {
         return (
           <div key={item.id}>
             <div className={`category-tree-item ${active ? 'active' : ''}`} style={{ paddingLeft: `${12 + (level - 1) * 18}px` }}>
+              <span className="category-tree-expander">
+                {children.length > 0 ? (
+                  <button
+                    type="button"
+                    className="admin-icon-btn subtle small"
+                    onClick={() => toggleExpand(item.id)}
+                    aria-label={expanded ? 'Thu gọn danh mục' : 'Mở rộng danh mục'}
+                  >
+                    {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  </button>
+                ) : (
+                  <span className="category-tree-bullet" />
+                )}
+              </span>
               <button
                 type="button"
                 className="category-tree-main"
@@ -374,23 +388,6 @@ const AdminCategories = () => {
                   setDraftMode('view');
                 }}
               >
-                <span className="category-tree-expander">
-                  {children.length > 0 ? (
-                    <button
-                      type="button"
-                      className="admin-icon-btn subtle small"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        toggleExpand(item.id);
-                      }}
-                      aria-label={expanded ? 'Thu gọn danh mục' : 'Mở rộng danh mục'}
-                    >
-                      {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    </button>
-                  ) : (
-                    <span className="category-tree-bullet" />
-                  )}
-                </span>
                 <div className="category-tree-meta">
                   <span className="category-tree-name">{item.name}</span>
                   <span className="category-tree-sub">Cấp {getLevel(item.id, byId)} · {isLeaf.has(item.id) ? 'Danh mục lá' : `${children.length} nhánh con`}</span>
