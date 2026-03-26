@@ -7,3 +7,38 @@ node_modules
 .agents/
 .vscode/settings.json
 skills-lock.json
+
+
+# Dependencies
+node_modules/
+frontend/node_modules/
+backend/.m2/
+
+# Build artifacts
+frontend/dist/
+frontend/dist-ssr/
+backend/target/
+
+# Env files
+.env
+.env.*
+frontend/.env
+backend/.env
+!*.env.example
+
+# Logs
+*.log
+backend/boot-run.log
+
+# IDE / Editor
+.vscode/
+.idea/
+*.iml
+.classpath
+.project
+.factorypath
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -112,11 +112,11 @@ const AdminReviews = () => {
   };
 
   const handleApprove = useCallback((id: string) => {
-    if (applyStatusUpdate(id, 'approved')) pushToast('Da approve review sau moderation.');
+    if (applyStatusUpdate(id, 'approved')) pushToast('Đã duyệt đánh giá.');
   }, [pushToast]);
 
   const handleHide = useCallback((id: string) => {
-    if (applyStatusUpdate(id, 'hidden')) pushToast('Da an review khoi storefront.');
+    if (applyStatusUpdate(id, 'hidden')) pushToast('Đã ẩn đánh giá.');
   }, [pushToast]);
 
   const confirmDelete = () => {
@@ -126,7 +126,7 @@ const AdminReviews = () => {
         setAllReviews((prev) => prev.filter((r) => r.id !== id));
       }
     });
-    pushToast('Da xoa review khoi he thong moderation.');
+    pushToast('Đã xóa đánh giá.');
     setSelected(new Set());
     setDeleteTarget(null);
     if (drawerReview && deleteTarget.ids.includes(drawerReview.id)) {
@@ -144,7 +144,7 @@ const AdminReviews = () => {
   return (
     <AdminLayout
       title="Đánh giá"
-      breadcrumbs={['Danh gia va tranh chap', 'Moderation center']}
+      breadcrumbs={['Đánh giá', 'Kiểm duyệt']}
       actions={
         <>
           <div className="admin-search">
