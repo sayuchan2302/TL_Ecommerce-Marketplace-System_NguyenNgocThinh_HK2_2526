@@ -29,19 +29,25 @@ const VendorSettings = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('store');
   const [settings, setSettings] = useState<VendorSettingsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
+      setLoading(true);
       try {
+        setLoadError('');
         const next = await vendorPortalService.getSettings();
         if (!mounted) return;
         setSettings(next);
       } catch (err: unknown) {
         if (!mounted) return;
-        addToast(getUiErrorMessage(err, 'Không tải được cấu hình gian hàng'), 'error');
-        setSettings(DEFAULT_SETTINGS);
+        const message = getUiErrorMessage(err, 'Không tải được cấu hình gian hàng');
+        setLoadError(message);
+        setSettings(null);
+        addToast(message, 'error');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -50,7 +56,7 @@ const VendorSettings = () => {
     return () => {
       mounted = false;
     };
-  }, [addToast]);
+  }, [addToast, reloadKey]);
 
   const updateStoreField = (key: keyof VendorSettingsData['storeInfo']) => (value: string) =>
     setSettings((current) =>
@@ -134,11 +140,19 @@ const VendorSettings = () => {
       )}
     >
       <div className="vendor-settings-shell">
-        {loading || !settings ? (
+        {loading ? (
           <AdminStateBlock
             type="empty"
             title="Đang tải cấu hình gian hàng"
             description="Thông tin gian hàng, đối soát và vận hành đang được đồng bộ."
+          />
+        ) : loadError || !settings ? (
+          <AdminStateBlock
+            type="error"
+            title="Không tải được cấu hình gian hàng"
+            description={loadError || 'Dữ liệu cấu hình không khả dụng.'}
+            actionLabel="Thử lại"
+            onAction={() => setReloadKey((key) => key + 1)}
           />
         ) : (
           <>

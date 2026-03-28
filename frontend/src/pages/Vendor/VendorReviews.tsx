@@ -11,11 +11,11 @@ import {
   PanelSearchField,
 } from '../../components/Panel/PanelPrimitives';
 import { reviewService, type Review } from '../../services/reviewService';
-import { authService } from '../../services/authService';
 import { useToast } from '../../contexts/ToastContext';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
 import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
 import Drawer from '../../components/Drawer/Drawer';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 
 const TABS = [
   { key: 'all', label: 'Tất cả' },
@@ -40,7 +40,6 @@ const RatingStars = ({ rating }: { rating: number }) => (
 
 const VendorReviews = () => {
   const { addToast } = useToast();
-  const storeId = authService.getSession()?.user.storeId || '';
   const [query, setQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'need_reply' | 'negative'>('all');
   const [allReviews, setAllReviews] = useState<Review[]>([]);
@@ -50,30 +49,23 @@ const VendorReviews = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [activeReview, setActiveReview] = useState<Review | null>(null);
   const [confirmReplyIds, setConfirmReplyIds] = useState<string[] | null>(null);
+  const [replyingIds, setReplyingIds] = useState<Set<string>>(new Set());
   const [reloadKey, setReloadKey] = useState(0);
   const canVendorReply = reviewService.canVendorReply();
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
-      if (!storeId) {
-        if (!mounted) return;
-        setAllReviews([]);
-        setLoadError('Cannot resolve current vendor store.');
-        setLoading(false);
-        return;
-      }
-
       try {
         setLoading(true);
         setLoadError(null);
-        const rows = await reviewService.getReviewsByStore(storeId);
+        const rows = await reviewService.getVendorReviews({ size: 1000 });
         if (!mounted) return;
         setAllReviews(rows);
-      } catch {
+      } catch (err: unknown) {
         if (!mounted) return;
         setAllReviews([]);
-        setLoadError('Cannot load reviews for this store.');
+        setLoadError(getUiErrorMessage(err, 'Không tải được đánh giá của cửa hàng.'));
       } finally {
         if (mounted) setLoading(false);
       }
@@ -83,7 +75,7 @@ const VendorReviews = () => {
     return () => {
       mounted = false;
     };
-  }, [storeId, reloadKey]);
+  }, [reloadKey]);
 
   const reviews = useMemo(() => {
     return allReviews.filter((review) => {
@@ -122,21 +114,68 @@ const VendorReviews = () => {
     addToast('Đã sao chép bộ lọc hiện tại của đánh giá shop', 'success');
   };
 
-  const submitReply = (id: string) => {
+  const submitReplies = async (ids: string[]) => {
     if (!canVendorReply) {
-      addToast('Seller reply API is not available yet. You can view reviews in read-only mode.', 'info');
+      addToast('Phiên đăng nhập hiện tại không hỗ trợ phản hồi đánh giá.', 'info');
       return;
     }
 
-    const content = (replyDrafts[id] || '').trim();
-    if (!content) {
-      addToast('Hãy nhập nội dung phản hồi trước khi gửi', 'info');
+    const targets = ids.filter((id) => {
+      const content = (replyDrafts[id] || '').trim();
+      const review = allReviews.find((item) => item.id === id);
+      return Boolean(content) && Boolean(review) && !review?.shopReply;
+    });
+
+    if (targets.length === 0) {
+      addToast('Hãy nhập nội dung phản hồi trước khi gửi.', 'info');
       return;
     }
-    setReplyDrafts((current) => ({ ...current, [id]: '' }));
-    setConfirmReplyIds(null);
-    setSelected(new Set());
-    addToast('Seller reply API is not available yet. Draft saved locally only.', 'info');
+
+    setReplyingIds((current) => {
+      const next = new Set(current);
+      targets.forEach((id) => next.add(id));
+      return next;
+    });
+
+    try {
+      const updates = await Promise.all(
+        targets.map(async (id) => {
+          const content = (replyDrafts[id] || '').trim();
+          const updated = await reviewService.replyAsVendor(id, content);
+          return [id, updated] as const;
+        }),
+      );
+
+      const updatedMap = new Map(updates);
+      setAllReviews((current) => current.map((review) => updatedMap.get(review.id) || review));
+      setReplyDrafts((current) => {
+        const next = { ...current };
+        targets.forEach((id) => {
+          delete next[id];
+        });
+        return next;
+      });
+      setActiveReview((current) => {
+        if (!current) return current;
+        return updatedMap.get(current.id) || current;
+      });
+      setConfirmReplyIds(null);
+      setSelected(new Set());
+      addToast(
+        targets.length > 1
+          ? `Đã gửi phản hồi cho ${targets.length} đánh giá.`
+          : 'Đã gửi phản hồi cho đánh giá.',
+        'success',
+      );
+    } catch (err: unknown) {
+      addToast(getUiErrorMessage(err, 'Không thể gửi phản hồi đánh giá.'), 'error');
+    } finally {
+      setReplyingIds((current) => {
+        const next = new Set(current);
+        targets.forEach((id) => next.delete(id));
+        return next;
+      });
+    }
   };
 
   const selectedNeedReply = Array.from(selected).filter((id) => {
@@ -338,7 +377,11 @@ const VendorReviews = () => {
           <div className="admin-actions">
             <button className="admin-ghost-btn" onClick={() => setSelected(new Set())}>Bỏ chọn</button>
             {selectedNeedReply.length > 0 ? (
-              <button className="admin-ghost-btn" onClick={() => setConfirmReplyIds(selectedNeedReply)}>
+              <button
+                className="admin-ghost-btn"
+                onClick={() => setConfirmReplyIds(selectedNeedReply)}
+                disabled={selectedNeedReply.some((id) => replyingIds.has(id))}
+              >
                 Gửi phản hồi đã chọn
               </button>
             ) : null}
@@ -354,7 +397,7 @@ const VendorReviews = () => {
         selectedNoun="đánh giá"
         confirmLabel="Gửi phản hồi"
         onCancel={() => setConfirmReplyIds(null)}
-        onConfirm={() => confirmReplyIds?.forEach((id) => submitReply(id))}
+        onConfirm={() => void submitReplies(confirmReplyIds || [])}
       />
 
       <Drawer open={Boolean(activeReview)} onClose={() => setActiveReview(null)}>
@@ -412,9 +455,13 @@ const VendorReviews = () => {
             <PanelDrawerFooter>
               <button className="admin-ghost-btn" onClick={() => setActiveReview(null)}>Đóng</button>
               {!activeReview.shopReply && canVendorReply ? (
-                <button className="admin-primary-btn vendor-admin-primary" onClick={() => submitReply(activeReview.id)}>
+                <button
+                  className="admin-primary-btn vendor-admin-primary"
+                  onClick={() => void submitReplies([activeReview.id])}
+                  disabled={replyingIds.has(activeReview.id)}
+                >
                   <MessageSquare size={15} />
-                  Gửi phản hồi
+                  {replyingIds.has(activeReview.id) ? 'Đang gửi...' : 'Gửi phản hồi'}
                 </button>
               ) : null}
             </PanelDrawerFooter>

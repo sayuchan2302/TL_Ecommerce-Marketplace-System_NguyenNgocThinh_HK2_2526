@@ -153,6 +153,7 @@ const VendorOrders = () => {
   const [searchQuery, setSearchQuery] = useState(keyword);
   const [ordersPage, setOrdersPage] = useState<VendorOrdersPage>(emptyOrdersPage);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [updating, setUpdating] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -206,6 +207,7 @@ const VendorOrders = () => {
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const next = await vendorPortalService.getOrders({
         status: activeTab,
@@ -231,7 +233,9 @@ const VendorOrders = () => {
         }, true);
       }
     } catch (err: unknown) {
-      addToast(getUiErrorMessage(err, 'Không tải được danh sách đơn hàng shop'), 'error');
+      const message = getUiErrorMessage(err, 'Không tải được danh sách đơn hàng shop');
+      setLoadError(message);
+      addToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -495,6 +499,14 @@ const VendorOrders = () => {
           </div>
           {loading ? (
             <AdminTableSkeleton columns={8} rows={6} />
+          ) : loadError ? (
+            <AdminStateBlock
+              type="error"
+              title="Không tải được danh sách đơn hàng"
+              description={loadError}
+              actionLabel="Thử lại"
+              onAction={() => void loadOrders()}
+            />
           ) : paginatedOrders.length === 0 ? (
             <AdminStateBlock
               type={hasViewContext ? 'search-empty' : 'empty'}

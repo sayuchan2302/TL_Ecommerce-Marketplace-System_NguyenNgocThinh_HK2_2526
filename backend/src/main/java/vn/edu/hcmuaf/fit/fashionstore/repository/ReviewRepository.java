@@ -8,11 +8,15 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Review;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
     Page<Review> findByStatus(Review.ReviewStatus status, Pageable pageable);
+    Page<Review> findByStoreId(UUID storeId, Pageable pageable);
+    Page<Review> findByStoreIdAndStatus(UUID storeId, Review.ReviewStatus status, Pageable pageable);
+    Optional<Review> findByIdAndStoreId(UUID id, UUID storeId);
 
     long countByStoreId(UUID storeId);
 

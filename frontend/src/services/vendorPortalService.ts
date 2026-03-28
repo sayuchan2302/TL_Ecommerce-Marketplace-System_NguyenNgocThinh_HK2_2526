@@ -613,12 +613,22 @@ export const vendorPortalService = {
   },
 
   async getAnalytics() {
-    const [dashboard, ordersPage] = await Promise.all([
+    const pageSize = 200;
+    const [dashboard, firstOrdersPage] = await Promise.all([
       this.getDashboardData(),
-      this.getOrders({ page: 1, size: 200 }),
+      this.getOrders({ page: 1, size: pageSize }),
     ]);
 
-    const recentOrders = ordersPage.items;
+    let recentOrders = [...firstOrdersPage.items];
+    if (firstOrdersPage.totalPages > 1) {
+      const pendingRequests: Array<Promise<VendorOrdersPage>> = [];
+      for (let nextPage = 2; nextPage <= firstOrdersPage.totalPages; nextPage += 1) {
+        pendingRequests.push(this.getOrders({ page: nextPage, size: pageSize }));
+      }
+      const remainingPages = await Promise.all(pendingRequests);
+      recentOrders = recentOrders.concat(remainingPages.flatMap((page) => page.items));
+    }
+
     const todayCurrent = summarizeWindow(recentOrders, 0, 1);
     const todayPrevious = summarizeWindow(recentOrders, 1, 2);
     const weekCurrent = summarizeWindow(recentOrders, 0, 7);

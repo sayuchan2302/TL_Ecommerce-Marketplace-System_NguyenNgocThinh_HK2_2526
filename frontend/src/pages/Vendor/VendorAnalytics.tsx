@@ -53,18 +53,25 @@ const VendorAnalytics = () => {
   const [activePeriod, setActivePeriod] = useState<Period>('week');
   const [analytics, setAnalytics] = useState<AnalyticsData>(emptyAnalytics);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
 
     const load = async () => {
+      setLoading(true);
       try {
+        setLoadError('');
         const next = await vendorPortalService.getAnalytics();
         if (!active) return;
         setAnalytics(next);
       } catch (err: unknown) {
         if (!active) return;
-        addToast(getUiErrorMessage(err, 'Không tải được thống kê của shop'), 'error');
+        const message = getUiErrorMessage(err, 'Không tải được thống kê của shop');
+        setLoadError(message);
+        setAnalytics(emptyAnalytics);
+        addToast(message, 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -74,7 +81,7 @@ const VendorAnalytics = () => {
     return () => {
       active = false;
     };
-  }, [addToast]);
+  }, [addToast, reloadKey]);
 
   const periodData = analytics.periods[activePeriod];
   const commission = { commission: periodData.commission, payout: periodData.payout };
@@ -155,6 +162,14 @@ const VendorAnalytics = () => {
           type="empty"
           title="Đang tải thống kê người bán"
           description="Doanh thu, thực nhận và hiệu suất đơn hàng con đang được đồng bộ."
+        />
+      ) : loadError ? (
+        <AdminStateBlock
+          type="error"
+          title="Không tải được thống kê người bán"
+          description={loadError}
+          actionLabel="Thử lại"
+          onAction={() => setReloadKey((key) => key + 1)}
         />
       ) : (
         <>

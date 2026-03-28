@@ -21,17 +21,23 @@ const VendorStorefront = () => {
   const [tagline, setTagline] = useState('Tinh chỉnh từ chất liệu, uy tín từ trải nghiệm mua sắm.');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
     const load = async () => {
+      setLoading(true);
       try {
+        setLoadError('');
         const next = await vendorPortalService.getSettings();
         if (!active) return;
         setSettings(next);
       } catch (err: unknown) {
         if (!active) return;
-        addToast(getUiErrorMessage(err, 'Không tải được gian hàng công khai'), 'error');
+        const message = getUiErrorMessage(err, 'Không tải được gian hàng công khai');
+        setLoadError(message);
+        addToast(message, 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -40,7 +46,7 @@ const VendorStorefront = () => {
     return () => {
       active = false;
     };
-  }, [addToast]);
+  }, [addToast, reloadKey]);
 
   const completion = useMemo(() => {
     const fields = [
@@ -91,6 +97,14 @@ const VendorStorefront = () => {
           type="empty"
           title="Đang tải gian hàng công khai"
           description="Hồ sơ storefront của shop đang được đồng bộ."
+        />
+      ) : loadError ? (
+        <AdminStateBlock
+          type="error"
+          title="Không tải được gian hàng công khai"
+          description={loadError}
+          actionLabel="Thử lại"
+          onAction={() => setReloadKey((key) => key + 1)}
         />
       ) : (
         <>

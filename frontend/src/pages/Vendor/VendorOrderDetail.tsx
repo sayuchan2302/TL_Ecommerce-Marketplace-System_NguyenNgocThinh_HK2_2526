@@ -38,19 +38,26 @@ const VendorOrderDetail = () => {
   const { addToast } = useToast();
   const [order, setOrder] = useState<VendorOrderDetailData>(emptyOrder);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     let active = true;
 
     const load = async () => {
+      setLoading(true);
       try {
+        setLoadError('');
         const next = await vendorPortalService.getOrderDetail(id);
         if (!active) return;
         startTransition(() => setOrder(next));
       } catch (err: unknown) {
         if (!active) return;
-        addToast(getUiErrorMessage(err, 'Không tải được chi tiết đơn hàng'), 'error');
+        const message = getUiErrorMessage(err, 'Không tải được chi tiết đơn hàng');
+        setLoadError(message);
+        setOrder(emptyOrder);
+        addToast(message, 'error');
       } finally {
         if (active) setLoading(false);
       }
@@ -60,7 +67,7 @@ const VendorOrderDetail = () => {
     return () => {
       active = false;
     };
-  }, [addToast, id]);
+  }, [addToast, id, reloadKey]);
 
   const updateStatus = async (
     status: 'CONFIRMED' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED',
@@ -187,6 +194,14 @@ const VendorOrderDetail = () => {
           type="empty"
           title="Đang tải chi tiết đơn hàng"
           description="Đơn hàng của shop đang được đồng bộ."
+        />
+      ) : loadError ? (
+        <AdminStateBlock
+          type="error"
+          title="Không tải được chi tiết đơn hàng"
+          description={loadError}
+          actionLabel="Thử lại"
+          onAction={() => setReloadKey((key) => key + 1)}
         />
       ) : (
         <motion.div className="order-detail-grid">

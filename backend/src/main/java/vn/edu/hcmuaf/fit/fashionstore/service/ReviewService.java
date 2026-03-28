@@ -65,6 +65,18 @@ public class ReviewService {
         return new PageImpl<>(content, pageable, page.getTotalElements());
     }
 
+    @Transactional(readOnly = true)
+    public Page<ReviewResponse> getStoreReviews(UUID storeId, Review.ReviewStatus status, Pageable pageable) {
+        Page<Review> page = status == null
+                ? reviewRepository.findByStoreId(storeId, pageable)
+                : reviewRepository.findByStoreIdAndStatus(storeId, status, pageable);
+
+        List<ReviewResponse> content = page.getContent().stream()
+                .map(this::toReviewResponse)
+                .collect(Collectors.toList());
+        return new PageImpl<>(content, pageable, page.getTotalElements());
+    }
+
     @Transactional
     public ReviewResponse updateStatus(UUID id, Review.ReviewStatus status) {
         Review review = reviewRepository.findById(id)
@@ -80,6 +92,18 @@ public class ReviewService {
         review.setShopReply(reply);
         review.setShopReplyAt(LocalDateTime.now());
         // Auto-approve if pending
+        if (review.getStatus() == Review.ReviewStatus.PENDING) {
+            review.setStatus(Review.ReviewStatus.APPROVED);
+        }
+        return toReviewResponse(reviewRepository.save(review));
+    }
+
+    @Transactional
+    public ReviewResponse addStoreReply(UUID id, UUID storeId, String reply) {
+        Review review = reviewRepository.findByIdAndStoreId(id, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
+        review.setShopReply(reply);
+        review.setShopReplyAt(LocalDateTime.now());
         if (review.getStatus() == Review.ReviewStatus.PENDING) {
             review.setStatus(Review.ReviewStatus.APPROVED);
         }

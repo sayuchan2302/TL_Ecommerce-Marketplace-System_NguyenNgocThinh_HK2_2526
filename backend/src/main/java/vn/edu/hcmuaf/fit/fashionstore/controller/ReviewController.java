@@ -10,6 +10,7 @@ import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReviewReplyRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.request.ReviewStatusUpdateRequest;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.ReviewResponse;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Review;
+import vn.edu.hcmuaf.fit.fashionstore.security.AuthContext;
 import vn.edu.hcmuaf.fit.fashionstore.service.ReviewService;
 
 import java.util.UUID;
@@ -19,9 +20,11 @@ import java.util.UUID;
 public class ReviewController {
 
     private final ReviewService reviewService;
+    private final AuthContext authContext;
 
-    public ReviewController(ReviewService reviewService) {
+    public ReviewController(ReviewService reviewService, AuthContext authContext) {
         this.reviewService = reviewService;
+        this.authContext = authContext;
     }
 
     @GetMapping("/admin/all")
@@ -46,6 +49,30 @@ public class ReviewController {
             @PathVariable UUID id,
             @Valid @RequestBody ReviewReplyRequest request) {
         return ResponseEntity.ok(reviewService.addReply(id, request.getReply()));
+    }
+
+    @GetMapping("/my-store")
+    @PreAuthorize("hasAnyRole('VENDOR', 'SUPER_ADMIN')")
+    public ResponseEntity<Page<ReviewResponse>> getMyStoreReviews(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestParam(required = false) UUID storeId,
+            @RequestParam(required = false) Review.ReviewStatus status,
+            Pageable pageable) {
+        AuthContext.UserContext ctx = authContext.requireVendor(authHeader);
+        UUID resolvedStoreId = authContext.resolveStoreId(ctx, storeId);
+        return ResponseEntity.ok(reviewService.getStoreReviews(resolvedStoreId, status, pageable));
+    }
+
+    @PostMapping("/my-store/{id}/reply")
+    @PreAuthorize("hasAnyRole('VENDOR', 'SUPER_ADMIN')")
+    public ResponseEntity<ReviewResponse> addStoreReply(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID storeId,
+            @Valid @RequestBody ReviewReplyRequest request) {
+        AuthContext.UserContext ctx = authContext.requireVendor(authHeader);
+        UUID resolvedStoreId = authContext.resolveStoreId(ctx, storeId);
+        return ResponseEntity.ok(reviewService.addStoreReply(id, resolvedStoreId, request.getReply()));
     }
 
     @DeleteMapping("/admin/{id}")

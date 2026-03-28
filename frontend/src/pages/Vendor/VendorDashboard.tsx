@@ -24,6 +24,7 @@ import { vendorPortalService, type VendorDashboardData, type VendorOrderSummary 
 import { vendorVoucherService } from '../../services/vendorVoucherService';
 import { useToast } from '../../contexts/ToastContext';
 import { getUiErrorMessage } from '../../utils/errorMessage';
+import { AdminStateBlock } from '../Admin/AdminStateBlocks';
 
 const initialData: VendorDashboardData = {
   stats: {
@@ -43,6 +44,8 @@ const VendorDashboard = () => {
   const { addToast } = useToast();
   const [data, setData] = useState<VendorDashboardData>(initialData);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [runningVoucherCount, setRunningVoucherCount] = useState(0);
 
@@ -50,7 +53,9 @@ const VendorDashboard = () => {
     let active = true;
 
     const load = async () => {
+      setLoading(true);
       try {
+        setLoadError('');
         const [next, voucherResult] = await Promise.all([
           vendorPortalService.getDashboardData(),
           vendorVoucherService.list({ status: 'running', page: 1, size: 1 }),
@@ -62,7 +67,11 @@ const VendorDashboard = () => {
         });
       } catch (err: unknown) {
         if (!active) return;
-        addToast(getUiErrorMessage(err, 'Không tải được bảng điều khiển gian hàng'), 'error');
+        const message = getUiErrorMessage(err, 'Không tải được bảng điều khiển gian hàng');
+        setLoadError(message);
+        setData(initialData);
+        setRunningVoucherCount(0);
+        addToast(message, 'error');
       } finally {
         if (active) {
           setLoading(false);
@@ -74,7 +83,7 @@ const VendorDashboard = () => {
     return () => {
       active = false;
     };
-  }, [addToast]);
+  }, [addToast, reloadKey]);
 
   const stats = data.stats;
   const topSaleBase = Math.max(...data.topProducts.map((product) => product.sales), 1);
@@ -175,6 +184,17 @@ const VendorDashboard = () => {
         </>
       )}
     >
+      {loadError ? (
+        <section className="admin-panels single">
+          <AdminStateBlock
+            type="error"
+            title="Không tải được dữ liệu tổng quan"
+            description={loadError}
+            actionLabel="Thử lại"
+            onAction={() => setReloadKey((key) => key + 1)}
+          />
+        </section>
+      ) : null}
       <section className="vendor-stats grid-6">
         {statCards.map((item, idx) => (
           <motion.div

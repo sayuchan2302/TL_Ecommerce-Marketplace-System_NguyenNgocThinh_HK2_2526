@@ -1,3 +1,5 @@
+import { apiRequest, hasBackendJwt } from './apiClient';
+
 export type ReviewStatus = 'pending' | 'approved' | 'hidden';
 
 export interface Review {
@@ -34,6 +36,27 @@ export interface ReviewSubmission {
   images?: string[];
 }
 
+interface BackendReviewResponse {
+  id: string;
+  storeId?: string;
+  productId?: string;
+  productName?: string;
+  productImage?: string;
+  rating?: number;
+  content?: string;
+  images?: string[];
+  date?: string;
+  status?: string;
+  reply?: string | null;
+  replyAt?: string | null;
+  orderId?: string;
+  version?: number;
+}
+
+interface BackendPage<T> {
+  content?: T[];
+}
+
 const STORAGE_KEY = 'fashionstore_reviews_v1';
 
 const parseStoredReviews = (): Review[] => {
@@ -57,6 +80,40 @@ const sortByNewest = (rows: Review[]) =>
   [...rows].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
 
 const isApproved = (review: Review) => review.status === 'approved';
+
+const normalizeStatus = (status?: string): ReviewStatus => {
+  const normalized = (status || '').toUpperCase();
+  if (normalized === 'APPROVED') return 'approved';
+  if (normalized === 'HIDDEN' || normalized === 'REJECTED') return 'hidden';
+  return 'pending';
+};
+
+const mapBackendReview = (row: BackendReviewResponse): Review => {
+  const createdAt = row.date || new Date().toISOString();
+  return {
+    id: String(row.id),
+    storeId: row.storeId || '',
+    productId: row.productId || '',
+    productName: row.productName || 'Sản phẩm',
+    productImage: row.productImage || '',
+    orderId: row.orderId || '',
+    rating: Number(row.rating || 0),
+    title: undefined,
+    content: row.content || '',
+    images: row.images || [],
+    createdAt,
+    updatedAt: createdAt,
+    helpful: 0,
+    shopReply: row.reply
+      ? {
+          content: row.reply,
+          createdAt: row.replyAt || createdAt,
+        }
+      : undefined,
+    status: normalizeStatus(row.status),
+    version: Number(row.version || 0),
+  };
+};
 
 const buildSubmissionRecord = (submission: ReviewSubmission): Review => ({
   id: `rev_${Date.now()}_${Math.round(Math.random() * 1000)}`,
@@ -83,8 +140,41 @@ export const reviewService = {
   },
 
   async getReviewsByStore(storeId: string): Promise<Review[]> {
+    if (hasBackendJwt()) {
+      const rows = await this.getVendorReviews({ size: 1000 });
+      return rows.filter((review) => review.storeId === storeId);
+    }
     const all = await this.getReviews();
     return all.filter((review) => review.storeId === storeId);
+  },
+
+  async getVendorReviews(params: { status?: ReviewStatus | 'all'; page?: number; size?: number } = {}): Promise<Review[]> {
+    const query = new URLSearchParams();
+    query.set('page', String(Math.max(0, (params.page ?? 1) - 1)));
+    query.set('size', String(Math.max(1, params.size ?? 1000)));
+    if (params.status && params.status !== 'all') {
+      query.set('status', params.status.toUpperCase());
+    }
+
+    const response = await apiRequest<BackendPage<BackendReviewResponse>>(
+      `/api/reviews/my-store?${query.toString()}`,
+      {},
+      { auth: true },
+    );
+
+    return (response.content || []).map(mapBackendReview);
+  },
+
+  async replyAsVendor(id: string, reply: string): Promise<Review> {
+    const response = await apiRequest<BackendReviewResponse>(
+      `/api/reviews/my-store/${id}/reply`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ reply }),
+      },
+      { auth: true },
+    );
+    return mapBackendReview(response);
   },
 
   async getReviewsByOrder(orderId: string): Promise<Review[]> {
@@ -116,8 +206,7 @@ export const reviewService = {
     return all.some((review) => review.productId === productId && review.orderId === orderId);
   },
 
-  // Backend has no vendor reply endpoint yet, so seller UI must stay read-only for reply action.
   canVendorReply(): boolean {
-    return false;
+    return hasBackendJwt();
   },
 };
