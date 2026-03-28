@@ -26,6 +26,7 @@ import { useAdminToast } from './useAdminToast';
 import { ADMIN_DICTIONARY } from './adminDictionary';
 import { calculateCommission, formatCurrency } from '../../services/commissionService';
 import { MARKETPLACE_DICTIONARY } from '../../utils/clientDictionary';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 
 const formatVND = (n: number) => n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
 
@@ -33,6 +34,7 @@ const AdminOrderDetailContent = ({ orderCode, routeId }: { orderCode: string; ro
   const t = ADMIN_DICTIONARY.orderDetail;
   const [order, setOrder] = useState<AdminOrderRecord | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { toast, pushToast } = useAdminToast();
   const [pendingTransition, setPendingTransition] = useState<FulfillmentStatus | null>(null);
   const [showTransitionModal, setShowTransitionModal] = useState(false);
@@ -59,12 +61,15 @@ const AdminOrderDetailContent = ({ orderCode, routeId }: { orderCode: string; ro
 
   const fetchOrder = async () => {
     try {
+      setLoadError(null);
       if (orderCode) {
         const data = await getAdminOrderByCode(orderCode);
         setOrder(data);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error: unknown) {
+      console.error(error);
+      setOrder(null);
+      setLoadError(getUiErrorMessage(error, 'Không thể tải chi tiết đơn hàng từ backend.'));
     } finally {
       setIsInitializing(false);
     }
@@ -87,7 +92,20 @@ const AdminOrderDetailContent = ({ orderCode, routeId }: { orderCode: string; ro
   if (!order) {
     return (
       <AdminLayout title={t.title}>
-        <AdminStateBlock type="error" title={t.notFound.title} description={t.notFound.description} />
+        {loadError ? (
+          <AdminStateBlock
+            type="error"
+            title="Không tải được chi tiết đơn hàng"
+            description={loadError}
+            actionLabel="Thử lại"
+            onAction={() => {
+              setIsInitializing(true);
+              void fetchOrder();
+            }}
+          />
+        ) : (
+          <AdminStateBlock type="error" title={t.notFound.title} description={t.notFound.description} />
+        )}
       </AdminLayout>
     );
   }

@@ -81,7 +81,9 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const [, setAddressVersion] = useState(0);
-  const [, setOrdersVersion] = useState(0);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const activeTab = useMemo(() => {
     const tabParam = searchParams.get('tab');
@@ -132,7 +134,6 @@ const Profile = () => {
     setEditingAddress(null);
   };
 
-  const allOrders = orderService.list();
   const orders = activeTab === 'orders' ? allOrders : [];
   const vouchers = activeTab === 'vouchers' ? voucherWallet : [];
   const selectedOrder = (() => {
@@ -164,6 +165,21 @@ const Profile = () => {
     nextParams.delete('orderId');
     setSearchParams(nextParams, { replace: true });
     setSelectedOrderId(null);
+  };
+
+  const loadOrders = async () => {
+    try {
+      setOrdersLoading(true);
+      setOrdersError(null);
+      const rows = await orderService.listFromBackend();
+      setAllOrders(rows);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Không thể tải đơn hàng.';
+      setOrdersError(message);
+      setAllOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
   };
 
   // Placeholder user data
@@ -199,6 +215,13 @@ const Profile = () => {
     const timer = setTimeout(() => setIsLoading(false), 600);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'orders') {
+      return;
+    }
+    void loadOrders();
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab !== 'vouchers') {
@@ -342,7 +365,11 @@ const Profile = () => {
                 : orders.filter(o => o.status === statusMap[orderFilter]);
               return (
             <div className="order-list">
-              {filteredOrders.length === 0 ? (
+              {ordersLoading ? (
+                <div className="account-meta">Đang tải đơn hàng...</div>
+              ) : ordersError ? (
+                <div className="account-meta">{ordersError}</div>
+              ) : filteredOrders.length === 0 ? (
                 <EmptyState 
                   icon={<Package size={80} strokeWidth={1} />}
                   title="Bạn chưa có đơn hàng nào"
@@ -351,7 +378,7 @@ const Profile = () => {
                   actionLink="/"
                 />
               ) : (
-                orders.map((order) => (
+                filteredOrders.map((order) => (
                   <div key={order.id} className="order-card">
                     <div className="order-card-header">
                       <div className="order-card-meta">
@@ -395,11 +422,16 @@ const Profile = () => {
                         {order.status === 'pending' && (
                           <button 
                             className="order-action-btn order-btn-danger"
-                            onClick={() => {
+                            onClick={async () => {
                               if (confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
-                                orderService.cancel(order.id, 'Khách hàng hủy đơn');
-                                setOrdersVersion((prev) => prev + 1);
-                                addToast('Đã hủy đơn hàng thành công', 'success');
+                                try {
+                                  await orderService.cancelOnBackend(order.id, 'Khách hàng hủy đơn');
+                                  await loadOrders();
+                                  addToast('Đã hủy đơn hàng thành công', 'success');
+                                } catch (error: unknown) {
+                                  const message = error instanceof Error ? error.message : 'Không thể hủy đơn hàng.';
+                                  addToast(message, 'error');
+                                }
                               }
                             }}
                           >
@@ -1114,12 +1146,17 @@ const Profile = () => {
               {selectedOrder.status === 'pending' && (
                 <button 
                   className="order-action-btn order-btn-danger"
-                  onClick={() => {
+                  onClick={async () => {
                     if (confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) {
-                      orderService.cancel(selectedOrder.id, 'Khách hàng hủy đơn');
-                      setOrdersVersion((prev) => prev + 1);
-                      closeOrderDetail();
-                      addToast('Đã hủy đơn hàng thành công', 'success');
+                      try {
+                        await orderService.cancelOnBackend(selectedOrder.id, 'Khách hàng hủy đơn');
+                        await loadOrders();
+                        closeOrderDetail();
+                        addToast('Đã hủy đơn hàng thành công', 'success');
+                      } catch (error: unknown) {
+                        const message = error instanceof Error ? error.message : 'Không thể hủy đơn hàng.';
+                        addToast(message, 'error');
+                      }
                     }
                   }}
                 >

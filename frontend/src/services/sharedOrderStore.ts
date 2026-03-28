@@ -1,7 +1,5 @@
 /**
- * sharedOrderStore.ts — Unified order data layer.
- *
- * Client (checkout/account) and Admin (AdminOrders) both read/write from here.
+ * sharedOrderStore.ts — Order cache layer used by customer flows.
  *
  * Status Mapping:
  *   Client OrderStatus  | Admin FulfillmentStatus
@@ -15,7 +13,9 @@
  */
 
 import type { FulfillmentStatus, PaymentStatus } from '../pages/Admin/orderWorkflow';
-import type { AdminOrderData, AdminOrderItem, AdminOrderPricing } from '../pages/Admin/adminOrdersData';
+
+const ENABLE_ORDER_SEED_DATA = import.meta.env.VITE_ENABLE_ORDER_SEED_DATA === 'true';
+const ENABLE_ORDER_LOCAL_CACHE = import.meta.env.VITE_ENABLE_ORDER_LOCAL_CACHE === 'true';
 
 // ── Unified Order Schema ───────────────────────────────────────────────────
 export interface SharedOrderItem {
@@ -111,7 +111,7 @@ export const clientStatusToFulfillment = (status: ClientOrderStatus): Fulfillmen
   return map[status];
 };
 
-// ── Seed Data (migrated + merged from adminOrdersData) ─────────────────────
+// ── Optional Seed Data (dev only via VITE_ENABLE_ORDER_SEED_DATA=true) ─────
 const SEED_ORDERS: SharedOrder[] = [
   {
     id: 'ORD-10235',
@@ -242,20 +242,28 @@ const SEED_ORDERS: SharedOrder[] = [
 
 // ── In-memory store ────────────────────────────────────────────────────────
 const loadFromStorage = (): SharedOrder[] => {
+  if (!ENABLE_ORDER_LOCAL_CACHE) {
+    return ENABLE_ORDER_SEED_DATA ? [...SEED_ORDERS] : [];
+  }
+
   try {
     const raw = localStorage.getItem('coolmate_shared_orders_v1');
-    if (!raw) return [...SEED_ORDERS];
+    if (!raw) return ENABLE_ORDER_SEED_DATA ? [...SEED_ORDERS] : [];
     const parsed: SharedOrder[] = JSON.parse(raw);
-    // Merge: use storage orders but ensure all seeds are present
+    if (!ENABLE_ORDER_SEED_DATA) return parsed;
     const storageIds = new Set(parsed.map((o) => o.id));
     const missingSeeds = SEED_ORDERS.filter((s) => !storageIds.has(s.id));
     return [...parsed, ...missingSeeds];
   } catch {
-    return [...SEED_ORDERS];
+    return ENABLE_ORDER_SEED_DATA ? [...SEED_ORDERS] : [];
   }
 };
 
 const saveToStorage = (orders: SharedOrder[]) => {
+  if (!ENABLE_ORDER_LOCAL_CACHE) {
+    return;
+  }
+
   try {
     localStorage.setItem('coolmate_shared_orders_v1', JSON.stringify(orders));
   } catch {
@@ -267,96 +275,18 @@ let _orders: SharedOrder[] = loadFromStorage();
 
 // ── Store API ──────────────────────────────────────────────────────────────
 export const sharedOrderStore = {
-  getAll(): SharedOrder[] {
-    return [..._orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  },
-
-  getById(id: string): SharedOrder | undefined {
-    return _orders.find((o) => o.id === id);
-  },
-
-  add(order: SharedOrder) {
-    _orders = [order, ..._orders];
+  upsert(order: SharedOrder) {
+    const idx = _orders.findIndex((o) => o.id === order.id);
+    if (idx >= 0) {
+      _orders[idx] = { ...order };
+    } else {
+      _orders = [order, ..._orders];
+    }
     saveToStorage(_orders);
   },
 
-  update(updated: SharedOrder) {
-    _orders = _orders.map((o) => (o.id === updated.id ? { ...updated } : o));
+  replaceAll(orders: SharedOrder[]) {
+    _orders = [...orders].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     saveToStorage(_orders);
-  },
-
-  canCancel(order: SharedOrder): boolean {
-    return order.fulfillment === 'pending' || order.fulfillment === 'packing';
-  },
-
-  updateTracking(id: string, tracking: string): boolean {
-    const order = _orders.find((o) => o.id === id);
-    if (!order) return false;
-    this.update({
-      ...order,
-      tracking,
-      timeline: [
-        ...order.timeline,
-        { time: new Date().toLocaleString('vi-VN'), text: tracking ? `Cập nhật mã vận đơn: ${tracking}` : 'Đã xóa mã vận đơn', tone: 'info' },
-      ],
-    });
-    return true;
-  },
-
-  cancel(id: string, reason: string): boolean {
-    const order = _orders.find((o) => o.id === id);
-    if (!order || !this.canCancel(order)) return false;
-    this.update({
-      ...order,
-      fulfillment: 'canceled',
-      paymentStatus: order.paymentStatus === 'paid' ? 'refund_pending' : order.paymentStatus,
-      cancelReason: reason,
-      cancelledAt: new Date().toISOString(),
-      timeline: [
-        ...order.timeline,
-        { time: new Date().toLocaleString('vi-VN'), text: `Đơn hàng bị hủy. Lý do: ${reason}`, tone: 'error' },
-      ],
-    });
-    return true;
-  },
-
-  /** Convert to the format AdminOrders expects */
-  toAdminOrderData(order: SharedOrder): AdminOrderData & { id: string } {
-    return {
-      id: order.id,
-      code: order.id,
-      customer: order.customerName,
-      avatar: order.customerAvatar,
-      total: `${order.total.toLocaleString('vi-VN')} đ`,
-      paymentStatus: order.paymentStatus,
-      fulfillment: order.fulfillment,
-      shipMethod: order.shipMethod,
-      tracking: order.tracking,
-      date: order.createdAt,
-      customerInfo: {
-        name: order.customerName,
-        phone: order.customerPhone,
-        email: order.customerEmail,
-      },
-      address: order.address,
-      note: order.note,
-      paymentMethod: order.paymentMethod,
-      items: order.items.map((item, i): AdminOrderItem => ({
-        id: i + 1,
-        name: item.name,
-        color: item.color || '',
-        size: item.size || '',
-        qty: item.quantity,
-        price: item.price,
-        image: item.image,
-      })),
-      pricing: {
-        subtotal: order.subtotal,
-        shipping: order.shippingFee,
-        discount: order.discount,
-        voucher: order.couponCode || '',
-      } as AdminOrderPricing,
-      timeline: order.timeline,
-    };
   },
 };

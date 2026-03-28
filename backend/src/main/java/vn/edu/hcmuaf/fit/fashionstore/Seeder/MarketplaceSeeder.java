@@ -1,16 +1,17 @@
 package vn.edu.hcmuaf.fit.fashionstore.Seeder;
 
-import java.util.ArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Address;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Cart;
+import vn.edu.hcmuaf.fit.fashionstore.entity.CartItem;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Category;
 import vn.edu.hcmuaf.fit.fashionstore.entity.ContentPage;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Order;
@@ -19,6 +20,7 @@ import vn.edu.hcmuaf.fit.fashionstore.entity.Product;
 import vn.edu.hcmuaf.fit.fashionstore.entity.ProductImage;
 import vn.edu.hcmuaf.fit.fashionstore.entity.ProductVariant;
 import vn.edu.hcmuaf.fit.fashionstore.entity.ReturnRequest;
+import vn.edu.hcmuaf.fit.fashionstore.entity.Review;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Store;
 import vn.edu.hcmuaf.fit.fashionstore.entity.User;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Voucher;
@@ -30,25 +32,25 @@ import vn.edu.hcmuaf.fit.fashionstore.repository.OrderRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.ProductRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.ProductVariantRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.ReturnRequestRepository;
+import vn.edu.hcmuaf.fit.fashionstore.repository.ReviewRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.StoreRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.UserRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.VoucherRepository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
-import java.math.BigDecimal;
 
 @Component
-@ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "app.seed", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class MarketplaceSeeder implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(MarketplaceSeeder.class);
     private static final String TEST_PASSWORD = "Test@123";
+    private static final String SEED_ACTOR = "seed-system";
 
     private final UserRepository userRepository;
     private final StoreRepository storeRepository;
@@ -61,6 +63,8 @@ public class MarketplaceSeeder implements ApplicationRunner {
     private final ReturnRequestRepository returnRequestRepository;
     private final VoucherRepository voucherRepository;
     private final ContentPageRepository contentPageRepository;
+    private final ReviewRepository reviewRepository;
+    private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
 
     public MarketplaceSeeder(
@@ -75,6 +79,8 @@ public class MarketplaceSeeder implements ApplicationRunner {
             ReturnRequestRepository returnRequestRepository,
             VoucherRepository voucherRepository,
             ContentPageRepository contentPageRepository,
+            ReviewRepository reviewRepository,
+            JdbcTemplate jdbcTemplate,
             PasswordEncoder passwordEncoder
     ) {
         this.userRepository = userRepository;
@@ -88,211 +94,235 @@ public class MarketplaceSeeder implements ApplicationRunner {
         this.returnRequestRepository = returnRequestRepository;
         this.voucherRepository = voucherRepository;
         this.contentPageRepository = contentPageRepository;
+        this.reviewRepository = reviewRepository;
+        this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
     }
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        log.info("Dang khoi tao du lieu mau...");
-        User customer = upsertUser("customer@test.local", "Khach hang mau", "0900000001", User.Role.CUSTOMER, null);
-        User vendor = upsertUser("vendor@test.local", "Nha ban hang mau", "0900000002", User.Role.VENDOR, null);
-        User admin = upsertUser("admin@test.local", "Quan tri vien", "0900000003", User.Role.SUPER_ADMIN, null);
-
-        ensureCart(customer);
-
-        Store vendorStore = upsertVendorStore(vendor);
-        if (!Objects.equals(vendor.getStoreId(), vendorStore.getId())) {
-            vendor.setStoreId(vendorStore.getId());
-            userRepository.save(vendor);
-        }
-        if (customer.getStoreId() != null) {
-            customer.setStoreId(null);
-            userRepository.save(customer);
-        }
-        if (admin.getStoreId() != null) {
-            admin.setStoreId(null);
-            userRepository.save(admin);
-        }
-
-        Category men = upsertCategory("Thoi trang nam", "thoi-trang-nam", "Danh muc cho san pham nam.", null, 1);
-        Category women = upsertCategory("Thoi trang nu", "thoi-trang-nu", "Danh muc cho san pham nu.", null, 2);
-        Category tshirt = upsertCategory("Ao thun", "ao-thun", "Ao thun co ban va nang cao.", men, 10);
-        Category jeans = upsertCategory("Quan jeans", "quan-jeans", "Quan jeans nam nu.", men, 20);
-        Category dress = upsertCategory("Dam vay", "dam-vay", "Dam vay cho nu.", women, 10);
-        upsertCategory("Phu kien", "phu-kien", "Phu kien thoi trang.", null, 3);
-
-        Product tshirtProduct = upsertProduct(
-                "Ao thun cotton basic",
-                "ao-thun-cotton-basic",
-                vendorStore.getId(),
-                tshirt,
-                new BigDecimal("199000"),
-                new BigDecimal("159000"),
-                Product.Gender.UNISEX,
-                Product.ProductStatus.ACTIVE,
-                true,
-                "Cotton 2 chieu",
-                "Regular fit",
-                "Mau ao thun basic ban chay."
-        );
-        ensurePrimaryImage(tshirtProduct, "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab", "Ao thun basic");
-        ProductVariant tshirtM = upsertVariant(tshirtProduct, "TEE-BASIC-BLACK-M", "Den", "M", 120, new BigDecimal("0"), true);
-        upsertVariant(tshirtProduct, "TEE-BASIC-WHITE-L", "Trang", "L", 80, new BigDecimal("10000"), true);
-
-        Product jeansProduct = upsertProduct(
-                "Quan jeans slim fit",
-                "quan-jeans-slim-fit",
-                vendorStore.getId(),
-                jeans,
-                new BigDecimal("399000"),
-                new BigDecimal("329000"),
-                Product.Gender.MALE,
-                Product.ProductStatus.ACTIVE,
-                false,
-                "Denim co gian",
-                "Slim fit",
-                "Mau quan jeans slim fit cho shop vendor."
-        );
-        ensurePrimaryImage(jeansProduct, "https://images.unsplash.com/photo-1542272604-787c3835535d", "Quan jeans slim fit");
-        ProductVariant jeans32 = upsertVariant(jeansProduct, "JEAN-SLIM-BLUE-32", "Xanh", "32", 45, new BigDecimal("0"), true);
-        upsertVariant(jeansProduct, "JEAN-SLIM-BLUE-34", "Xanh", "34", 22, new BigDecimal("0"), true);
-
-        Product dressProduct = upsertProduct(
-                "Dam midi du tiec",
-                "dam-midi-du-tiec",
-                vendorStore.getId(),
-                dress,
-                new BigDecimal("499000"),
-                new BigDecimal("449000"),
-                Product.Gender.FEMALE,
-                Product.ProductStatus.DRAFT,
-                false,
-                "Linen cao cap",
-                "Slim fit",
-                "Mau dam dang soan va chua mo ban."
-        );
-        ensurePrimaryImage(dressProduct, "https://images.unsplash.com/photo-1496747611176-843222e1e57c", "Dam midi du tiec");
-        upsertVariant(dressProduct, "DRESS-MIDI-BEIGE-S", "Be", "S", 18, new BigDecimal("0"), true);
-
-        Address customerAddress = ensureDefaultAddress(customer);
-
-        Order deliveredOrder = upsertOrder(
-                customer,
-                customerAddress,
-                vendorStore.getId(),
-                Order.OrderStatus.DELIVERED,
-                Order.PaymentMethod.BANK_TRANSFER,
-                Order.PaymentStatus.PAID,
-                "SEED_ORDER_DELIVERED",
-                "GHN000123456",
-                "GHN",
-                new BigDecimal("20000"),
-                new BigDecimal("15000")
-        );
-        OrderItem deliveredItem = ensureOrderItem(
-                deliveredOrder,
-                tshirtProduct,
-                tshirtM,
-                2,
-                new BigDecimal("159000"),
-                "Ao thun cotton basic",
-                "Den / M",
-                "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab",
-                vendorStore.getId()
-        );
-
-        Order processingOrder = upsertOrder(
-                customer,
-                customerAddress,
-                vendorStore.getId(),
-                Order.OrderStatus.PROCESSING,
-                Order.PaymentMethod.COD,
-                Order.PaymentStatus.UNPAID,
-                "SEED_ORDER_PROCESSING",
-                null,
-                null,
-                new BigDecimal("25000"),
-                new BigDecimal("0")
-        );
-        ensureOrderItem(
-                processingOrder,
-                jeansProduct,
-                jeans32,
-                1,
-                new BigDecimal("329000"),
-                "Quan jeans slim fit",
-                "Xanh / 32",
-                "https://images.unsplash.com/photo-1542272604-787c3835535d",
-                vendorStore.getId()
-        );
-
-        upsertReturnRequest(deliveredOrder, customer, deliveredItem);
-
-        upsertVoucher(vendorStore.getId(), "WELCOME10", "Voucher chao mung", Voucher.DiscountType.PERCENT, new BigDecimal("10"), new BigDecimal("299000"), 500, 120, Voucher.VoucherStatus.RUNNING);
-        upsertVoucher(vendorStore.getId(), "FREESHIP50", "Voucher giam truc tiep", Voucher.DiscountType.FIXED, new BigDecimal("50000"), new BigDecimal("599000"), 250, 64, Voucher.VoucherStatus.PAUSED);
-
-        upsertContent(
-                ContentPage.ContentType.FAQ,
-                "Thoi gian xu ly don hang",
-                "Don hang thuong duoc xu ly trong 24 gio lam viec.",
-                1
-        );
-        upsertContent(
-                ContentPage.ContentType.POLICY,
-                "Chinh sach doi tra",
-                "Khach hang co the yeu cau doi tra trong 7 ngay ke tu khi nhan hang.",
-                1
-        );
-
-        log.info("Da seed du lieu mau marketplace thanh cong (customer/vendor/admin + store/category/product/order/voucher/content).");
+        truncateAllData();
+        seedMarketplace();
     }
 
-    private User upsertUser(String email, String name, String phone, User.Role role, UUID storeId) {
-        User user = userRepository.findByEmail(email).orElseGet(User::new);
+    private void seedMarketplace() {
+        log.info("Bat dau nap du lieu mau marketplace...");
+
+        User admin = createUser("admin@fashion.local", "Quản trị hệ thống", "0900000001", User.Role.SUPER_ADMIN);
+        User vendorAn = createUser("an.shop@fashion.local", "Nguyễn Hoàng An", "0900000002", User.Role.VENDOR);
+        User vendorBinh = createUser("binh.store@fashion.local", "Trần Gia Bình", "0900000003", User.Role.VENDOR);
+        User vendorDuyet = createUser("duyet.vendor@fashion.local", "Lê Thanh Duyệt", "0900000004", User.Role.VENDOR);
+        User customerMinh = createUser("minh.customer@fashion.local", "Phạm Minh Khang", "0901000001", User.Role.CUSTOMER);
+        User customerLan = createUser("lan.customer@fashion.local", "Đỗ Ngọc Lan", "0901000002", User.Role.CUSTOMER);
+        User customerHuy = createUser("huy.customer@fashion.local", "Vũ Đức Huy", "0901000003", User.Role.CUSTOMER);
+
+        Store storeAn = createStore(
+                vendorAn, "An Urban", "an-urban",
+                "Chuyên thời trang nam tối giản, chất liệu cao cấp.",
+                "45 Nguyễn Trãi, Quận 1, TP. Hồ Chí Minh",
+                Store.StoreStatus.ACTIVE, Store.ApprovalStatus.APPROVED,
+                new BigDecimal("6.0"), 4.8, 148, new BigDecimal("128900000"),
+                LocalDateTime.now().minusDays(30), admin.getEmail(), null
+        );
+        Store storeBinh = createStore(
+                vendorBinh, "Bình Boutique", "binh-boutique",
+                "Thời trang nữ công sở và dự tiệc, phong cách thanh lịch.",
+                "117 Hai Bà Trưng, Quận 3, TP. Hồ Chí Minh",
+                Store.StoreStatus.ACTIVE, Store.ApprovalStatus.APPROVED,
+                new BigDecimal("5.5"), 4.6, 96, new BigDecimal("84200000"),
+                LocalDateTime.now().minusDays(15), admin.getEmail(), null
+        );
+        Store storeChoDuyet = createStore(
+                vendorDuyet, "Duyệt Local Brand", "duyet-local-brand",
+                "Gian hàng mới đăng ký, đang chờ đội ngũ kiểm duyệt.",
+                "22 Lý Tự Trọng, Quận 1, TP. Hồ Chí Minh",
+                Store.StoreStatus.INACTIVE, Store.ApprovalStatus.PENDING,
+                new BigDecimal("5.0"), 0.0, 0, BigDecimal.ZERO,
+                null, null, "Đang chờ bổ sung giấy phép kinh doanh."
+        );
+        linkVendorStore(vendorAn, storeAn);
+        linkVendorStore(vendorBinh, storeBinh);
+        linkVendorStore(vendorDuyet, storeChoDuyet);
+
+        Category nam = createCategory("Thời trang nam", "thoi-trang-nam", "Danh mục sản phẩm dành cho nam.", null, 1);
+        Category nu = createCategory("Thời trang nữ", "thoi-trang-nu", "Danh mục sản phẩm dành cho nữ.", null, 2);
+        Category phuKien = createCategory("Phụ kiện", "phu-kien", "Phụ kiện thời trang đi kèm.", null, 3);
+        Category aoThun = createCategory("Áo thun", "ao-thun", "Áo thun cơ bản và nâng cao.", nam, 10);
+        Category quanJean = createCategory("Quần jean", "quan-jean", "Quần jean nhiều phom dáng.", nam, 20);
+        Category damVay = createCategory("Đầm váy", "dam-vay", "Đầm và váy nữ tính.", nu, 10);
+        Category tuiXach = createCategory("Túi xách", "tui-xach", "Túi đeo chéo, tote, clutch.", phuKien, 10);
+
+        Product aoThunPremium = createProduct(
+                storeAn, aoThun, "Áo thun cotton premium", "ao-thun-cotton-premium",
+                new BigDecimal("249000"), new BigDecimal("199000"), Product.Gender.UNISEX, Product.ProductStatus.ACTIVE,
+                true, "Cotton compact 240gsm", "Regular fit", "Áo thun mềm mịn, thấm hút tốt, phù hợp mặc hằng ngày.",
+                "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab", "Áo thun cotton premium"
+        );
+        Product quanJeanSlim = createProduct(
+                storeAn, quanJean, "Quần jean slim wash", "quan-jean-slim-wash",
+                new BigDecimal("459000"), new BigDecimal("379000"), Product.Gender.MALE, Product.ProductStatus.ACTIVE,
+                false, "Denim co giãn", "Slim fit", "Quần jean ôm vừa, màu wash hiện đại.",
+                "https://images.unsplash.com/photo-1542272604-787c3835535d", "Quần jean slim wash"
+        );
+        Product damMidi = createProduct(
+                storeBinh, damVay, "Đầm midi hoa nhí", "dam-midi-hoa-nhi",
+                new BigDecimal("529000"), new BigDecimal("449000"), Product.Gender.FEMALE, Product.ProductStatus.ACTIVE,
+                true, "Voan lụa", "Dáng xòe", "Đầm nhẹ, thoáng, phù hợp đi làm và dạo phố.",
+                "https://images.unsplash.com/photo-1496747611176-843222e1e57c", "Đầm midi hoa nhí"
+        );
+        Product blazerNu = createProduct(
+                storeBinh, damVay, "Áo blazer nữ basic", "ao-blazer-nu-basic",
+                new BigDecimal("699000"), new BigDecimal("599000"), Product.Gender.FEMALE, Product.ProductStatus.ACTIVE,
+                false, "Tweed pha", "Regular fit", "Blazer tối giản, phù hợp môi trường công sở.",
+                "https://images.unsplash.com/photo-1483985988355-763728e1935b", "Áo blazer nữ basic"
+        );
+        Product tuiDaMem = createProduct(
+                storeBinh, tuiXach, "Túi đeo chéo da mềm", "tui-deo-cheo-da-mem",
+                new BigDecimal("489000"), new BigDecimal("409000"), Product.Gender.UNISEX, Product.ProductStatus.ACTIVE,
+                true, "Da PU cao cấp", "Đeo chéo", "Túi nhỏ gọn, có nhiều ngăn tiện lợi.",
+                "https://images.unsplash.com/photo-1542291026-7eec264c27ff", "Túi đeo chéo da mềm"
+        );
+        Product sanPhamNhap = createProduct(
+                storeChoDuyet, aoThun, "Áo thun local draft", "ao-thun-local-draft",
+                new BigDecimal("199000"), BigDecimal.ZERO, Product.Gender.UNISEX, Product.ProductStatus.DRAFT,
+                false, "Cotton 2 chiều", "Regular fit", "Sản phẩm nháp chờ gian hàng được duyệt.",
+                "https://images.unsplash.com/photo-1434389677669-e08b4cac3105", "Áo thun local draft"
+        );
+
+        ProductVariant aoThunDenM = createVariant(aoThunPremium, "AN-TEE-PRM-BLK-M", "Đen", "M", 90, BigDecimal.ZERO, true);
+        ProductVariant aoThunTrangL = createVariant(aoThunPremium, "AN-TEE-PRM-WHT-L", "Trắng", "L", 70, new BigDecimal("5000"), true);
+        ProductVariant jeanXanh30 = createVariant(quanJeanSlim, "AN-JEAN-SLIM-BLU-30", "Xanh", "30", 40, BigDecimal.ZERO, true);
+        ProductVariant jeanXanh32 = createVariant(quanJeanSlim, "AN-JEAN-SLIM-BLU-32", "Xanh", "32", 55, BigDecimal.ZERO, true);
+        ProductVariant damKemS = createVariant(damMidi, "BINH-DRESS-FLR-S", "Kem", "S", 26, BigDecimal.ZERO, true);
+        ProductVariant damKemM = createVariant(damMidi, "BINH-DRESS-FLR-M", "Kem", "M", 34, BigDecimal.ZERO, true);
+        ProductVariant blazerBeM = createVariant(blazerNu, "BINH-BLAZER-BEI-M", "Be", "M", 22, BigDecimal.ZERO, true);
+        ProductVariant blazerDenL = createVariant(blazerNu, "BINH-BLAZER-BLK-L", "Đen", "L", 18, new BigDecimal("15000"), true);
+        ProductVariant tuiDenFree = createVariant(tuiDaMem, "BINH-BAG-CRS-BLK-F", "Đen", "Free", 64, BigDecimal.ZERO, true);
+        createVariant(sanPhamNhap, "DUYET-TEE-DRF-WHT-M", "Trắng", "M", 12, BigDecimal.ZERO, true);
+
+        Address addressMinh = createAddress(customerMinh, "Phạm Minh Khang", "0901000001", "TP. Hồ Chí Minh", "Quận 1", "Phường Bến Nghé", "18 Nguyễn Huệ", true, "Nhà riêng");
+        Address addressLan = createAddress(customerLan, "Đỗ Ngọc Lan", "0901000002", "TP. Hồ Chí Minh", "Quận 3", "Phường Võ Thị Sáu", "212 Nam Kỳ Khởi Nghĩa", true, "Công ty");
+        Address addressHuy = createAddress(customerHuy, "Vũ Đức Huy", "0901000003", "Đà Nẵng", "Hải Châu", "Phường Thạch Thang", "55 Trần Phú", true, "Nhà riêng");
+
+        createCart(customerMinh, List.of(new CartLine(quanJeanSlim, jeanXanh32, 1), new CartLine(blazerNu, blazerBeM, 1)));
+        createCart(customerLan, List.of(new CartLine(tuiDaMem, tuiDenFree, 1), new CartLine(aoThunPremium, aoThunTrangL, 2)));
+        createCart(customerHuy, List.of(new CartLine(damMidi, damKemS, 1)));
+
+        Order orderDaGiao = createOrder(customerMinh, addressMinh, storeAn, Order.OrderStatus.DELIVERED, Order.PaymentMethod.BANK_TRANSFER, Order.PaymentStatus.PAID, "DH-SEED-DELIVERED-001", "GHN100000001", "GHN", new BigDecimal("25000"), new BigDecimal("20000"), LocalDateTime.now().minusDays(6));
+        OrderItem itemDaGiao = addOrderItem(orderDaGiao, aoThunPremium, aoThunDenM, 2, new BigDecimal("199000"), storeAn.getId());
+        addOrderItem(orderDaGiao, quanJeanSlim, jeanXanh30, 1, new BigDecimal("379000"), storeAn.getId());
+
+        Order orderXuLy = createOrder(customerMinh, addressMinh, storeAn, Order.OrderStatus.PROCESSING, Order.PaymentMethod.COD, Order.PaymentStatus.UNPAID, "DH-SEED-PROCESSING-001", null, null, new BigDecimal("30000"), BigDecimal.ZERO, null);
+        addOrderItem(orderXuLy, aoThunPremium, aoThunTrangL, 1, new BigDecimal("204000"), storeAn.getId());
+
+        Order orderDangGiao = createOrder(customerLan, addressLan, storeBinh, Order.OrderStatus.SHIPPED, Order.PaymentMethod.MOMO, Order.PaymentStatus.PAID, "DH-SEED-SHIPPED-001", "GHTK200000001", "GHTK", new BigDecimal("22000"), new BigDecimal("15000"), LocalDateTime.now().minusDays(2));
+        addOrderItem(orderDangGiao, damMidi, damKemM, 1, new BigDecimal("449000"), storeBinh.getId());
+        addOrderItem(orderDangGiao, tuiDaMem, tuiDenFree, 1, new BigDecimal("409000"), storeBinh.getId());
+
+        Order orderDaHuy = createOrder(customerHuy, addressHuy, storeBinh, Order.OrderStatus.CANCELLED, Order.PaymentMethod.VNPAY, Order.PaymentStatus.FAILED, "DH-SEED-CANCELLED-001", null, null, new BigDecimal("25000"), BigDecimal.ZERO, null);
+        addOrderItem(orderDaHuy, blazerNu, blazerDenL, 1, new BigDecimal("614000"), storeBinh.getId());
+
+        createReturnRequest(orderDaGiao, customerMinh, itemDaGiao, ReturnRequest.ReturnReason.SIZE, ReturnRequest.ReturnResolution.EXCHANGE, ReturnRequest.ReturnStatus.PENDING, "Khách muốn đổi size M sang L.", "Đã tiếp nhận và chờ cửa hàng xác nhận tồn kho.");
+
+        createReview(aoThunPremium, customerMinh, orderDaGiao, storeAn.getId(), 5, "Áo mặc rất thoải mái", "Chất vải mát, form đẹp, giao nhanh.", Review.ReviewStatus.APPROVED, "Cảm ơn bạn đã ủng hộ shop.", List.of("https://images.unsplash.com/photo-1521572163474-6864f9cf17ab"));
+        createReview(quanJeanSlim, customerMinh, orderDaGiao, storeAn.getId(), 4, "Jean ổn trong tầm giá", "Màu đẹp, mặc vừa vặn.", Review.ReviewStatus.APPROVED, null, List.of());
+        createReview(damMidi, customerLan, orderDangGiao, storeBinh.getId(), 5, "Đầm lên dáng xinh", "Vải nhẹ, không nhăn nhiều.", Review.ReviewStatus.PENDING, null, List.of());
+        createReview(blazerNu, customerHuy, null, storeBinh.getId(), 3, "Áo đẹp nhưng hơi dày", "Nên mặc phòng lạnh sẽ hợp hơn.", Review.ReviewStatus.APPROVED, "Shop ghi nhận góp ý để cải tiến chất liệu.", List.of());
+
+        createVoucher(storeAn.getId(), "CHAOAN10", "Giảm 10% đơn đầu tiên", "Áp dụng cho khách mới, tối đa giảm 40.000đ.", Voucher.DiscountType.PERCENT, new BigDecimal("10"), new BigDecimal("299000"), 1500, 320, Voucher.VoucherStatus.RUNNING, LocalDate.now().minusDays(15), LocalDate.now().plusDays(45));
+        createVoucher(storeAn.getId(), "FREESHIP30", "Hỗ trợ phí ship 30k", "Giảm trực tiếp 30.000đ vào phí vận chuyển.", Voucher.DiscountType.FIXED, new BigDecimal("30000"), new BigDecimal("199000"), 900, 440, Voucher.VoucherStatus.RUNNING, LocalDate.now().minusDays(5), LocalDate.now().plusDays(20));
+        createVoucher(storeBinh.getId(), "BINHNEW12", "Chào mừng khách mới", "Giảm 12% toàn bộ sản phẩm của gian hàng.", Voucher.DiscountType.PERCENT, new BigDecimal("12"), new BigDecimal("399000"), 1100, 210, Voucher.VoucherStatus.RUNNING, LocalDate.now().minusDays(20), LocalDate.now().plusDays(35));
+        createVoucher(storeBinh.getId(), "BINH50K", "Giảm trực tiếp 50k", "Giảm 50.000đ cho đơn từ 699.000đ.", Voucher.DiscountType.FIXED, new BigDecimal("50000"), new BigDecimal("699000"), 500, 127, Voucher.VoucherStatus.DRAFT, LocalDate.now().plusDays(2), LocalDate.now().plusDays(60));
+
+        createContentPage(ContentPage.ContentType.FAQ, "Thời gian xử lý đơn hàng", "Đơn hàng thường được xác nhận trong 2-6 giờ làm việc và bàn giao đơn vị vận chuyển trong 24 giờ.", 1);
+        createContentPage(ContentPage.ContentType.FAQ, "Tôi có thể đổi size như thế nào?", "Bạn có thể gửi yêu cầu đổi trả trong vòng 7 ngày kể từ khi nhận hàng tại mục Đơn hàng của tôi.", 2);
+        createContentPage(ContentPage.ContentType.POLICY, "Chính sách đổi trả", "Marketplace hỗ trợ đổi/trả cho sản phẩm lỗi hoặc sai mô tả. Sản phẩm cần còn tem nhãn và chưa qua sử dụng.", 1);
+        createContentPage(ContentPage.ContentType.POLICY, "Chính sách hoàn tiền", "Tiền hoàn sẽ được xử lý trong 3-7 ngày làm việc tùy phương thức thanh toán ban đầu.", 2);
+
+        log.info("Seed hoan tat: {} users, {} stores, {} products, {} orders, {} reviews.",
+                userRepository.count(), storeRepository.count(), productRepository.count(), orderRepository.count(), reviewRepository.count());
+    }
+
+    private void truncateAllData() {
+        jdbcTemplate.execute("""
+                TRUNCATE TABLE
+                    review_images,
+                    return_items,
+                    wallet_transactions,
+                    vendor_wallets,
+                    inventory_ledger,
+                    wishlists,
+                    notifications,
+                    loyalty_points,
+                    coupons,
+                    commission_tiers,
+                    return_requests,
+                    reviews,
+                    order_items,
+                    orders,
+                    cart_items,
+                    carts,
+                    vouchers,
+                    product_variants,
+                    product_images,
+                    products,
+                    categories,
+                    content_pages,
+                    addresses,
+                    stores,
+                    users
+                RESTART IDENTITY CASCADE
+                """);
+        log.info("Da xoa toan bo du lieu cu truoc khi seed.");
+    }
+
+    private User createUser(String email, String name, String phone, User.Role role) {
+        User user = new User();
         user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(TEST_PASSWORD));
         user.setName(name);
         user.setPhone(phone);
         user.setRole(role);
-        user.setStoreId(storeId);
+        user.setStoreId(null);
         user.setIsActive(true);
-        if (user.getPassword() == null || !passwordEncoder.matches(TEST_PASSWORD, user.getPassword())) {
-            user.setPassword(passwordEncoder.encode(TEST_PASSWORD));
-        }
         return userRepository.save(user);
     }
 
-    private void ensureCart(User user) {
-        cartRepository.findByUserId(user.getId()).ifPresentOrElse(existing -> {
-            if (existing.getUser() == null) {
-                existing.setUser(user);
-                cartRepository.save(existing);
-            }
-        }, () -> {
-            Cart cart = new Cart();
-            cart.setUser(user);
-            cart.setTotalAmount(new BigDecimal("0"));
-            cartRepository.save(cart);
-        });
+    private void linkVendorStore(User vendor, Store store) {
+        vendor.setStoreId(store.getId());
+        userRepository.save(vendor);
     }
 
-    private Store upsertVendorStore(User owner) {
-        Store store = storeRepository.findByOwnerId(owner.getId())
-                .or(() -> storeRepository.findBySlug("test-vendor-store"))
-                .orElseGet(Store::new);
-
+    private Store createStore(
+            User owner,
+            String name,
+            String slug,
+            String description,
+            String address,
+            Store.StoreStatus status,
+            Store.ApprovalStatus approvalStatus,
+            BigDecimal commissionRate,
+            double rating,
+            int totalOrders,
+            BigDecimal totalSales,
+            LocalDateTime approvedAt,
+            String approvedBy,
+            String rejectionReason
+    ) {
+        Store store = new Store();
         store.setOwner(owner);
-        store.setName("Test Vendor Store");
-        store.setSlug("test-vendor-store");
-        store.setDescription("Gian hang mau phuc vu kiem thu luong vendor.");
-        store.setLogo("https://images.unsplash.com/photo-1521572163474-6864f9cf17ab");
-        store.setBanner("https://images.unsplash.com/photo-1441986300917-64674bd600d8");
+        store.setName(name);
+        store.setSlug(slug);
+        store.setDescription(description);
+        store.setLogo("https://images.unsplash.com/photo-1441986300917-64674bd600d8");
+        store.setBanner("https://images.unsplash.com/photo-1523381210434-271e8be1f52b");
         store.setContactEmail(owner.getEmail());
         store.setPhone(owner.getPhone());
-        store.setAddress("123 Nguyen Hue, Quan 1, TP.HCM");
+        store.setAddress(address);
         store.setBankName("Vietcombank");
         store.setBankAccountNumber("1234567890");
-        store.setBankAccountHolder("NGUYEN VAN A");
+        store.setBankAccountHolder(owner.getName().toUpperCase());
         store.setBankVerified(true);
         store.setNotifyNewOrder(true);
         store.setNotifyOrderStatusChange(true);
@@ -302,40 +332,37 @@ public class MarketplaceSeeder implements ApplicationRunner {
         store.setShipGhn(true);
         store.setShipGhtk(true);
         store.setShipExpress(false);
-        store.setWarehouseAddress("123 Nguyen Hue, Quan 1, TP.HCM");
-        store.setWarehouseContact("Nguyen Van A");
-        store.setWarehousePhone("0901234567");
-        store.setCommissionRate(new BigDecimal("5"));
-        store.setStatus(Store.StoreStatus.ACTIVE);
-        store.setApprovalStatus(Store.ApprovalStatus.APPROVED);
-        store.setApprovedAt(LocalDateTime.now().minusDays(7));
-        store.setApprovedBy("seed-system");
-        store.setRejectionReason(null);
-        store.setTotalSales(new BigDecimal("3400000"));
-        store.setTotalOrders(24);
-        store.setRating(4.7);
-
+        store.setWarehouseAddress(address);
+        store.setWarehouseContact(owner.getName());
+        store.setWarehousePhone(owner.getPhone());
+        store.setCommissionRate(commissionRate);
+        store.setStatus(status);
+        store.setApprovalStatus(approvalStatus);
+        store.setApprovedAt(approvedAt);
+        store.setApprovedBy(approvedBy);
+        store.setRejectionReason(rejectionReason);
+        store.setTotalSales(totalSales);
+        store.setTotalOrders(totalOrders);
+        store.setRating(rating);
         return storeRepository.save(store);
     }
 
-    private Category upsertCategory(String name, String slug, String description, Category parent, int sortOrder) {
-        Category category = categoryRepository.findBySlug(slug).orElseGet(Category::new);
+    private Category createCategory(String name, String slug, String description, Category parent, int sortOrder) {
+        Category category = new Category();
         category.setName(name);
         category.setSlug(slug);
         category.setDescription(description);
         category.setParent(parent);
         category.setSortOrder(sortOrder);
-        if (category.getImage() == null || category.getImage().isBlank()) {
-            category.setImage("https://images.unsplash.com/photo-1441986300917-64674bd600d8");
-        }
+        category.setImage("https://images.unsplash.com/photo-1441986300917-64674bd600d8");
         return categoryRepository.save(category);
     }
 
-    private Product upsertProduct(
+    private Product createProduct(
+            Store store,
+            Category category,
             String name,
             String slug,
-            UUID storeId,
-            Category category,
             BigDecimal basePrice,
             BigDecimal salePrice,
             Product.Gender gender,
@@ -343,12 +370,14 @@ public class MarketplaceSeeder implements ApplicationRunner {
             boolean featured,
             String material,
             String fit,
-            String description
+            String description,
+            String imageUrl,
+            String imageAlt
     ) {
-        Product product = productRepository.findBySlug(slug).orElseGet(Product::new);
+        Product product = new Product();
         product.setName(name);
         product.setSlug(slug);
-        product.setStoreId(storeId);
+        product.setStoreId(store.getId());
         product.setCategory(category);
         product.setBasePrice(basePrice);
         product.setSalePrice(salePrice);
@@ -358,32 +387,19 @@ public class MarketplaceSeeder implements ApplicationRunner {
         product.setMaterial(material);
         product.setFit(fit);
         product.setDescription(description);
+
+        ProductImage image = new ProductImage();
+        image.setProduct(product);
+        image.setUrl(imageUrl);
+        image.setAlt(imageAlt);
+        image.setSortOrder(0);
+        image.setIsPrimary(true);
+        product.setImages(new ArrayList<>(List.of(image)));
+        product.setVariants(new ArrayList<>());
         return productRepository.save(product);
     }
 
-    private void ensurePrimaryImage(Product product, String url, String alt) {
-        if (product.getImages() == null) {
-            product.setImages(new ArrayList<>());
-        }
-
-        ProductImage image = product.getImages().stream()
-                .filter(img -> Boolean.TRUE.equals(img.getIsPrimary()))
-                .findFirst()
-                .orElseGet(() -> {
-                    ProductImage newImage = new ProductImage();
-                    product.getImages().add(newImage);
-                    return newImage;
-                });
-
-        image.setProduct(product);
-        image.setUrl(url);
-        image.setAlt(alt);
-        image.setSortOrder(0);
-        image.setIsPrimary(true);
-        productRepository.save(product);
-    }
-
-    private ProductVariant upsertVariant(
+    private ProductVariant createVariant(
             Product product,
             String sku,
             String color,
@@ -392,7 +408,7 @@ public class MarketplaceSeeder implements ApplicationRunner {
             BigDecimal priceAdjustment,
             boolean isActive
     ) {
-        ProductVariant variant = productVariantRepository.findBySku(sku).orElseGet(ProductVariant::new);
+        ProductVariant variant = new ProductVariant();
         variant.setProduct(product);
         variant.setSku(sku);
         variant.setColor(color);
@@ -403,114 +419,106 @@ public class MarketplaceSeeder implements ApplicationRunner {
         return productVariantRepository.save(variant);
     }
 
-    private Address ensureDefaultAddress(User customer) {
-        return addressRepository.findByUserIdOrderByIsDefaultDesc(customer.getId()).stream()
-                .filter(address -> "SEED_DEFAULT_ADDRESS".equals(address.getLabel()))
-                .findFirst()
-                .map(address -> updateAddress(address, customer))
-                .orElseGet(() -> {
-                    Address address = new Address();
-                    return addressRepository.save(updateAddress(address, customer));
-                });
-    }
-
-    private Address updateAddress(Address address, User customer) {
-        address.setUser(customer);
-        address.setFullName("Khach hang mau");
-        address.setPhone("0900000001");
-        address.setProvince("TP.HCM");
-        address.setDistrict("Quan 1");
-        address.setWard("Ben Nghe");
-        address.setDetail("123 Le Loi");
-        address.setIsDefault(true);
-        address.setLabel("SEED_DEFAULT_ADDRESS");
-        return address;
-    }
-
-    private Order upsertOrder(
+    private Address createAddress(
             User user,
+            String fullName,
+            String phone,
+            String province,
+            String district,
+            String ward,
+            String detail,
+            boolean isDefault,
+            String label
+    ) {
+        Address address = new Address();
+        address.setUser(user);
+        address.setFullName(fullName);
+        address.setPhone(phone);
+        address.setProvince(province);
+        address.setDistrict(district);
+        address.setWard(ward);
+        address.setDetail(detail);
+        address.setIsDefault(isDefault);
+        address.setLabel(label);
+        return addressRepository.save(address);
+    }
+
+    private void createCart(User user, List<CartLine> lines) {
+        Cart cart = new Cart();
+        cart.setUser(user);
+        cart.setItems(new ArrayList<>());
+        for (CartLine line : lines) {
+            CartItem item = new CartItem();
+            item.setCart(cart);
+            item.setProduct(line.product());
+            item.setVariant(line.variant());
+            item.setQuantity(line.quantity());
+            item.setUnitPrice(line.variant() != null ? line.variant().getPrice() : line.product().getEffectivePrice());
+            cart.getItems().add(item);
+        }
+        cart.calculateTotal();
+        cartRepository.save(cart);
+    }
+
+    private Order createOrder(
+            User customer,
             Address shippingAddress,
-            UUID storeId,
+            Store store,
             Order.OrderStatus status,
             Order.PaymentMethod paymentMethod,
             Order.PaymentStatus paymentStatus,
-            String seedTag,
+            String note,
             String trackingNumber,
             String shippingCarrier,
             BigDecimal shippingFee,
-            BigDecimal discount
+            BigDecimal discount,
+            LocalDateTime paidAt
     ) {
-        Order order = orderRepository.findByUserIdOrderByCreatedAtDesc(user.getId()).stream()
-                .filter(existing -> seedTag.equals(existing.getNote()))
-                .findFirst()
-                .orElseGet(Order::new);
-
-        order.setUser(user);
+        Order order = new Order();
+        order.setUser(customer);
         order.setShippingAddress(shippingAddress);
-        order.setStoreId(storeId);
+        order.setStoreId(store.getId());
         order.setStatus(status);
         order.setPaymentMethod(paymentMethod);
         order.setPaymentStatus(paymentStatus);
-        order.setShippingFee(shippingFee);
-        order.setDiscount(discount);
+        order.setNote(note);
         order.setTrackingNumber(trackingNumber);
         order.setShippingCarrier(shippingCarrier);
+        order.setShippingFee(shippingFee);
+        order.setDiscount(discount);
         order.setParentOrder(null);
-        order.setNote(seedTag);
-        if (status == Order.OrderStatus.DELIVERED && order.getPaidAt() == null) {
-            order.setPaidAt(LocalDateTime.now().minusDays(2));
-        }
-        if (order.getSubtotal() == null) {
-            order.setSubtotal(new BigDecimal("0"));
-        }
+        order.setItems(new ArrayList<>());
+        order.setSubtotal(BigDecimal.ZERO);
         order.calculateTotal();
-        if (order.getCommissionFee() == null) {
-            order.setCommissionFee(new BigDecimal("0"));
-        }
-        if (order.getVendorPayout() == null) {
-            order.setVendorPayout(order.getTotal());
-        }
+        order.setCommissionFee(BigDecimal.ZERO);
+        order.setVendorPayout(BigDecimal.ZERO);
+        order.setPaidAt(paidAt);
         return orderRepository.save(order);
     }
 
-    private OrderItem ensureOrderItem(
+    private OrderItem addOrderItem(
             Order order,
             Product product,
             ProductVariant variant,
             int quantity,
             BigDecimal unitPrice,
-            String productName,
-            String variantName,
-            String image,
             UUID storeId
     ) {
-        if (order.getItems() == null) {
-            order.setItems(new ArrayList<>());
-        }
-
-        OrderItem item = order.getItems().stream()
-                .filter(existing -> existing.getProduct() != null && existing.getProduct().getId().equals(product.getId()))
-                .findFirst()
-                .orElseGet(() -> {
-                    OrderItem newItem = new OrderItem();
-                    order.getItems().add(newItem);
-                    return newItem;
-                });
-
+        OrderItem item = new OrderItem();
         item.setOrder(order);
         item.setProduct(product);
         item.setVariant(variant);
-        item.setProductName(productName);
-        item.setVariantName(variantName);
-        item.setProductImage(image);
+        item.setProductName(product.getName());
+        item.setVariantName((variant.getColor() != null ? variant.getColor() : "") + " / " + (variant.getSize() != null ? variant.getSize() : ""));
+        item.setProductImage(product.getImages() != null && !product.getImages().isEmpty() ? product.getImages().get(0).getUrl() : null);
         item.setQuantity(quantity);
         item.setUnitPrice(unitPrice);
         item.setTotalPrice(unitPrice.multiply(BigDecimal.valueOf(quantity)));
         item.setStoreId(storeId);
+        order.getItems().add(item);
 
         BigDecimal subtotal = order.getItems().stream()
                 .map(OrderItem::getTotalPrice)
-                .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         order.setSubtotal(subtotal);
         order.calculateTotal();
@@ -521,20 +529,25 @@ public class MarketplaceSeeder implements ApplicationRunner {
         return item;
     }
 
-    private void upsertReturnRequest(Order order, User user, OrderItem orderItem) {
-        ReturnRequest request = returnRequestRepository.findAll().stream()
-                .filter(existing -> "SEED_RETURN_PENDING".equals(existing.getNote()))
-                .findFirst()
-                .orElseGet(ReturnRequest::new);
-
+    private void createReturnRequest(
+            Order order,
+            User user,
+            OrderItem orderItem,
+            ReturnRequest.ReturnReason reason,
+            ReturnRequest.ReturnResolution resolution,
+            ReturnRequest.ReturnStatus status,
+            String note,
+            String adminNote
+    ) {
+        ReturnRequest request = new ReturnRequest();
         request.setOrder(order);
         request.setUser(user);
-        request.setReason(ReturnRequest.ReturnReason.DEFECT);
-        request.setResolution(ReturnRequest.ReturnResolution.REFUND);
-        request.setStatus(ReturnRequest.ReturnStatus.PENDING);
-        request.setNote("SEED_RETURN_PENDING");
-        request.setAdminNote("Yeu cau doi tra mau cho trang quan tri.");
-        request.setUpdatedBy("seed-system");
+        request.setReason(reason);
+        request.setResolution(resolution);
+        request.setStatus(status);
+        request.setNote(note);
+        request.setAdminNote(adminNote);
+        request.setUpdatedBy(SEED_ACTOR);
         request.setItems(new ArrayList<>(List.of(
                 new ReturnRequest.ReturnItemSnapshot(
                         orderItem.getId(),
@@ -548,44 +561,82 @@ public class MarketplaceSeeder implements ApplicationRunner {
         returnRequestRepository.save(request);
     }
 
-    private void upsertVoucher(
+    private void createReview(
+            Product product,
+            User user,
+            Order order,
+            UUID storeId,
+            int rating,
+            String title,
+            String content,
+            Review.ReviewStatus status,
+            String shopReply,
+            List<String> imageUrls
+    ) {
+        Review review = new Review();
+        review.setProduct(product);
+        review.setUser(user);
+        review.setOrder(order);
+        review.setStoreId(storeId);
+        review.setRating(rating);
+        review.setTitle(title);
+        review.setContent(content);
+        review.setStatus(status);
+        review.setHelpful(Math.max(0, rating - 1));
+        review.setShopReply(shopReply);
+        review.setImages(new ArrayList<>(imageUrls));
+        if (shopReply != null && !shopReply.isBlank()) {
+            review.setShopReplyAt(LocalDateTime.now().minusDays(1));
+        }
+        reviewRepository.save(review);
+    }
+
+    private void createVoucher(
             UUID storeId,
             String code,
             String name,
+            String description,
             Voucher.DiscountType discountType,
             BigDecimal discountValue,
             BigDecimal minOrderValue,
             int totalIssued,
             int usedCount,
-            Voucher.VoucherStatus status
+            Voucher.VoucherStatus status,
+            LocalDate startDate,
+            LocalDate endDate
     ) {
-        Voucher voucher = voucherRepository.findByStoreIdAndCode(storeId, code).orElseGet(Voucher::new);
+        Voucher voucher = new Voucher();
         voucher.setStoreId(storeId);
         voucher.setCode(code);
         voucher.setName(name);
-        voucher.setDescription("Voucher du lieu mau phuc vu kiem thu.");
+        voucher.setDescription(description);
         voucher.setDiscountType(discountType);
         voucher.setDiscountValue(discountValue);
         voucher.setMinOrderValue(minOrderValue);
         voucher.setTotalIssued(totalIssued);
         voucher.setUsedCount(usedCount);
-        voucher.setStartDate(LocalDate.now().minusDays(2));
-        voucher.setEndDate(LocalDate.now().plusDays(20));
         voucher.setStatus(status);
-        voucher.setUpdatedBy("seed-system");
+        voucher.setStartDate(startDate);
+        voucher.setEndDate(endDate);
+        voucher.setUpdatedBy(SEED_ACTOR);
         voucherRepository.save(voucher);
     }
 
-    private void upsertContent(ContentPage.ContentType type, String title, String body, int displayOrder) {
-        ContentPage content = contentPageRepository.findByTypeOrderByDisplayOrderAscUpdatedAtDesc(type).stream()
-                .filter(page -> title.equalsIgnoreCase(page.getTitle()))
-                .min(Comparator.comparing(ContentPage::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
-                .orElseGet(ContentPage::new);
-        content.setType(type);
-        content.setTitle(title);
-        content.setBody(body);
-        content.setDisplayOrder(displayOrder);
-        content.setUpdatedBy("seed-system");
-        contentPageRepository.save(content);
+    private void createContentPage(
+            ContentPage.ContentType type,
+            String title,
+            String body,
+            int displayOrder
+    ) {
+        ContentPage page = new ContentPage();
+        page.setType(type);
+        page.setTitle(title);
+        page.setBody(body);
+        page.setDisplayOrder(displayOrder);
+        page.setUpdatedBy(SEED_ACTOR);
+        contentPageRepository.save(page);
+    }
+
+    private record CartLine(Product product, ProductVariant variant, int quantity) {
     }
 }

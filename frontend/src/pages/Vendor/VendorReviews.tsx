@@ -1,4 +1,4 @@
-﻿import './Vendor.css';
+import './Vendor.css';
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Eye, Link2, MessageSquare, Star } from 'lucide-react';
@@ -18,9 +18,9 @@ import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
 import Drawer from '../../components/Drawer/Drawer';
 
 const TABS = [
-  { key: 'all', label: 'Táº¥t cáº£' },
-  { key: 'need_reply', label: 'Cáº§n pháº£n há»“i' },
-  { key: 'negative', label: 'ÄÃ¡nh giÃ¡ tiÃªu cá»±c' },
+  { key: 'all', label: 'Tất cả' },
+  { key: 'need_reply', label: 'Cần phản hồi' },
+  { key: 'negative', label: 'Đánh giá tiêu cực' },
 ] as const;
 
 const RatingStars = ({ rating }: { rating: number }) => (
@@ -119,7 +119,7 @@ const VendorReviews = () => {
 
   const shareCurrentView = async () => {
     await navigator.clipboard.writeText(window.location.href);
-    addToast('ÄÃ£ sao chÃ©p bá»™ lá»c hiá»‡n táº¡i cá»§a Ä‘Ã¡nh giÃ¡ shop', 'success');
+    addToast('Đã sao chép bộ lọc hiện tại của đánh giá shop', 'success');
   };
 
   const submitReply = (id: string) => {
@@ -130,7 +130,7 @@ const VendorReviews = () => {
 
     const content = (replyDrafts[id] || '').trim();
     if (!content) {
-      addToast('HÃ£y nháº­p ná»™i dung pháº£n há»“i trÆ°á»›c khi gá»­i', 'info');
+      addToast('Hãy nhập nội dung phản hồi trước khi gửi', 'info');
       return;
     }
     setReplyDrafts((current) => ({ ...current, [id]: '' }));
@@ -148,32 +148,32 @@ const VendorReviews = () => {
   const statItems = [
     {
       key: 'all',
-      label: 'Tá»•ng Ä‘Ã¡nh giÃ¡',
+      label: 'Tổng đánh giá',
       value: stats.total,
-      sub: `Äiá»ƒm trung bÃ¬nh: ${stats.average}`,
+      sub: `Điểm trung bình: ${stats.average}`,
       onClick: () => setActiveTab('all'),
     },
     {
       key: 'need_reply',
-      label: 'Cáº§n pháº£n há»“i',
+      label: 'Cần phản hồi',
       value: stats.needReply,
-      sub: 'ÄÃ¡nh giÃ¡ chÆ°a cÃ³ pháº£n há»“i tá»« shop',
+      sub: 'Đánh giá chưa có phản hồi từ shop',
       tone: 'warning',
       onClick: () => setActiveTab('need_reply'),
     },
     {
       key: 'negative',
-      label: 'ÄÃ¡nh giÃ¡ â‰¤ 3 sao',
+      label: 'Đánh giá ≤ 3 sao',
       value: stats.negative,
-      sub: 'TÃ­n hiá»‡u cáº§n chÄƒm sÃ³c Æ°u tiÃªn',
+      sub: 'Tín hiệu cần chăm sóc ưu tiên',
       tone: 'info',
       onClick: () => setActiveTab('negative'),
     },
     {
       key: 'reply_rate',
-      label: 'Tá»· lá»‡ pháº£n há»“i',
+      label: 'Tỷ lệ phản hồi',
       value: stats.total ? `${Math.round(((stats.total - stats.needReply) / stats.total) * 100)}%` : '0%',
-      sub: 'Tá»· lá»‡ Ä‘Ã¡nh giÃ¡ Ä‘Ã£ Ä‘Æ°á»£c shop chÄƒm sÃ³c',
+      sub: 'Tỷ lệ đánh giá đã được shop chăm sóc',
       tone: 'success',
       onClick: () => setActiveTab('all'),
     },
@@ -184,20 +184,20 @@ const VendorReviews = () => {
 
   return (
     <VendorLayout
-      title="ÄÃ¡nh giÃ¡, pháº£n há»“i vÃ  uy tÃ­n shop"
-      breadcrumbs={['KÃªnh NgÆ°á»i BÃ¡n', 'ÄÃ¡nh giÃ¡ vÃ  pháº£n há»“i']}
+      title="Đánh giá, phản hồi và uy tín shop"
+      breadcrumbs={['Kênh Người Bán', 'Đánh giá và phản hồi']}
       actions={
         <>
           <PanelSearchField
-            placeholder="TÃ¬m theo sáº£n pháº©m, ná»™i dung hoáº·c mÃ£ Ä‘Æ¡n"
+            placeholder="Tìm theo sản phẩm, nội dung hoặc mã đơn"
             value={query}
             onChange={setQuery}
           />
           <button className="admin-ghost-btn" onClick={() => void shareCurrentView()}>
             <Link2 size={16} />
-            Chia sáº» bá»™ lá»c
+            Chia sẻ bộ lọc
           </button>
-          <button className="admin-ghost-btn" onClick={resetCurrentView}>Äáº·t láº¡i</button>
+          <button className="admin-ghost-btn" onClick={resetCurrentView}>Đặt lại</button>
         </>
       }
     >
@@ -214,40 +214,40 @@ const VendorReviews = () => {
         <div className="admin-panel">
           <div className="admin-panel-head">
             <div>
-              <h2>Danh sÃ¡ch Ä‘Ã¡nh giÃ¡</h2>
+              <h2>Danh sách đánh giá</h2>
               {!canVendorReply ? (
-                <p className="admin-muted small">Táº¡m thá»i cháº¿ Ä‘á»™ read-only: backend chÆ°a cung cáº¥p API seller reply.</p>
+                <p className="admin-muted small">Tạm thời chế độ read-only: backend chưa cung cấp API seller reply.</p>
               ) : null}
             </div>
           </div>
           {loading ? (
             <AdminStateBlock
               type="empty"
-              title="Äang táº£i danh sÃ¡ch Ä‘Ã¡nh giÃ¡"
-              description="Há»‡ thá»‘ng Ä‘ang Ä‘á»“ng bá»™ dá»¯ liá»‡u pháº£n há»“i cá»§a gian hÃ ng."
+              title="Đang tải danh sách đánh giá"
+              description="Hệ thống đang đồng bộ dữ liệu phản hồi của gian hàng."
             />
           ) : loadError ? (
             <AdminStateBlock
               type="empty"
-              title="KhÃ´ng táº£i Ä‘Æ°á»£c Ä‘Ã¡nh giÃ¡"
+              title="Không tải được đánh giá"
               description={loadError}
-              actionLabel="Thá»­ láº¡i"
+              actionLabel="Thử lại"
               onAction={() => setReloadKey((key) => key + 1)}
             />
           ) : reviews.length === 0 ? (
             <AdminStateBlock
               type={query.trim() ? 'search-empty' : 'empty'}
-              title={query.trim() ? 'KhÃ´ng cÃ³ Ä‘Ã¡nh giÃ¡ phÃ¹ há»£p' : 'ChÆ°a cÃ³ Ä‘Ã¡nh giÃ¡ cáº§n xá»­ lÃ½'}
+              title={query.trim() ? 'Không có đánh giá phù hợp' : 'Chưa có đánh giá cần xử lý'}
               description={
                 query.trim()
-                  ? 'Thá»­ Ä‘á»•i tá»« khÃ³a hoáº·c tab Ä‘á»ƒ xem láº¡i hÃ ng Ä‘á»£i pháº£n há»“i cá»§a shop.'
-                  : 'Khi khÃ¡ch Ä‘á»ƒ láº¡i Ä‘Ã¡nh giÃ¡, seller panel sáº½ hiá»ƒn thá»‹ táº¡i Ä‘Ã¢y.'
+                  ? 'Thử đổi từ khóa hoặc tab để xem lại hàng đợi phản hồi của shop.'
+                  : 'Khi khách để lại đánh giá, seller panel sẽ hiển thị tại đây.'
               }
-              actionLabel={query.trim() ? 'Äáº·t láº¡i bá»™ lá»c' : undefined}
+              actionLabel={query.trim() ? 'Đặt lại bộ lọc' : undefined}
               onAction={query.trim() ? resetCurrentView : undefined}
             />
           ) : (
-            <div className="admin-table" role="table" aria-label="Báº£ng Ä‘Ã¡nh giÃ¡ cá»§a shop">
+            <div className="admin-table" role="table" aria-label="Bảng đánh giá của shop">
               <div className="admin-table-row vendor-reviews admin-table-head" role="row">
                 <div role="columnheader">
                   <input
@@ -256,12 +256,12 @@ const VendorReviews = () => {
                     onChange={(event) => setSelected(event.target.checked ? new Set(reviews.map((item) => item.id)) : new Set())}
                   />
                 </div>
-                <div role="columnheader">Sáº£n pháº©m</div>
-                <div role="columnheader">ÄÃ¡nh giÃ¡</div>
-                <div role="columnheader">Ná»™i dung</div>
-                <div role="columnheader">Tráº¡ng thÃ¡i</div>
-                <div role="columnheader">Pháº£n há»“i</div>
-                <div role="columnheader">HÃ nh Ä‘á»™ng</div>
+                <div role="columnheader">Sản phẩm</div>
+                <div role="columnheader">Đánh giá</div>
+                <div role="columnheader">Nội dung</div>
+                <div role="columnheader">Trạng thái</div>
+                <div role="columnheader">Phản hồi</div>
+                <div role="columnheader">Hành động</div>
               </div>
 
               {reviews.map((review, index) => (
@@ -292,7 +292,7 @@ const VendorReviews = () => {
                     <img src={review.productImage} alt={review.productName} className="vendor-admin-thumb" />
                     <div className="vendor-admin-product-copy">
                       <div className="admin-bold">{review.productName}</div>
-                      <div className="admin-muted small">ÄÆ¡n #{review.orderId}</div>
+                      <div className="admin-muted small">Đơn #{review.orderId}</div>
                     </div>
                   </div>
                   <div role="cell">
@@ -302,25 +302,25 @@ const VendorReviews = () => {
                   <div role="cell" className="vendor-review-content">{review.content}</div>
                   <div role="cell">
                     <span className={`admin-pill ${review.rating <= 3 ? 'pending' : 'success'}`}>
-                      {review.rating <= 3 ? 'Cáº§n chÄƒm sÃ³c' : 'á»”n Ä‘á»‹nh'}
+                      {review.rating <= 3 ? 'Cần chăm sóc' : 'Ổn định'}
                     </span>
                   </div>
                   <div role="cell">
                     {review.shopReply ? (
                       <div className="vendor-reply-badge">
-                        <span className="admin-bold">ÄÃ£ pháº£n há»“i</span>
+                        <span className="admin-bold">Đã phản hồi</span>
                         <span className="admin-muted small">{review.shopReply.createdAt}</span>
                       </div>
                     ) : (
-                      <span className="badge amber">ChÆ°a pháº£n há»“i</span>
+                      <span className="badge amber">Chưa phản hồi</span>
                     )}
                   </div>
                   <div role="cell" className="admin-actions" onClick={(event) => event.stopPropagation()}>
                     <button
                       className="admin-icon-btn subtle"
                       onClick={() => setActiveReview(review)}
-                      aria-label="Xem chi tiáº¿t Ä‘Ã¡nh giÃ¡"
-                      title="Xem chi tiáº¿t Ä‘Ã¡nh giÃ¡"
+                      aria-label="Xem chi tiết đánh giá"
+                      title="Xem chi tiết đánh giá"
                     >
                       <Eye size={16} />
                     </button>
@@ -334,12 +334,12 @@ const VendorReviews = () => {
 
       <PanelFloatingBar show={selected.size > 0} className="vendor-floating-bar">
         <div className="admin-floating-content">
-          <span>ÄÃ£ chá»n {selected.size} Ä‘Ã¡nh giÃ¡</span>
+          <span>Đã chọn {selected.size} đánh giá</span>
           <div className="admin-actions">
-            <button className="admin-ghost-btn" onClick={() => setSelected(new Set())}>Bá» chá»n</button>
+            <button className="admin-ghost-btn" onClick={() => setSelected(new Set())}>Bỏ chọn</button>
             {selectedNeedReply.length > 0 ? (
               <button className="admin-ghost-btn" onClick={() => setConfirmReplyIds(selectedNeedReply)}>
-                Gá»­i pháº£n há»“i Ä‘Ã£ chá»n
+                Gửi phản hồi đã chọn
               </button>
             ) : null}
           </div>
@@ -348,11 +348,11 @@ const VendorReviews = () => {
 
       <AdminConfirmDialog
         open={Boolean(confirmReplyIds?.length)}
-        title="Gá»­i pháº£n há»“i cho cÃ¡c Ä‘Ã¡nh giÃ¡ Ä‘Ã£ chá»n"
-        description="CÃ¡c Ä‘Ã¡nh giÃ¡ nÃ y sáº½ nháº­n pháº£n há»“i tá»« shop ngay sau khi xÃ¡c nháº­n."
+        title="Gửi phản hồi cho các đánh giá đã chọn"
+        description="Các đánh giá này sẽ nhận phản hồi từ shop ngay sau khi xác nhận."
         selectedItems={confirmReplyIds || []}
-        selectedNoun="Ä‘Ã¡nh giÃ¡"
-        confirmLabel="Gá»­i pháº£n há»“i"
+        selectedNoun="đánh giá"
+        confirmLabel="Gửi phản hồi"
         onCancel={() => setConfirmReplyIds(null)}
         onConfirm={() => confirmReplyIds?.forEach((id) => submitReply(id))}
       />
@@ -361,60 +361,60 @@ const VendorReviews = () => {
         {activeReview ? (
           <>
             <PanelDrawerHeader
-              eyebrow="Chi tiáº¿t Ä‘Ã¡nh giÃ¡"
+              eyebrow="Chi tiết đánh giá"
               title={activeReview.productName}
               onClose={() => setActiveReview(null)}
-              closeLabel="ÄÃ³ng chi tiáº¿t Ä‘Ã¡nh giÃ¡"
+              closeLabel="Đóng chi tiết đánh giá"
             />
             <div className="drawer-body">
-              <PanelDrawerSection title="ThÃ´ng tin Ä‘Ã¡nh giÃ¡">
+              <PanelDrawerSection title="Thông tin đánh giá">
                 <div className="admin-card-list">
                   <div className="admin-card-row">
-                    <span className="admin-bold">ÄÆ¡n hÃ ng</span>
+                    <span className="admin-bold">Đơn hàng</span>
                     <span className="admin-muted">#{activeReview.orderId}</span>
                   </div>
                   <div className="admin-card-row">
-                    <span className="admin-bold">Sá»‘ sao</span>
+                    <span className="admin-bold">Số sao</span>
                     <span><RatingStars rating={activeReview.rating} /></span>
                   </div>
                   <div className="admin-card-row">
-                    <span className="admin-bold">Ná»™i dung</span>
+                    <span className="admin-bold">Nội dung</span>
                     <span className="admin-muted">{activeReview.content}</span>
                   </div>
                 </div>
               </PanelDrawerSection>
-              <PanelDrawerSection title="Pháº£n há»“i cá»§a shop">
+              <PanelDrawerSection title="Phản hồi của shop">
                 {activeReview.shopReply ? (
                   <div className="vendor-review-reply-box">
-                    <strong>ÄÃ£ pháº£n há»“i:</strong> {activeReview.shopReply.content}
+                    <strong>Đã phản hồi:</strong> {activeReview.shopReply.content}
                   </div>
                 ) : canVendorReply ? (
                   <div className="form-grid">
                     <label className="form-field full">
-                      <span>Ná»™i dung pháº£n há»“i</span>
+                      <span>Nội dung phản hồi</span>
                       <textarea
                         rows={4}
                         value={replyDrafts[activeReview.id] || ''}
                         onChange={(event) =>
                           setReplyDrafts((current) => ({ ...current, [activeReview.id]: event.target.value }))
                         }
-                        placeholder="Giáº£i thÃ­ch, xin lá»—i hoáº·c hÆ°á»›ng dáº«n khÃ¡ch hÃ ng..."
+                        placeholder="Giải thích, xin lỗi hoặc hướng dẫn khách hàng..."
                       />
                     </label>
                   </div>
                 ) : (
                   <div className="vendor-review-reply-box">
-                    API pháº£n há»“i cho seller chÆ°a sáºµn sÃ ng. Báº¡n cÃ³ thá»ƒ theo dÃµi Ä‘Ã¡nh giÃ¡ á»Ÿ cháº¿ Ä‘á»™ xem.
+                    API phản hồi cho seller chưa sẵn sàng. Bạn có thể theo dõi đánh giá ở chế độ xem.
                   </div>
                 )}
               </PanelDrawerSection>
             </div>
             <PanelDrawerFooter>
-              <button className="admin-ghost-btn" onClick={() => setActiveReview(null)}>ÄÃ³ng</button>
+              <button className="admin-ghost-btn" onClick={() => setActiveReview(null)}>Đóng</button>
               {!activeReview.shopReply && canVendorReply ? (
                 <button className="admin-primary-btn vendor-admin-primary" onClick={() => submitReply(activeReview.id)}>
                   <MessageSquare size={15} />
-                  Gá»­i pháº£n há»“i
+                  Gửi phản hồi
                 </button>
               ) : null}
             </PanelDrawerFooter>

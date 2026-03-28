@@ -3,7 +3,7 @@ import {
   ChevronRight, Package, Truck, CheckCircle2, XCircle, Clock,
   MapPin, Phone, CreditCard, ArrowLeft, RotateCcw, Copy, X, AlertTriangle
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { orderService } from '../../services/orderService';
 import { formatPrice } from '../../utils/formatters';
@@ -37,16 +37,55 @@ const OrderDetail = () => {
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [selectedReason, setSelectedReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
-  const order = useMemo<Order | null>(() => (id ? orderService.getById(id) : null), [id]);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleCancelOrder = () => {
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOrder = async () => {
+      try {
+        setIsLoading(true);
+        if (!id) {
+          if (mounted) setOrder(null);
+          return;
+        }
+        const data = await orderService.getByIdFromBackend(id);
+        if (!mounted) return;
+        setOrder(data);
+      } catch (error: unknown) {
+        if (!mounted) return;
+        setOrder(null);
+        const message = error instanceof Error ? error.message : 'Không thể tải chi tiết đơn hàng.';
+        addToast(message, 'error');
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    void loadOrder();
+    return () => {
+      mounted = false;
+    };
+  }, [addToast, id]);
+
+  const handleCancelOrder = async () => {
     if (!order) return;
     const finalReason = selectedReason === 'Lý do khác' ? otherReason : selectedReason;
     if (!finalReason) {
       addToast('Vui lòng chọn hoặc nhập lý do hủy đơn', 'error');
       return;
     }
-    orderService.cancel(order.id, finalReason);
+    try {
+      const updated = await orderService.cancelOnBackend(order.id, finalReason);
+      if (updated) {
+        setOrder(updated);
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Không thể hủy đơn hàng.';
+      addToast(message, 'error');
+      return;
+    }
     addToast('Đã hủy đơn hàng thành công!', 'success');
     setIsCancelModalOpen(false);
     setTimeout(() => navigate('/profile'), 1500);
@@ -58,6 +97,18 @@ const OrderDetail = () => {
       addToast('Đã sao chép mã vận đơn!', 'success');
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="od-page">
+        <div className="od-container">
+          <div className="od-not-found">
+            <h2>Đang tải đơn hàng...</h2>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!order) {
     return (

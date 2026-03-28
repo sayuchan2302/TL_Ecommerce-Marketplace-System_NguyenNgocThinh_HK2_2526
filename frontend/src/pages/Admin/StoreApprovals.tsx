@@ -71,10 +71,10 @@ const mapStore = (store: StoreProfile): ManagedStore => ({
         ? 'SUSPENDED'
         : 'ACTIVE'
       : 'INACTIVE',
-  productCount: 0,
-  liveProductCount: 0,
-  responseRate: 0,
-  warehouseAddress: store.address || 'Ch\u01b0a c\u1ea5u h\u00ecnh kho l\u1ea5y h\u00e0ng',
+  productCount: Number(store.productCount ?? 0),
+  liveProductCount: Number(store.liveProductCount ?? 0),
+  responseRate: Number(store.responseRate ?? 0),
+  warehouseAddress: store.warehouseAddress || store.address || 'Ch\u01b0a c\u1ea5u h\u00ecnh kho l\u1ea5y h\u00e0ng',
 });
 
 
@@ -82,6 +82,8 @@ const StoreApprovals = () => {
   const { addToast } = useToast();
   const [stores, setStores] = useState<ManagedStore[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<StoreFilter>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -93,19 +95,31 @@ const StoreApprovals = () => {
   const pageSize = 8;
 
   useEffect(() => {
+    let active = true;
+
     const fetchStores = async () => {
-      setLoading(true);
       try {
+        setLoading(true);
+        setLoadError(null);
         const adminStores = await storeService.getAdminStores();
+        if (!active) return;
         setStores(adminStores.map(mapStore));
       } catch (error: unknown) {
-        addToast(getUiErrorMessage(error, 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c danh s\u00e1ch gian h\u00e0ng'), 'error');
+        if (!active) return;
+        setStores([]);
+        const message = getUiErrorMessage(error, 'Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c danh s\u00e1ch gian h\u00e0ng t\u1eeb backend.');
+        setLoadError(message);
+        addToast(message, 'error');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
+
     void fetchStores();
-  }, [addToast]);
+    return () => {
+      active = false;
+    };
+  }, [addToast, reloadKey]);
 
   const filteredStores = useMemo(() => {
     let next = stores;
@@ -227,15 +241,16 @@ const StoreApprovals = () => {
             <button className="admin-ghost-btn" onClick={() => setSelected(new Set())}>B\u1ecf ch\u1ecdn</button></div>);
         })()}
       </div>
-      {!loading && filteredStores.length === 0 ? (<AdminStateBlock type={search.trim() ? 'search-empty' : 'empty'} title={search.trim() ? 'Kh\u00f4ng t\u00ecm th\u1ea5y gian h\u00e0ng ph\u00f9 h\u1ee3p' : 'Ch\u01b0a c\u00f3 h\u1ed3 s\u01a1 gian h\u00e0ng'} description={search.trim() ? 'Th\u1eed \u0111\u1ed5i t\u1eeb kh\u00f3a ho\u1eb7c \u0111\u1eb7t l\u1ea1i b\u1ed9 l\u1ecdc \u0111\u1ec3 xem l\u1ea1i danh s\u00e1ch gian h\u00e0ng.' : 'Danh s\u00e1ch gian h\u00e0ng s\u1ebd hi\u1ec3n th\u1ecb t\u1ea1i \u0111\u00e2y \u0111\u1ec3 qu\u1ea3n tr\u1ecb vi\u00ean theo d\u00f5i v\u00e0 x\u1eed l\u00fd.'} actionLabel="\u0110\u1eb7t l\u1ea1i b\u1ed9 l\u1ecdc" onAction={resetCurrentView} />) : null}
-      {!loading && filteredStores.length > 0 ? (<><div className="admin-table" role="table" aria-label="B\u1ea3ng gian h\u00e0ng"><div className="admin-table-row stores admin-table-head" role="row">
+      {!loading && loadError ? (<AdminStateBlock type="error" title="Kh\u00f4ng t\u1ea3i \u0111\u01b0\u1ee3c danh s\u00e1ch gian h\u00e0ng" description={loadError} actionLabel="Th\u1eed l\u1ea1i" onAction={() => setReloadKey((value) => value + 1)} />) : null}
+      {!loading && !loadError && filteredStores.length === 0 ? (<AdminStateBlock type={search.trim() ? 'search-empty' : 'empty'} title={search.trim() ? 'Kh\u00f4ng t\u00ecm th\u1ea5y gian h\u00e0ng ph\u00f9 h\u1ee3p' : 'Ch\u01b0a c\u00f3 h\u1ed3 s\u01a1 gian h\u00e0ng'} description={search.trim() ? 'Th\u1eed \u0111\u1ed5i t\u1eeb kh\u00f3a ho\u1eb7c \u0111\u1eb7t l\u1ea1i b\u1ed9 l\u1ecdc \u0111\u1ec3 xem l\u1ea1i danh s\u00e1ch gian h\u00e0ng.' : 'Danh s\u00e1ch gian h\u00e0ng s\u1ebd hi\u1ec3n th\u1ecb t\u1ea1i \u0111\u00e2y \u0111\u1ec3 qu\u1ea3n tr\u1ecb vi\u00ean theo d\u00f5i v\u00e0 x\u1eed l\u00fd.'} actionLabel="\u0110\u1eb7t l\u1ea1i b\u1ed9 l\u1ecdc" onAction={resetCurrentView} />) : null}
+      {!loading && !loadError && filteredStores.length > 0 ? (<><div className="admin-table" role="table" aria-label="B\u1ea3ng gian h\u00e0ng"><div className="admin-table-row stores admin-table-head" role="row">
         <div role="columnheader"><input type="checkbox" checked={selected.size === filteredStores.length && filteredStores.length > 0} onChange={(event) => setSelected(event.target.checked ? new Set(filteredStores.map((i) => i.id)) : new Set())} /></div>
         <div role="columnheader">Gian h\u00e0ng</div><div role="columnheader">Ch\u1ee7 s\u1edf h\u1eefu</div><div role="columnheader">Quy m\u00f4 v\u1eadn h\u00e0nh</div><div role="columnheader">Tr\u1ea1ng th\u00e1i</div><div role="columnheader">Ng\u00e0y t\u1ea1o</div><div role="columnheader">H\u00e0nh \u0111\u1ed9ng</div>
       </div>{pagedStores.map((store) => (<motion.div key={store.id} className="admin-table-row stores" role="row" whileHover={{ y: -1 }} onClick={() => { setDetailStore(store); setRejectReason(store.rejectionReason || ''); }} style={{ cursor: 'pointer' }}>
         <div role="cell" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.has(store.id)} onChange={(e) => { const n = new Set(selected); if (e.target.checked) n.add(store.id); else n.delete(store.id); setSelected(n); }} /></div>
         <div role="cell" className="store-cell"><div className="store-avatar">{store.logo ? <img src={store.logo} alt={store.name} /> : <Store size={18} />}</div><div className="store-copy"><div className="admin-bold">{store.name}</div><div className="admin-muted small">{store.slug}</div></div></div>
         <div role="cell"><div className="admin-bold">{store.applicantName || 'Ch\u01b0a \u0111\u0103ng k\u00fd ch\u1ee7 s\u1edf h\u1eefu'}</div><div className="admin-muted small">{store.applicantEmail || store.contactEmail || 'Ch\u01b0a c\u00f3 email'}</div></div>
-        <div role="cell" className="store-ops-cell"><div className="admin-bold">{store.productCount > 0 ? `${store.productCount.toLocaleString('vi-VN')} SKU` : 'N/A SKU'}</div><div className="admin-muted small">{store.liveProductCount > 0 ? (store.liveProductCount.toLocaleString('vi-VN') + ' \u0110ang b\u00e1n') : 'Ch\u01b0a c\u00f3 d\u1eef li\u1ec7u SKU live'} \u00b7 {store.totalOrders.toLocaleString('vi-VN')} \u0111\u01a1n</div></div>
+        <div role="cell" className="store-ops-cell"><div className="admin-bold">{store.productCount.toLocaleString('vi-VN')} SKU</div><div className="admin-muted small">{store.liveProductCount.toLocaleString('vi-VN')} \u0110ang b\u00e1n \u00b7 {store.totalOrders.toLocaleString('vi-VN')} \u0111\u01a1n</div></div>
         <div role="cell"><div className="store-status-stack"><span className={`admin-pill ${approvalTone(store.approvalStatus)}`}>{approvalLabel(store.approvalStatus)}</span><span className={`admin-pill ${operatingTone(store.operatingStatus)}`}>{operatingLabel(store.operatingStatus)}</span></div></div>
         <div role="cell">{new Date(store.createdAt).toLocaleDateString('vi-VN')}</div>
         <div role="cell" className="admin-actions" onClick={(e) => e.stopPropagation()}>
@@ -250,7 +265,7 @@ const StoreApprovals = () => {
       <Drawer open={Boolean(detailStore)} onClose={() => { setDetailStore(null); setRejectReason(''); }} className="store-drawer">{detailStore ? (<><PanelDrawerHeader eyebrow="H\u1ed3 s\u01a1 gian h\u00e0ng" title={detailStore.name} onClose={() => { setDetailStore(null); setRejectReason(''); }} closeLabel="\u0110\u00f3ng h\u1ed3 s\u01a1 gian h\u00e0ng" />
         <div className="drawer-body"><PanelDrawerSection title="T\u1ed5ng quan gian h\u00e0ng"><div className="store-drawer-hero"><div className="store-avatar large">{detailStore.logo ? <img src={detailStore.logo} alt={detailStore.name} /> : <Store size={22} />}</div><div><div className="admin-bold">{detailStore.name}</div><div className="admin-muted">{detailStore.slug}</div></div><div className="store-hero-pills"><span className={`admin-pill ${approvalTone(detailStore.approvalStatus)}`}>{approvalLabel(detailStore.approvalStatus)}</span><span className={`admin-pill ${operatingTone(detailStore.operatingStatus)}`}>{operatingLabel(detailStore.operatingStatus)}</span></div></div></PanelDrawerSection>
           <PanelDrawerSection title="H\u1ed3 s\u01a1 v\u00e0 ch\u1ee7 s\u1edf h\u1eefu"><div className="admin-card-list"><div className="admin-card-row"><span className="admin-bold"><User size={14} style={{ verticalAlign: -2, marginRight: 6 }} /> Ch\u1ee7 s\u1edf h\u1eefu</span><span className="admin-muted">{detailStore.applicantName || 'Ch\u01b0a \u0111\u0103ng k\u00fd ch\u1ee7 s\u1edf h\u1eefu'}</span></div><div className="admin-card-row"><span className="admin-bold">Email li\u00ean h\u1ec7</span><span className="admin-muted">{detailStore.applicantEmail || detailStore.contactEmail || 'Ch\u01b0a c\u00f3 email'}</span></div><div className="admin-card-row"><span className="admin-bold">S\u1ed1 \u0111i\u1ec7n tho\u1ea1i</span><span className="admin-muted">{detailStore.phone || 'Ch\u01b0a c\u1eadp nh\u1eadt'}</span></div><div className="admin-card-row"><span className="admin-bold">Kho l\u1ea5y h\u00e0ng</span><span className="admin-muted">{detailStore.warehouseAddress}</span></div><div className="admin-card-row"><span className="admin-bold">T\u1ef7 l\u1ec7 hoa h\u1ed3ng</span><span className="admin-muted">{detailStore.commissionRate || 5}%</span></div></div></PanelDrawerSection>
-          <PanelDrawerSection title="T\u00edn hi\u1ec7u kinh doanh"><div className="store-signal-grid"><div className="store-signal-card"><span className="admin-muted small">S\u1ea3n ph\u1ea9m</span><strong>{detailStore.productCount > 0 ? `${detailStore.liveProductCount}/${detailStore.productCount}` : 'N/A'}</strong><span className="admin-muted small">\u0111ang hi\u1ec3n th\u1ecb / t\u1ed5ng SKU</span></div><div className="store-signal-card"><span className="admin-muted small">\u0110\u01a1n h\u00e0ng</span><strong>{detailStore.totalOrders.toLocaleString('vi-VN')}</strong><span className="admin-muted small">\u0111\u01a1n \u0111\u00e3 ghi nh\u1eadn</span></div><div className="store-signal-card"><span className="admin-muted small">GMV</span><strong>{formatCurrency(detailStore.totalSales)}</strong><span className="admin-muted small">doanh s\u1ed1 to\u00e0n gian h\u00e0ng</span></div><div className="store-signal-card"><span className="admin-muted small">\u0110\u00e1nh gi\u00e1</span><strong>{detailStore.rating.toFixed(1)}</strong><span className="admin-muted small">trung b\u00ecnh kh\u00e1ch h\u00e0ng</span></div><div className="store-signal-card"><span className="admin-muted small">Ph\u1ea3n h\u1ed3i</span><strong>{detailStore.responseRate > 0 ? `${detailStore.responseRate}%` : 'N/A'}</strong><span className="admin-muted small">ch\u1edd endpoint aggregate t\u1eeb backend</span></div><div className="store-signal-card"><span className="admin-muted small">Ng\u00e0y t\u1ea1o</span><strong>{new Date(detailStore.createdAt).toLocaleDateString('vi-VN')}</strong><span className="admin-muted small">m\u1ed1c kh\u1edfi t\u1ea1o h\u1ed3 s\u01a1</span></div></div></PanelDrawerSection>
+          <PanelDrawerSection title="T\u00edn hi\u1ec7u kinh doanh"><div className="store-signal-grid"><div className="store-signal-card"><span className="admin-muted small">S\u1ea3n ph\u1ea9m</span><strong>{`${detailStore.liveProductCount.toLocaleString('vi-VN')}/${detailStore.productCount.toLocaleString('vi-VN')}`}</strong><span className="admin-muted small">\u0111ang hi\u1ec3n th\u1ecb / t\u1ed5ng SKU</span></div><div className="store-signal-card"><span className="admin-muted small">\u0110\u01a1n h\u00e0ng</span><strong>{detailStore.totalOrders.toLocaleString('vi-VN')}</strong><span className="admin-muted small">\u0111\u01a1n \u0111\u00e3 ghi nh\u1eadn</span></div><div className="store-signal-card"><span className="admin-muted small">GMV</span><strong>{formatCurrency(detailStore.totalSales)}</strong><span className="admin-muted small">doanh s\u1ed1 to\u00e0n gian h\u00e0ng</span></div><div className="store-signal-card"><span className="admin-muted small">\u0110\u00e1nh gi\u00e1</span><strong>{detailStore.rating.toFixed(1)}</strong><span className="admin-muted small">trung b\u00ecnh kh\u00e1ch h\u00e0ng</span></div><div className="store-signal-card"><span className="admin-muted small">Ph\u1ea3n h\u1ed3i</span><strong>{`${detailStore.responseRate.toLocaleString('vi-VN')}%`}</strong><span className="admin-muted small">t\u1ef7 l\u1ec7 ph\u1ea3n h\u1ed3i c\u1ee7a shop</span></div><div className="store-signal-card"><span className="admin-muted small">Ng\u00e0y t\u1ea1o</span><strong>{new Date(detailStore.createdAt).toLocaleDateString('vi-VN')}</strong><span className="admin-muted small">m\u1ed1c kh\u1edfi t\u1ea1o h\u1ed3 s\u01a1</span></div></div></PanelDrawerSection>
           <PanelDrawerSection title="M\u00f4 t\u1ea3 gian h\u00e0ng"><p className="admin-muted store-description">{detailStore.description || 'Ch\u01b0a c\u00f3 m\u00f4 t\u1ea3 gian h\u00e0ng.'}</p></PanelDrawerSection>
           <PanelDrawerSection title="Ghi ch\u00fa ki\u1ec3m duy\u1ec7t">{detailStore.approvalStatus === 'PENDING' || detailStore.approvalStatus === 'REJECTED' ? (<textarea className="admin-textarea store-reject-note" rows={4} placeholder="Nh\u1eadp ghi ch\u00fa ho\u1eb7c l\u00fd do t\u1eeb ch\u1ed1i h\u1ed3 s\u01a1 gian h\u00e0ng" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />) : (<div className="admin-card-list"><div className="admin-card-row"><span className="admin-bold">Ghi ch\u00fa hi\u1ec7n t\u1ea1i</span><span className="admin-muted">{detailStore.rejectionReason || 'Ch\u01b0a c\u00f3 ghi ch\u00fa ki\u1ec3m duy\u1ec7t. Gian h\u00e0ng \u0111ang ho\u1ea1t \u0111\u1ed9ng b\u00ecnh th\u01b0\u1eddng.'}</span></div></div>)}</PanelDrawerSection></div>
           <PanelDrawerFooter><button className="admin-ghost-btn" onClick={() => { setDetailStore(null); setRejectReason(''); }}>\u0110\u00f3ng</button>{detailStore.approvalStatus === 'PENDING' ? <button className="admin-ghost-btn danger" disabled={actionLoading} onClick={() => void rejectStore()}><X size={14} />T\u1eeb ch\u1ed1i h\u1ed3 s\u01a1</button> : null}{detailStore.approvalStatus === 'PENDING' ? <button className="admin-primary-btn" disabled={actionLoading} onClick={() => openConfirm('approve', [detailStore.id])}><Check size={14} />Duy\u1ec7t gian h\u00e0ng</button> : null}{detailStore.approvalStatus === 'APPROVED' && detailStore.operatingStatus === 'ACTIVE' ? <button className="admin-ghost-btn danger" onClick={() => openConfirm('suspend', [detailStore.id])}><Ban size={14} />T\u1ea1m kh\u00f3a gian h\u00e0ng</button> : null}{detailStore.approvalStatus === 'APPROVED' && detailStore.operatingStatus === 'SUSPENDED' ? <button className="admin-primary-btn" onClick={() => openConfirm('reactivate', [detailStore.id])}><RotateCcw size={14} />M\u1edf l\u1ea1i gian h\u00e0ng</button> : null}</PanelDrawerFooter></>) : null}</Drawer>

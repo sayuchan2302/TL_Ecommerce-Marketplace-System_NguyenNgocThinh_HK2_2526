@@ -24,6 +24,7 @@ import {
 } from './orderWorkflow';
 import { PanelStatsGrid, PanelTabs } from '../../components/Panel/PanelPrimitives';
 import Portal from '../../components/Portal/Portal';
+import { getUiErrorMessage } from '../../utils/errorMessage';
 
 interface AdminOrderRow {
   code: string;
@@ -97,6 +98,7 @@ const AdminOrders = () => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showBulkConfirmModal, setShowBulkConfirmModal] = useState(false);
   const { toast, pushToast } = useAdminToast();
 
@@ -134,16 +136,18 @@ const AdminOrders = () => {
   });
 
   const fetchOrders = useCallback(async () => {
+    setLoadError(null);
     try {
       const records = await listAdminOrders();
       setRows(records.map(mapOrderRecordToRow));
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
-      pushToast('Lỗi khi tải danh sách đơn hàng.');
+      setRows([]);
+      setLoadError(getUiErrorMessage(error, 'Không thể tải danh sách đơn hàng từ backend.'));
     } finally {
       setIsInitializing(false);
     }
-  }, [pushToast]);
+  }, []);
 
   useEffect(() => {
     fetchOrders();
@@ -329,7 +333,18 @@ const AdminOrders = () => {
 
           {isInitializing ? (
             <div className="admin-loading" style={{ padding: '3rem', textAlign: 'center' }}>Đang tải dữ liệu...</div>
-          ) : isLoading ? null : filteredOrders.length === 0 ? (
+          ) : isLoading ? null : loadError ? (
+            <AdminStateBlock
+              type="error"
+              title="Không tải được danh sách đơn hàng"
+              description={loadError}
+              actionLabel="Thử lại"
+              onAction={() => {
+                setIsInitializing(true);
+                void fetchOrders();
+              }}
+            />
+          ) : filteredOrders.length === 0 ? (
             <AdminStateBlock
               type={search.trim() ? 'search-empty' : 'empty'}
               title={search.trim() ? 'Không tìm thấy đơn hàng phù hợp' : 'Chưa có đơn hàng nào'}

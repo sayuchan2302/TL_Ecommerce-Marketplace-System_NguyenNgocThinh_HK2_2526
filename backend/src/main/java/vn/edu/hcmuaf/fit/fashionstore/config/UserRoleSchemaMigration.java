@@ -3,6 +3,7 @@ package vn.edu.hcmuaf.fit.fashionstore.config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Component
 @Order(10)
+@ConditionalOnProperty(prefix = "app.migration.user-role", name = "enabled", havingValue = "true", matchIfMissing = false)
 @RequiredArgsConstructor
 public class UserRoleSchemaMigration implements CommandLineRunner {
 

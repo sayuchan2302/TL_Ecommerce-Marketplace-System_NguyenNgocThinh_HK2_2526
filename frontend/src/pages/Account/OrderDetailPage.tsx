@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import './Account.css';
 import { orderService } from '../../services/orderService';
 import { useCart } from '../../contexts/CartContext';
@@ -7,10 +8,49 @@ import { formatPrice } from '../../utils/formatters';
 
 const OrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const order = id ? orderService.getById(id) : null;
+  const [order, setOrder] = useState<Awaited<ReturnType<typeof orderService.getByIdFromBackend>>>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { addToCart } = useCart();
   const { addToast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadOrder = async () => {
+      try {
+        setIsLoading(true);
+        if (!id) {
+          if (mounted) setOrder(null);
+          return;
+        }
+        const fresh = await orderService.getByIdFromBackend(id);
+        if (!mounted) return;
+        setOrder(fresh);
+      } catch (error: unknown) {
+        if (!mounted) return;
+        const message = error instanceof Error ? error.message : 'Không thể tải chi tiết đơn hàng.';
+        addToast(message, 'error');
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    void loadOrder();
+    return () => {
+      mounted = false;
+    };
+  }, [addToast, id]);
+
+  if (isLoading) {
+    return (
+      <div className="account-page">
+        <div className="account-container">
+          <h1 className="account-title">Đang tải đơn hàng...</h1>
+        </div>
+      </div>
+    );
+  }
 
   if (!order) {
     return (

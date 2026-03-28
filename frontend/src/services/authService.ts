@@ -2,19 +2,12 @@ import type { AuthResponse, User } from '../types';
 
 const AUTH_KEY = 'coolmate_auth_v1';
 const ADMIN_AUTH_KEY = 'coolmate_admin_auth_v1';
-const REGISTERED_ACCOUNTS_KEY = 'coolmate_registered_accounts_v1';
 const SESSION_REASON_KEY = 'coolmate_auth_reason_v1';
 const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
 if (!API_BASE) {
   // eslint-disable-next-line no-console
-  console.warn('[auth] VITE_API_URL is empty. Frontend will use mock auth (customer only).');
-}
-
-interface MockAccount {
-  email: string;
-  password: string;
-  user: User;
+  console.warn('[auth] VITE_API_URL is empty. Authentication requests will fail until backend URL is configured.');
 }
 
 interface BackendAuthResponse {
@@ -26,61 +19,6 @@ interface BackendAuthResponse {
   storeId?: string;
   approvedVendor?: boolean;
 }
-
-const MOCK_ACCOUNTS: MockAccount[] = [
-  {
-    email: 'user@gmail.com',
-    password: '123456',
-    user: {
-      id: 'u_customer_001',
-      name: 'Nguyen Ngoc Thinh',
-      email: 'user@gmail.com',
-      phone: '0382253049',
-      avatar: 'NT',
-      gender: 'male',
-      role: 'CUSTOMER',
-    },
-  },
-  {
-    email: 'vendor@gmail.com',
-    password: '123456',
-    user: {
-      id: 'u_vendor_001',
-      name: 'Shop Thoi Trang',
-      email: 'vendor@gmail.com',
-      phone: '0382253050',
-      avatar: 'SH',
-      role: 'VENDOR',
-      storeId: 'store_001',
-      isApprovedVendor: true,
-    },
-  },
-  {
-    email: 'vendorpending@gmail.com',
-    password: '123456',
-    user: {
-      id: 'u_vendor_002',
-      name: 'Shop Cho Duyet',
-      email: 'vendorpending@gmail.com',
-      phone: '0382253051',
-      avatar: 'CD',
-      role: 'VENDOR',
-      storeId: 'store_002',
-      isApprovedVendor: false,
-    },
-  },
-  {
-    email: 'admin@gmail.com',
-    password: '123456',
-    user: {
-      id: 'u_super_admin_001',
-      name: 'Admin Coolmate',
-      email: 'admin@gmail.com',
-      role: 'SUPER_ADMIN',
-      avatar: 'AD',
-    },
-  },
-];
 
 const getInitials = (name: string) =>
   name
@@ -170,7 +108,7 @@ const mapBackendAuthResponse = (payload: BackendAuthResponse): AuthResponse => {
 
 const loginWithBackend = async (email: string, password: string): Promise<AuthResponse | null> => {
   if (!API_BASE) {
-    return null;
+    throw new Error('VITE_API_URL is empty. Please configure backend API URL.');
   }
 
   try {
@@ -197,7 +135,7 @@ const loginWithBackend = async (email: string, password: string): Promise<AuthRe
 
 const registerWithBackend = async (name: string, email: string, password: string): Promise<AuthResponse | null> => {
   if (!API_BASE) {
-    return null;
+    throw new Error('VITE_API_URL is empty. Please configure backend API URL.');
   }
 
   try {
@@ -224,24 +162,6 @@ const registerWithBackend = async (name: string, email: string, password: string
     return null;
   }
 };
-
-const loadRegisteredAccounts = (): MockAccount[] => {
-  try {
-    const raw = localStorage.getItem(REGISTERED_ACCOUNTS_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const persistRegisteredAccounts = (accounts: MockAccount[]) => {
-  localStorage.setItem(REGISTERED_ACCOUNTS_KEY, JSON.stringify(accounts));
-};
-
-const getAllAccounts = (): MockAccount[] => [...MOCK_ACCOUNTS, ...loadRegisteredAccounts()];
 
 const persist = (data: AuthResponse | null) => {
   if (data) {
@@ -360,44 +280,15 @@ export const authService = {
       throw new Error('Vui long nhap email va mat khau');
     }
 
-    const forceBackend = Boolean(API_BASE);
-    try {
-      const backendSession = await loginWithBackend(email, password);
-      if (backendSession) {
-        persist(backendSession);
-        if (backendSession.user.role === 'VENDOR' || backendSession.user.role === 'SUPER_ADMIN') {
-          persistAdmin(backendSession);
-        }
-        return backendSession;
-      }
-    } catch (error) {
-      if (forceBackend) {
-        throw error instanceof Error ? error : new Error('Dang nhap that bai');
-      }
-    }
-
-    if (forceBackend) {
+    const backendSession = await loginWithBackend(email, password);
+    if (!backendSession) {
       throw new Error('Dang nhap that bai. Vui long kiem tra lai tai khoan/mat khau.');
     }
-
-    const account = getAllAccounts().find(
-      acc => acc.email.toLowerCase() === email.toLowerCase() && acc.password === password,
-    );
-
-    if (!account) {
-      throw new Error('Email hoac mat khau khong dung');
+    persist(backendSession);
+    if (backendSession.user.role === 'VENDOR' || backendSession.user.role === 'SUPER_ADMIN') {
+      persistAdmin(backendSession);
     }
-
-    if (account.user.role === 'VENDOR' || account.user.role === 'SUPER_ADMIN') {
-      throw new Error('Tai khoan seller/admin phai dang nhap bang backend JWT that.');
-    }
-
-    const response: AuthResponse = {
-      token: 'mock-token-' + Date.now(),
-      user: account.user,
-    };
-    persist(response);
-    return response;
+    return backendSession;
   },
 
   async register(name: string, email: string, password: string): Promise<AuthResponse> {
@@ -411,51 +302,12 @@ export const authService = {
       throw new Error('Mat khau phai co it nhat 6 ky tu');
     }
 
-    const existing = getAllAccounts().find(
-      acc => acc.email.toLowerCase() === email.toLowerCase(),
-    );
-    if (existing) {
-      throw new Error('Email da duoc su dung');
-    }
-
-    try {
-      const backendSession = await registerWithBackend(name, email, password);
-      if (backendSession) {
-        persist(backendSession);
-        return backendSession;
-      }
-    } catch (error) {
-      if (API_BASE) {
-        throw error instanceof Error ? error : new Error('Dang ky that bai. Vui long thu lai.');
-      }
-    }
-
-    if (API_BASE) {
+    const backendSession = await registerWithBackend(name, email, password);
+    if (!backendSession) {
       throw new Error('Dang ky that bai. Vui long thu lai.');
     }
-
-    const newUser: User = {
-      id: 'u_' + Date.now(),
-      name,
-      email,
-      avatar: getInitials(name),
-      role: 'CUSTOMER',
-    };
-
-    const newAccount: MockAccount = {
-      email,
-      password,
-      user: newUser,
-    };
-
-    persistRegisteredAccounts([...loadRegisteredAccounts(), newAccount]);
-
-    const response: AuthResponse = {
-      token: 'mock-token-' + Date.now(),
-      user: newUser,
-    };
-    persist(response);
-    return response;
+    persist(backendSession);
+    return backendSession;
   },
 
   async forgot(email: string): Promise<void> {
@@ -479,19 +331,6 @@ export const authService = {
     persist(next);
     if (user.role === 'VENDOR' || user.role === 'SUPER_ADMIN') {
       persistAdmin(next);
-    }
-
-    const registeredAccounts = loadRegisteredAccounts();
-    const accountIndex = registeredAccounts.findIndex(
-      (account) => account.email.toLowerCase() === user.email.toLowerCase(),
-    );
-
-    if (accountIndex >= 0) {
-      registeredAccounts[accountIndex] = {
-        ...registeredAccounts[accountIndex],
-        user,
-      };
-      persistRegisteredAccounts(registeredAccounts);
     }
 
     return next;

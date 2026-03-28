@@ -5,7 +5,7 @@ import {
   type TransitionReasonCode,
 } from './orderWorkflow';
 import { type AdminOrderData } from './adminOrdersData';
-import { apiRequest } from '../../services/apiClient';
+import { ApiError, apiRequest } from '../../services/apiClient';
 
 type TransitionSource = 'orders_list' | 'order_detail';
 
@@ -178,22 +178,19 @@ const mapBackendToAdmin = (order: BackendAdminOrder): AdminOrderRecord => {
 };
 
 export const listAdminOrders = async (): Promise<AdminOrderRecord[]> => {
-  try {
-    const data = await apiRequest<BackendAdminOrder[]>('/api/orders/admin/all', {}, { auth: true });
-    return (data || []).map(mapBackendToAdmin);
-  } catch (error) {
-    console.error('Failed to fetch admin orders', error);
-    return [];
-  }
+  const data = await apiRequest<BackendAdminOrder[]>('/api/orders/admin/all', {}, { auth: true });
+  return (data || []).map(mapBackendToAdmin);
 };
 
 export const getAdminOrderByCode = async (code: string): Promise<AdminOrderRecord | null> => {
   try {
     const data = await apiRequest<BackendAdminOrder>(`/api/orders/${code}`, {}, { auth: true });
     return mapBackendToAdmin(data);
-  } catch (error) {
-    console.error('Failed to fetch admin order detail', error);
-    return null;
+  } catch (error: unknown) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+    throw error;
   }
 };
 

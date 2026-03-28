@@ -143,7 +143,7 @@ const VendorRegister = () => {
       setCurrentStep('success');
       addToast(dict.wizard.success.pendingTag, 'success');
     } catch (err: unknown) {
-      addToast(getUiErrorMessage(err, 'Gá»­i Ä‘Äƒng kÃ½ tháº¥t báº¡i'), 'error');
+      addToast(getUiErrorMessage(err, 'Gửi đăng ký thất bại'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -155,12 +155,12 @@ const VendorRegister = () => {
         <motion.div key="shop" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }}>
           <div className="vr-grid">
             <Field label={dict.form.shopName} value={shopInfo.shopName} onChange={v => setShopInfo({ ...shopInfo, shopName: v })} placeholder="Coolmate Studio" />
-            <Field label={dict.form.brandName} value={shopInfo.brandName} onChange={v => setShopInfo({ ...shopInfo, brandName: v })} placeholder="ThÆ°Æ¡ng hiá»‡u/Brand" />
+            <Field label={dict.form.brandName} value={shopInfo.brandName} onChange={v => setShopInfo({ ...shopInfo, brandName: v })} placeholder="Thương hiệu/Brand" />
             <Field label={dict.form.slug} value={shopInfo.slug} onChange={v => setShopInfo({ ...shopInfo, slug: v })} prefix="/store/" placeholder="coolmate" />
-            <Field label={dict.form.category} value={shopInfo.category} onChange={v => setShopInfo({ ...shopInfo, category: v })} placeholder="Thá»i trang nam" />
-            <Field label={dict.form.address} value={shopInfo.address} onChange={v => setShopInfo({ ...shopInfo, address: v })} placeholder="123 Pasteur, Quáº­n 3" fullWidth />
-            <Field label={dict.form.city} value={shopInfo.city} onChange={v => setShopInfo({ ...shopInfo, city: v })} placeholder="Há»“ ChÃ­ Minh" />
-            <Field label={dict.form.district} value={shopInfo.district} onChange={v => setShopInfo({ ...shopInfo, district: v })} placeholder="Quáº­n 3" />
+            <Field label={dict.form.category} value={shopInfo.category} onChange={v => setShopInfo({ ...shopInfo, category: v })} placeholder="Thời trang nam" />
+            <Field label={dict.form.address} value={shopInfo.address} onChange={v => setShopInfo({ ...shopInfo, address: v })} placeholder="123 Pasteur, Quận 3" fullWidth />
+            <Field label={dict.form.city} value={shopInfo.city} onChange={v => setShopInfo({ ...shopInfo, city: v })} placeholder="Hồ Chí Minh" />
+            <Field label={dict.form.district} value={shopInfo.district} onChange={v => setShopInfo({ ...shopInfo, district: v })} placeholder="Quận 3" />
           </div>
         </motion.div>
       );
@@ -170,11 +170,11 @@ const VendorRegister = () => {
       return (
         <motion.div key="contact" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }}>
           <div className="vr-grid">
-            <Field label={dict.form.contactName} value={contactInfo.contactName} onChange={v => setContactInfo({ ...contactInfo, contactName: v })} placeholder="Nguyá»…n VÄƒn A" />
+            <Field label={dict.form.contactName} value={contactInfo.contactName} onChange={v => setContactInfo({ ...contactInfo, contactName: v })} placeholder="Nguyễn Văn A" />
             <Field label={dict.form.contactPhone} value={contactInfo.contactPhone} onChange={v => setContactInfo({ ...contactInfo, contactPhone: v })} placeholder="09xx xxx xxx" />
             <Field label={dict.form.contactEmail} value={contactInfo.contactEmail} onChange={v => setContactInfo({ ...contactInfo, contactEmail: v })} placeholder="you@brand.com" />
             <Field label={dict.form.shippingLeadTime} value={contactInfo.shippingLeadTime} onChange={v => setContactInfo({ ...contactInfo, shippingLeadTime: v })} placeholder="24-48h" />
-            <Field label={dict.form.logistics} value={contactInfo.returnPolicy} onChange={v => setContactInfo({ ...contactInfo, returnPolicy: v })} placeholder="Äá»•i tráº£ trong 15 ngÃ y, bÃªn bÃ¡n chá»‹u phÃ­" fullWidth />
+            <Field label={dict.form.logistics} value={contactInfo.returnPolicy} onChange={v => setContactInfo({ ...contactInfo, returnPolicy: v })} placeholder="Đổi trả trong 15 ngày, bên bán chịu phí" fullWidth />
           </div>
         </motion.div>
       );
@@ -185,12 +185,12 @@ const VendorRegister = () => {
         <motion.div key="compliance" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.25 }}>
           <div className="vr-grid">
             <Field label={dict.form.taxCode} value={complianceInfo.taxCode} onChange={v => setComplianceInfo({ ...complianceInfo, taxCode: v })} placeholder="MST/CCCD" />
-            <Field label={dict.form.businessType} value={complianceInfo.businessType} onChange={v => setComplianceInfo({ ...complianceInfo, businessType: v })} placeholder="Há»™ kinh doanh / CÃ´ng ty" />
+            <Field label={dict.form.businessType} value={complianceInfo.businessType} onChange={v => setComplianceInfo({ ...complianceInfo, businessType: v })} placeholder="Hộ kinh doanh / Công ty" />
             <div className="vr-checkbox">
               <input id="agree" type="checkbox" checked={complianceInfo.agree} onChange={(e) => setComplianceInfo({ ...complianceInfo, agree: e.target.checked })} />
               <label htmlFor="agree">{dict.form.agree}</label>
             </div>
-            <div className="vr-note">{dict.form.commissionNote}: 5% - 8% tuá»³ ngÃ nh hÃ ng</div>
+            <div className="vr-note">{dict.form.commissionNote}: 5% - 8% tùy ngành hàng</div>
           </div>
         </motion.div>
       );

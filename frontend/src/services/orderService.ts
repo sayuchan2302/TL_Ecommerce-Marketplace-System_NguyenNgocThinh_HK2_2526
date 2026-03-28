@@ -5,7 +5,7 @@
  * Multi-vendor: Supports sub-order splitting by store.
  */
 import { sharedOrderStore, fulfillmentToClientStatus, clientStatusToFulfillment, type SharedOrder, type ClientOrderStatus } from './sharedOrderStore';
-import { apiRequest } from './apiClient';
+import { ApiError, apiRequest } from './apiClient';
 import type { Order, OrderStatus, OrderItem, OrderStatusStep } from '../types';
 
 
@@ -20,18 +20,25 @@ interface BackendOrderRequestItem {
 interface BackendAddressSummary {
   fullName?: string;
   phone?: string;
+  address?: string;
   detail?: string;
   ward?: string;
   district?: string;
+  city?: string;
   province?: string;
 }
 
 interface BackendOrderItemResponse {
   id?: string;
+  name?: string;
+  sku?: string;
+  image?: string;
   productName?: string;
   variantName?: string;
   productImage?: string;
+  variant?: string;
   quantity?: number;
+  price?: number;
   unitPrice?: number;
   totalPrice?: number;
 }
@@ -46,12 +53,19 @@ interface BackendOrderResponse {
   shippingFee?: number;
   discount?: number;
   total?: number;
+  carrier?: string;
   note?: string;
   trackingNumber?: string;
   couponCode?: string;
   subOrderId?: string | null;
   storeId?: string | null;
+  storeName?: string | null;
   items?: BackendOrderItemResponse[];
+  customer?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
   shippingAddress?: BackendAddressSummary;
 }
 
@@ -85,23 +99,24 @@ const backendPaymentStatusToClient = (status?: string, paymentMethod?: string) =
 };
 
 const formatBackendAddress = (address?: BackendAddressSummary) =>
-  [address?.detail, address?.ward, address?.district, address?.province]
+  [address?.detail || address?.address, address?.ward, address?.district, address?.province || address?.city]
     .filter((part): part is string => Boolean(part && part.trim()))
     .join(', ');
 
-const syncBackendOrderToSharedStore = (order: BackendOrderResponse) => {
+const mapBackendOrderToShared = (order: BackendOrderResponse): SharedOrder => {
   const clientStatus = backendStatusToClientStatus(order.status);
-  const shared: SharedOrder = {
+  return {
     id: order.id,
     createdAt: order.createdAt || new Date().toISOString(),
     parentOrderId: order.subOrderId || undefined,
     storeId: order.storeId || undefined,
-    customerName: order.shippingAddress?.fullName || 'Khach hang',
-    customerEmail: '',
-    customerPhone: order.shippingAddress?.phone || '',
+    storeName: order.storeName || undefined,
+    customerName: order.shippingAddress?.fullName || order.customer?.name || 'Khach hang',
+    customerEmail: order.customer?.email || '',
+    customerPhone: order.shippingAddress?.phone || order.customer?.phone || '',
     customerAvatar: 'KH',
     address: formatBackendAddress(order.shippingAddress),
-    shipMethod: 'Marketplace delivery',
+    shipMethod: order.carrier || 'Marketplace delivery',
     tracking: order.trackingNumber || '',
     note: order.note || '',
     paymentMethod: order.paymentMethod || 'COD',
@@ -110,16 +125,16 @@ const syncBackendOrderToSharedStore = (order: BackendOrderResponse) => {
     fulfillment: clientStatusToFulfillment(clientStatus),
     items: (order.items || []).map((item, index) => ({
       id: item.id || `${order.id}-${index + 1}`,
-      name: item.productName || `Item ${index + 1}`,
-      price: item.unitPrice || 0,
-      image: item.productImage || '',
+      name: item.name || item.productName || `Item ${index + 1}`,
+      price: Number(item.price || item.unitPrice || 0),
+      image: item.image || item.productImage || '',
       quantity: item.quantity || 0,
-      size: item.variantName,
+      size: item.variant || item.variantName,
     })),
-    subtotal: order.subtotal || 0,
-    shippingFee: order.shippingFee || 0,
-    discount: order.discount || 0,
-    total: order.total || 0,
+    subtotal: Number(order.subtotal || 0),
+    shippingFee: Number(order.shippingFee || 0),
+    discount: Number(order.discount || 0),
+    total: Number(order.total || 0),
     timeline: [
       {
         time: new Date(order.createdAt || Date.now()).toLocaleString('vi-VN'),
@@ -128,12 +143,11 @@ const syncBackendOrderToSharedStore = (order: BackendOrderResponse) => {
       },
     ],
   };
+};
 
-  if (sharedOrderStore.getById(shared.id)) {
-    sharedOrderStore.update(shared);
-  } else {
-    sharedOrderStore.add(shared);
-  }
+const syncBackendOrderToSharedStore = (order: BackendOrderResponse) => {
+  const shared = mapBackendOrderToShared(order);
+  sharedOrderStore.upsert(shared);
 };
 
 const toClientOrder = (o: SharedOrder): Order => ({
@@ -160,6 +174,8 @@ const toClientOrder = (o: SharedOrder): Order => ({
   cancelReason: o.cancelReason,
   cancelledAt: o.cancelledAt,
   tracking: o.tracking,
+  shippingFee: o.shippingFee,
+  discount: o.discount,
   // Multi-vendor fields
   parentOrderId: o.parentOrderId,
   storeId: o.storeId,
@@ -187,41 +203,40 @@ export const orderService = {
     return order;
   },
 
-  list(): Order[] {
-    return sharedOrderStore.getAll().map(toClientOrder);
+  async listFromBackend(): Promise<Order[]> {
+    const orders = await apiRequest<BackendOrderResponse[]>('/api/orders', {}, { auth: true });
+    const mapped = (orders || []).map(mapBackendOrderToShared);
+    sharedOrderStore.replaceAll(mapped);
+    return mapped.map(toClientOrder);
   },
 
-  /**
-   * List only parent orders (excludes sub-orders)
-   */
-  listParentOrders(): Order[] {
-    return sharedOrderStore.getAll()
-      .filter(o => !o.parentOrderId)
-      .map(toClientOrder);
+  async getByIdFromBackend(id: string): Promise<Order | null> {
+    if (!UUID_PATTERN.test(id)) {
+      return null;
+    }
+
+    try {
+      const order = await apiRequest<BackendOrderResponse>(`/api/orders/${id}`, {}, { auth: true });
+      syncBackendOrderToSharedStore(order);
+      return toClientOrder(mapBackendOrderToShared(order));
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   },
 
-  /**
-   * Get sub-orders for a parent order
-   */
-  getSubOrders(parentOrderId: string): Order[] {
-    return sharedOrderStore.getAll()
-      .filter(o => o.parentOrderId === parentOrderId)
-      .map(toClientOrder);
-  },
+  async cancelOnBackend(id: string, reason: string): Promise<Order | null> {
+    if (!UUID_PATTERN.test(id)) {
+      throw new Error('Mã đơn hàng không hợp lệ.');
+    }
 
-  getById(id: string): Order | null {
-    const order = sharedOrderStore.getById(id);
-    return order ? toClientOrder(order) : null;
-  },
-
-
-  cancel(id: string, reason: string): boolean {
-    return sharedOrderStore.cancel(id, reason);
-  },
-
-  canCancel(order: Order): boolean {
-    const shared = sharedOrderStore.getById(order.id);
-    if (!shared) return false;
-    return sharedOrderStore.canCancel(shared);
+    const updated = await apiRequest<BackendOrderResponse>(`/api/orders/${id}/cancel`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
+    }, { auth: true });
+    syncBackendOrderToSharedStore(updated);
+    return toClientOrder(mapBackendOrderToShared(updated));
   },
 };

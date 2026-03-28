@@ -16,11 +16,33 @@ const statusText: Record<Order['status'], string> = {
 
 const OrdersPage = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const orders = orderService.list();
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500);
-    return () => clearTimeout(timer);
+    let mounted = true;
+
+    const loadOrders = async () => {
+      try {
+        setIsLoading(true);
+        setLoadError(null);
+        const rows = await orderService.listFromBackend();
+        if (!mounted) return;
+        setOrders(rows);
+      } catch (error: unknown) {
+        if (!mounted) return;
+        const message = error instanceof Error ? error.message : 'Không thể tải danh sách đơn hàng.';
+        setLoadError(message);
+        setOrders([]);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    void loadOrders();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   return (
@@ -44,7 +66,9 @@ const OrdersPage = () => {
               ))}
             </>
           ) : (
-            orders.length === 0 ? (
+            loadError ? (
+              <div className="account-meta">{loadError}</div>
+            ) : orders.length === 0 ? (
               <div className="account-meta">Chưa có đơn hàng nào.</div>
             ) : (
               orders.map(order => (

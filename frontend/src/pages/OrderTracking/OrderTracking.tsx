@@ -32,21 +32,25 @@ const OrderTracking = () => {
   const [phone, setPhone] = useState('');
   const [result, setResult] = useState<MockOrder | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setNotFound(false);
-    setTimeout(() => {
-      const order = orderService.getById(orderId.trim());
+    setLoadError(null);
+    try {
+      const code = orderId.trim();
+      const order = await orderService.getByIdFromBackend(code);
+
       if (order && order.addressSummary.includes(phone.trim())) {
         const statusMap: Record<string, MockOrder['status']> = {
           pending: 'pending',
           processing: 'processing',
           shipping: 'shipping',
           delivered: 'delivered',
-          canceled: 'cancelled',
+          cancelled: 'cancelled',
         };
         const found: MockOrder = {
           id: order.id,
@@ -68,8 +72,15 @@ const OrderTracking = () => {
         setResult(null);
         setNotFound(true);
       }
+    } catch (error: unknown) {
+      setResult(null);
+      setNotFound(false);
+      const message = error instanceof Error ? error.message : 'Không thể tra cứu đơn hàng.';
+      setLoadError(message);
+      addToast(message, 'error');
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
   return (
@@ -120,6 +131,16 @@ const OrderTracking = () => {
             <div>
               <h3>{t.notFound.title}</h3>
               <p>{t.notFound.desc}</p>
+            </div>
+          </div>
+        )}
+
+        {loadError && (
+          <div className="tracking-empty">
+            <XCircle size={28} />
+            <div>
+              <h3>Không thể tra cứu đơn hàng</h3>
+              <p>{loadError}</p>
             </div>
           </div>
         )}

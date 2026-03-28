@@ -676,6 +676,8 @@ body {
 .admin-stats.grid-6 {
   grid-template-columns: repeat(6, 1fr);
 }
+
+.admin-stats.grid-3 {
   grid-template-columns: repeat(3, 1fr);
 }
 
