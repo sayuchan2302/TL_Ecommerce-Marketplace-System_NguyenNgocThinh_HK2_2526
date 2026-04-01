@@ -2,6 +2,7 @@ package vn.edu.hcmuaf.fit.fashionstore.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import vn.edu.hcmuaf.fit.fashionstore.entity.CustomerWalletTransaction;
 
@@ -18,5 +19,8 @@ public interface CustomerWalletTransactionRepository extends JpaRepository<Custo
             WHERE t.orderId = :orderId
               AND t.type = :type
             """)
-    BigDecimal sumAmountByOrderIdAndType(UUID orderId, CustomerWalletTransaction.TransactionType type);
+    BigDecimal sumAmountByOrderIdAndType(
+            @Param("orderId") UUID orderId,
+            @Param("type") CustomerWalletTransaction.TransactionType type
+    );
 }

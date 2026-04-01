@@ -218,6 +218,16 @@ public class WalletService {
         CustomerWallet wallet = customerWalletRepository.findByUserId(lockedOrder.getUser().getId())
                 .orElseGet(() -> createCustomerWallet(lockedOrder.getUser().getId()));
 
+        BigDecimal orderTotal = lockedOrder.getTotal() == null ? BigDecimal.ZERO : lockedOrder.getTotal().max(BigDecimal.ZERO);
+        BigDecimal refundedBefore = customerWalletTransactionRepository.sumAmountByOrderIdAndType(
+                lockedOrder.getId(),
+                CustomerWalletTransaction.TransactionType.CREDIT_REFUND
+        );
+        BigDecimal refundedAfter = refundedBefore.add(refundAmount);
+        if (orderTotal.compareTo(BigDecimal.ZERO) > 0 && refundedAfter.compareTo(orderTotal) > 0) {
+            throw new IllegalArgumentException("Refund amount exceeds escrow balance for this order");
+        }
+
         wallet.setBalance(wallet.getBalance().add(refundAmount));
         wallet.setLastUpdated(LocalDateTime.now());
         customerWalletRepository.save(wallet);
@@ -235,13 +245,7 @@ public class WalletService {
                 .build();
         customerWalletTransactionRepository.save(transaction);
 
-        BigDecimal totalRefunded = customerWalletTransactionRepository.sumAmountByOrderIdAndType(
-                lockedOrder.getId(),
-                CustomerWalletTransaction.TransactionType.CREDIT_REFUND
-        );
-        BigDecimal orderTotal = lockedOrder.getTotal() == null ? BigDecimal.ZERO : lockedOrder.getTotal().max(BigDecimal.ZERO);
-
-        if (orderTotal.compareTo(BigDecimal.ZERO) > 0 && totalRefunded.compareTo(orderTotal) >= 0) {
+        if (orderTotal.compareTo(BigDecimal.ZERO) > 0 && refundedAfter.compareTo(orderTotal) >= 0) {
             lockedOrder.setPaymentStatus(Order.PaymentStatus.REFUNDED);
         } else {
             lockedOrder.setPaymentStatus(Order.PaymentStatus.REFUND_PENDING);

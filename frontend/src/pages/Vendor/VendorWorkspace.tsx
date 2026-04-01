@@ -10,6 +10,7 @@ import VendorSettings from './VendorSettings';
 import VendorStorefront from './VendorStorefront';
 import VendorPromotions from './VendorPromotions';
 import VendorReviews from './VendorReviews';
+import VendorReturnDashboard from './VendorReturnDashboard';
 import VendorLayout from './VendorLayout';
 import { AdminShellContext, type AdminShellState } from '../Admin/AdminShellContext';
 import PageFallback from '../../components/Transitions/PageFallback';
@@ -110,6 +111,7 @@ const VendorWorkspace = () => {
               <Route path="dashboard" element={<VendorDashboard />} />
               <Route path="orders" element={<VendorOrders />} />
               <Route path="orders/:id" element={<VendorOrderDetail />} />
+              <Route path="returns" element={<VendorReturnDashboard />} />
               <Route path="products" element={<VendorProducts />} />
               <Route path="storefront" element={<VendorStorefront />} />
               <Route path="promotions" element={<VendorPromotions />} />

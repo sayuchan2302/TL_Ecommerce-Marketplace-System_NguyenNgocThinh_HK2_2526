@@ -363,7 +363,7 @@ class OrderServiceTest {
         private UUID lastDebitedOrderId;
 
         private RecordingWalletService() {
-            super(null, null, null, null);
+            super(null, null, null, null, null, null);
         }
 
         @Override

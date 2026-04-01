@@ -279,6 +279,26 @@ public class MarketplaceSeeder implements ApplicationRunner {
                     users
                 RESTART IDENTITY CASCADE
                 """);
+        jdbcTemplate.execute("""
+                ALTER TABLE return_requests
+                DROP CONSTRAINT IF EXISTS return_requests_status_check
+                """);
+        jdbcTemplate.execute("""
+                ALTER TABLE return_requests
+                ADD CONSTRAINT return_requests_status_check
+                CHECK (
+                    status IN (
+                        'PENDING_VENDOR',
+                        'ACCEPTED',
+                        'SHIPPING',
+                        'RECEIVED',
+                        'COMPLETED',
+                        'REJECTED',
+                        'DISPUTED',
+                        'CANCELLED'
+                    )
+                )
+                """);
         log.info("Da xoa toan bo du lieu cu truoc khi seed.");
     }
 

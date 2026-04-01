@@ -22,12 +22,12 @@ import { toDisplayOrderCode, toDisplayReturnCode } from '../../utils/displayCode
 
 const statusConfig: Record<ReturnStatus, { label: string; pillClass: string }> = {
   PENDING_VENDOR: { label: 'Chờ vendor xử lý', pillClass: 'admin-pill pending' },
-  ACCEPTED: { label: 'Đã chấp nhận', pillClass: 'admin-pill info' },
-  SHIPPING: { label: 'Đang hoàn gửi', pillClass: 'admin-pill info' },
+  ACCEPTED: { label: 'Đã chấp nhận', pillClass: 'admin-pill neutral' },
+  SHIPPING: { label: 'Đang hoàn gửi', pillClass: 'admin-pill neutral' },
   RECEIVED: { label: 'Vendor đang kiểm', pillClass: 'admin-pill warning' },
   COMPLETED: { label: 'Đã hoàn tiền', pillClass: 'admin-pill success' },
-  REJECTED: { label: 'Từ chối', pillClass: 'admin-pill danger' },
-  DISPUTED: { label: 'Tranh chấp', pillClass: 'admin-pill danger' },
+  REJECTED: { label: 'Từ chối', pillClass: 'admin-pill error' },
+  DISPUTED: { label: 'Tranh chấp', pillClass: 'admin-pill error' },
   CANCELLED: { label: 'Đã hủy', pillClass: 'admin-pill neutral' },
 };
 
@@ -277,7 +277,7 @@ const AdminReturns = () => {
                 onChange={setSearch}
               />
               {tabCounts.disputed > 0 && (
-                <span className="admin-pill danger">
+                <span className="admin-pill error">
                   <ShieldAlert size={14} />
                   {tabCounts.disputed} tranh chấp chờ phán quyết
                 </span>

@@ -970,6 +970,26 @@
     minmax(138px, 0.95fr);
 }
 
+.admin-table-row.vendor-returns {
+  grid-template-columns:
+    minmax(144px, 1.05fr)
+    minmax(138px, 1fr)
+    minmax(188px, 1.45fr)
+    minmax(176px, 1.3fr)
+    minmax(122px, 0.9fr)
+    minmax(110px, 0.82fr)
+    minmax(140px, 0.95fr);
+}
+
+.admin-table-row.vendor-returns .vendor-return-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  justify-self: end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .admin-table-row.vendor-orders .admin-actions.vendor-order-actions {
   display: grid;
   grid-template-columns: repeat(3, 32px);
@@ -1418,6 +1438,17 @@
       minmax(128px, 0.9fr);
   }
 
+  .admin-table-row.vendor-returns {
+    grid-template-columns:
+      minmax(132px, 1.02fr)
+      minmax(128px, 0.98fr)
+      minmax(170px, 1.3fr)
+      minmax(152px, 1.15fr)
+      minmax(112px, 0.86fr)
+      minmax(102px, 0.8fr)
+      minmax(128px, 0.9fr);
+  }
+
   .admin-table-row.vendor-promotions {
     grid-template-columns:
       40px
@@ -1476,6 +1507,10 @@
 
   .admin-table-row.vendor-orders {
     min-width: 1260px;
+  }
+
+  .admin-table-row.vendor-returns {
+    min-width: 1120px;
   }
 
   .admin-table-row.vendor-promotions {
