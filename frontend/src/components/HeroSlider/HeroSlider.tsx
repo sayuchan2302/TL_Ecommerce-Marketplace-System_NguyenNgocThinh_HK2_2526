@@ -1,43 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ShieldCheck, Store } from 'lucide-react';
 import './HeroSlider.css';
 
 const slides = [
   {
-    title: 'BỘ SƯU TẬP HÈ 2026',
-    subtitle: 'Chất liệu mát, form fit tự tin ra phố',
+    title: 'SIÊU SALE ĐA CỬA HÀNG',
+    subtitle: 'Hàng chính hãng từ hàng nghìn vendor đã xác thực',
     image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?q=80&w=1920&auto=format&fit=crop',
-    cta: 'Khám phá ngay',
+    cta: 'Khám phá sản phẩm',
+    ctaLink: '/search?scope=products',
   },
   {
-    title: 'POLO COOLMAX SIÊU THOÁNG',
-    subtitle: 'Khử mùi, thấm hút tốt, 10 phối màu mới',
-    image: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=1920&auto=format&fit=crop',
-    cta: 'Mua polo',
+    title: 'Mua sắm an toàn, Platform bảo vệ 100%',
+    subtitle: 'Thanh toán giữ tại sàn (escrow) cho đến khi đơn giao thành công',
+    image: 'https://images.unsplash.com/photo-1556740749-887f6717d7e4?q=80&w=1920&auto=format&fit=crop',
+    cta: 'Xem cam kết sàn',
+    ctaLink: '/policy/bao-mat',
+    icon: <ShieldCheck size={20} strokeWidth={1.8} />,
   },
   {
-    title: 'QUẦN ACTIVE SERIES',
-    subtitle: 'Co giãn 4 chiều, nhẹ và khô nhanh',
-    image: 'https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?q=80&w=1920&auto=format&fit=crop',
-    cta: 'Thử ngay',
-  },
-  {
-    title: 'SUMMER ESSENTIALS',
-    subtitle: 'Tối giản, nhẹ nhàng, phối nhanh mọi dịp',
-    image: 'https://images.unsplash.com/photo-1500522144261-ea64433bbe27?q=80&w=1920&auto=format&fit=crop',
-    cta: 'Xem lookbook',
-  },
-  {
-    title: 'COLLECTION DENIM',
-    subtitle: 'Form slim, wash đẹp, bền màu lâu dài',
-    image: 'https://images.unsplash.com/photo-1487222477894-8943e31ef7b2?q=80&w=1920&auto=format&fit=crop',
-    cta: 'Mua denim',
+    title: 'Trở thành đối tác Marketplace',
+    subtitle: 'Tiếp cận 5 triệu khách hàng và hệ thống vận hành chuẩn sàn',
+    image: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=1920&auto=format&fit=crop',
+    cta: 'Đăng ký bán hàng',
+    ctaLink: '/vendor/register',
+    icon: <Store size={20} strokeWidth={1.8} />,
   },
 ];
 
 const AUTO_DELAY = 5500;
 
 const HeroSlider = () => {
+  const navigate = useNavigate();
   const loopSlides = [slides[slides.length - 1], ...slides, slides[0]];
   const [position, setPosition] = useState(1); // index in loopSlides (offset by 1)
   const [isTransitioning, setIsTransitioning] = useState(true);
@@ -196,7 +192,17 @@ const HeroSlider = () => {
             <div className="hero-content">
               <h1 className="hero-title">{slide.title}</h1>
               <p className="hero-subtitle">{slide.subtitle}</p>
-              <button className="hero-btn">{slide.cta}</button>
+              {slide.icon && <div className="hero-slide-icon">{slide.icon}</div>}
+              <button
+                className="hero-btn"
+                onClick={() => {
+                  if (slide.ctaLink) {
+                    navigate(slide.ctaLink);
+                  }
+                }}
+              >
+                {slide.cta}
+              </button>
             </div>
           </div>
         ))}

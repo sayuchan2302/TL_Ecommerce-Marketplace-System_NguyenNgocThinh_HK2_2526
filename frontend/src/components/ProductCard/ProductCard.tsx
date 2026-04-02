@@ -198,40 +198,36 @@ const ProductCard = ({ id, sku, name, price, originalPrice, image, badge, colors
            <h3 className="product-name">{name}</h3>
          </Link>
          
-         {/* Store Attribution */}
-         {(storeName || storeId) && (
-           <div className="product-store-attribution">
-             {isOfficialStore ? (
-               <motion.div 
-                 className="store-badge-official"
-                 whileHover={{ scale: 1.02 }}
-                 title="Cửa hàng chính hãng"
-               >
-                 <BadgeCheck size={12} strokeWidth={2.5} />
-                 <span>{storeName || 'Chính hãng'}</span>
-               </motion.div>
-             ) : hasStoreSlug ? (
-               <Link
-                 to={`/store/${storeSlug}`}
-                 className="store-link"
-                 onClick={(e) => e.stopPropagation()}
-               >
-                 <Store size={12} />
-                 <span>{storeName || 'Người bán'}</span>
-               </Link>
-             ) : (
-               <span className="store-link is-disabled">
-                 <Store size={12} />
-                 <span>{storeName || 'Người bán'}</span>
-               </span>
-             )}
-           </div>
-         )}
-         
         <div className="product-prices">
           <span className="current-price">{price.toLocaleString('vi-VN')}đ</span>
           {originalPrice && <span className="original-price">{originalPrice.toLocaleString('vi-VN')}đ</span>}
         </div>
+
+        {(storeName || storeId) && (
+          <div className="product-store-attribution">
+            <Store size={12} />
+            <span className="store-prefix">Bán bởi:</span>
+            {hasStoreSlug ? (
+              <Link
+                to={`/store/${storeSlug}`}
+                className="store-link"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span>{storeName || 'Người bán'}</span>
+              </Link>
+            ) : (
+              <span className="store-link is-disabled">
+                <span>{storeName || 'Người bán'}</span>
+              </span>
+            )}
+            {isOfficialStore && (
+              <motion.span className="store-badge-official" whileHover={{ scale: 1.02 }} title="Cửa hàng chính hãng">
+                <BadgeCheck size={11} strokeWidth={2.3} />
+                Mall
+              </motion.span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Quick View Modal */}
@@ -268,7 +264,11 @@ function arePropsEqual(prev: ProductCardProps, next: ProductCardProps) {
     prev.badge === next.badge &&
     JSON.stringify(prev.colors) === JSON.stringify(next.colors) &&
     JSON.stringify(prev.sizes) === JSON.stringify(next.sizes) &&
-    prev.backendId === next.backendId
+    prev.backendId === next.backendId &&
+    prev.storeId === next.storeId &&
+    prev.storeName === next.storeName &&
+    prev.storeSlug === next.storeSlug &&
+    prev.isOfficialStore === next.isOfficialStore
   );
 }
 

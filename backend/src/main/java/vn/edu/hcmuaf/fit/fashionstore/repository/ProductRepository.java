@@ -113,6 +113,58 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
             "LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     Page<Product> searchProducts(String keyword, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"category", "images", "variants"})
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
+              AND p.storeId IS NOT NULL
+              AND p.storeId IN (
+                  SELECT s.id FROM Store s
+                  WHERE s.approvalStatus = 'APPROVED'
+                    AND s.status = 'ACTIVE'
+              )
+            """)
+    Page<Product> findPublicMarketplaceProducts(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "images", "variants"})
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
+              AND COALESCE(p.isFeatured, false) = true
+              AND p.storeId IS NOT NULL
+              AND p.storeId IN (
+                  SELECT s.id FROM Store s
+                  WHERE s.approvalStatus = 'APPROVED'
+                    AND s.status = 'ACTIVE'
+              )
+            """)
+    Page<Product> findPublicFeaturedMarketplaceProducts(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "images", "variants"})
+    @Query("""
+            SELECT DISTINCT p FROM Product p
+            WHERE p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
+              AND p.storeId IS NOT NULL
+              AND p.storeId IN (
+                  SELECT s.id FROM Store s
+                  WHERE s.approvalStatus = 'APPROVED'
+                    AND s.status = 'ACTIVE'
+              )
+              AND (
+                COALESCE(:keyword, '') = ''
+                OR LOWER(COALESCE(p.name, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(COALESCE(p.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(COALESCE(p.sku, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
+            """)
+    Page<Product> searchPublicMarketplaceProducts(
+            @Param("keyword") String keyword,
+            Pageable pageable
+    );
+
     @Query("SELECT p FROM Product p LEFT JOIN FETCH p.images LEFT JOIN FETCH p.variants WHERE p.id = :id")
     Optional<Product> findByIdWithDetails(UUID id);
 

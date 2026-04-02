@@ -223,20 +223,39 @@
   align-items: center;
 }
 
+.search-scope-wrap {
+  position: absolute;
+  left: 8px;
+  z-index: 2;
+}
+
+.search-scope {
+  appearance: none;
+  border: 1px solid var(--co-gray-300);
+  border-radius: 999px;
+  background: #f8fafc;
+  color: var(--co-black);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 26px 6px 12px;
+  cursor: pointer;
+  line-height: 1;
+}
+
 .search-icon {
   position: absolute;
-  left: 14px;
+  left: 102px;
   color: var(--co-gray-500);
 }
 
 .search-input {
   background-color: var(--co-white);
   border: 1px solid var(--co-gray-300);
-  padding: 10px 16px 10px 42px;
+  padding: 10px 16px 10px 130px;
   border-radius: var(--radius-full);
   color: var(--co-black);
   font-size: 14px;
-  width: 180px;
+  width: 230px;
   transition: width 0.2s ease, border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -246,14 +265,14 @@
 
 .search-input:focus {
   outline: none;
-  width: 220px;
+  width: 280px;
   border-color: var(--co-blue);
   box-shadow: 0 0 0 3px rgba(47, 90, 207, 0.1);
 }
 
 .search-input:focus-visible {
   outline: none;
-  width: 220px;
+  width: 280px;
   border-color: var(--co-blue);
   box-shadow: 0 0 0 3px rgba(47, 90, 207, 0.2);
 }
@@ -349,7 +368,7 @@
 .account-toggle {
   border: none;
   background: transparent;
-  padding: 6px 10px;
+  padding: 6px 12px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -364,25 +383,25 @@
 }
 
 .account-avatar {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--co-black);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
 }
 
 .account-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--co-black);
   white-space: nowrap;
-  max-width: 120px;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -395,13 +414,13 @@
   border: 1px solid var(--border-color);
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-  min-width: 160px;
+  min-width: 180px;
   padding: 0;
   z-index: 120;
   opacity: 0;
   visibility: hidden;
   transform: translateY(-8px);
-  transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .account-dropdown.show {
@@ -420,9 +439,9 @@
   background: none;
   border: none;
   text-align: left;
-  padding: 10px 14px;
+  padding: 10px 16px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--co-black);
   display: flex;
   align-items: center;
@@ -561,154 +580,6 @@
 .portal-quick-btn.super_admin:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
-}
-
-.account-menu {
-  position: relative;
-  display: inline-block;
-  flex-shrink: 0;
-}
-
-.account-toggle {
-  border: none;
-  background: transparent;
-  padding: 6px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background 0.2s;
-  white-space: nowrap;
-}
-
-.account-toggle:hover {
-  background: var(--bg-secondary);
-}
-
-.account-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--co-black);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.account-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--co-black);
-  white-space: nowrap;
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.account-menu {
-  position: relative;
-  display: inline-block;
-}
-
-.account-toggle {
-  border: none;
-  background: transparent;
-  padding: 6px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background 0.2s;
-}
-
-.account-toggle:hover {
-  background: var(--bg-secondary);
-}
-
-.account-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--co-black);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.account-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--co-black);
-}
-
-.account-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
-  background: var(--co-white);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-  min-width: 180px;
-  padding: 0;
-  z-index: 120;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-8px);
-  transition: all 0.2s ease;
-}
-
-.account-dropdown.show {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-.account-dropdown-divider {
-  height: 1px;
-  background: var(--border-color);
-  margin: 4px 0;
-}
-
-.account-item {
-  background: none;
-  border: none;
-  text-align: left;
-  padding: 10px 16px;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--co-black);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: background 0.15s;
-  width: 100%;
-}
-
-.account-item:hover {
-  background: var(--bg-secondary);
-}
-
-.account-item.admin-link {
-  color: var(--co-blue);
-  font-weight: 600;
-}
-
-.account-item.logout {
-  color: var(--co-red);
-}
-
-.account-item.logout:hover {
-  background: #fef2f2;
 }
 
 .auth-link {
@@ -853,6 +724,16 @@
     font-size: 14px;
   }
 
+  .mobile-search-scope {
+    border: 1px solid #d1d5db;
+    border-radius: 999px;
+    background: white;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--co-black);
+  }
+
   .mobile-search svg { color: var(--text-secondary); flex-shrink: 0; }
 
   /* Mobile Nav */
@@ -860,7 +741,7 @@
     display: flex;
     flex-direction: column;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 166px;
+    padding-bottom: 16px;
     margin-bottom: 16px;
   }
 

@@ -66,6 +66,18 @@
   color: rgba(255,255,255,0.9);
 }
 
+.hero-slide-icon {
+  margin: 0 auto 14px;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+
 .hero-btn {
   background-color: var(--co-white);
   color: var(--co-black);

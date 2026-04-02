@@ -204,23 +204,27 @@
 .product-store-attribution {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 4px;
+  margin-top: 7px;
   font-size: 12px;
+  min-height: 20px;
+  color: var(--co-gray-500);
+  flex-wrap: wrap;
 }
 
 .store-badge-official {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 3px;
+  padding: 2px 6px;
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(99, 102, 241, 0.12) 100%);
-  color: var(--co-blue-600);
+  color: var(--co-blue);
   border-radius: 6px;
   font-weight: 500;
-  font-size: 11px;
+  font-size: 10px;
   cursor: default;
   transition: all 0.2s ease;
+  margin-left: 4px;
 }
 
 .store-badge-official:hover {
@@ -231,15 +235,22 @@
 .store-link {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  color: var(--co-gray-500);
+  gap: 2px;
+  color: var(--co-blue-dark);
   text-decoration: none;
   font-size: 11px;
+  font-weight: 600;
   transition: color 0.2s ease;
 }
 
 .store-link:hover {
-  color: var(--co-blue-600);
+  color: var(--co-blue);
+  text-decoration: underline;
+}
+
+.store-prefix {
+  font-size: 11px;
+  color: var(--co-gray-500);
 }
 
 .store-link.is-disabled {

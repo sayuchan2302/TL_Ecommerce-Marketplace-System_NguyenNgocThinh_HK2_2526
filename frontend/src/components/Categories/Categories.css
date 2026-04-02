@@ -95,10 +95,111 @@
   text-align: center;
 }
 
+.featured-stores {
+  margin-top: var(--space-10);
+  padding: var(--space-6);
+  border: 1px solid var(--co-gray-200);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.featured-stores-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.featured-stores-head h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--co-black);
+}
+
+.featured-stores-head a {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--co-blue);
+  text-decoration: none;
+}
+
+.featured-stores-head a:hover {
+  text-decoration: underline;
+}
+
+.featured-stores-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.featured-store-card {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #e6ebff;
+  text-decoration: none;
+  color: inherit;
+  background: white;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.featured-store-card:hover {
+  border-color: #c7d6ff;
+  box-shadow: 0 8px 22px rgba(19, 43, 114, 0.08);
+  transform: translateY(-2px);
+}
+
+.featured-store-logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.featured-store-meta {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.featured-store-code {
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--co-gray-500);
+}
+
+.featured-store-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--co-black);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.featured-store-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #d97706;
+  font-weight: 600;
+}
+
 @media (max-width: 1024px) {
   .categories-grid {
     grid-template-columns: repeat(3, 1fr) !important;
     gap: var(--space-6) var(--space-4);
+  }
+
+  .featured-stores-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -118,5 +219,20 @@
   
   .tab-btn {
     padding: var(--space-2) var(--space-6);
+  }
+
+  .featured-stores {
+    margin-top: var(--space-8);
+    padding: var(--space-4);
+  }
+
+  .featured-stores-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .featured-stores-grid {
+    grid-template-columns: 1fr;
   }
 }

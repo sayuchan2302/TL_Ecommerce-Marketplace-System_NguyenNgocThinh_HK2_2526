@@ -30,7 +30,7 @@ const Footer = () => {
         </div>
 
         <div className="footer-column">
-          <h3 className="footer-title">CHÍNH SÁCH</h3>
+          <h3 className="footer-title">CHÍNH SÁCH MUA HÀNG</h3>
           <ul className="footer-links">
             <li><Link to="/policy/doi-tra">Chính sách đổi trả 60 ngày</Link></li>
             <li><Link to="/policy/khuyen-mai">Chính sách khuyến mãi</Link></li>
@@ -50,6 +50,24 @@ const Footer = () => {
             <li><Link to="/contact">Liên hệ</Link></li>
             <li><Link to="/size-guide">Bảng size</Link></li>
             <li><Link to="/faq">FAQ</Link></li>
+          </ul>
+        </div>
+
+        <div className="footer-column">
+          <h3 className="footer-title">KHU VỰC VENDOR</h3>
+          <ul className="footer-links">
+            <li><Link to="/vendor/register">Bán hàng ngay</Link></li>
+            <li><Link to="/policy/vendor">Chính sách Vendor</Link></li>
+            <li><Link to="/vendor/dashboard">Seller Help</Link></li>
+          </ul>
+        </div>
+
+        <div className="footer-column">
+          <h3 className="footer-title">CHÍNH SÁCH SÀN</h3>
+          <ul className="footer-links">
+            <li><Link to="/policy/marketplace-tos">Marketplace ToS</Link></li>
+            <li><Link to="/policy/san">Chính sách Sàn</Link></li>
+            <li><Link to="/policy/dispute">Giải quyết tranh chấp</Link></li>
           </ul>
         </div>
 

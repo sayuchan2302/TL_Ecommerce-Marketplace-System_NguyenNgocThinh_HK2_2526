@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SlidersHorizontal, ChevronRight, Clock, Trash2, X, Search as SearchIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -8,36 +8,80 @@ import EmptySearchState from '../../components/EmptySearchState/EmptySearchState
 import { searchService } from '../../services/searchService';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { useClientViewState } from '../../hooks/useClientViewState';
+import { marketplaceService, type MarketplaceStoreCard } from '../../services/marketplaceService';
+import type { Product } from '../../types';
 import './Search.css';
 
 const t = CLIENT_TEXT.search;
 
+type SearchScope = 'products' | 'stores';
+
 const Search = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
+  const scope: SearchScope = searchParams.get('scope') === 'stores' ? 'stores' : 'products';
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [productResults, setProductResults] = useState<Product[]>([]);
+  const [storeResults, setStoreResults] = useState<MarketplaceStoreCard[]>([]);
   const view = useClientViewState({ validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
 
   const history = searchService.getRecentSearches();
 
-  const searchResults = useMemo(() => {
-    if (!query) return [];
-    return searchService.search(query, 100);
-  }, [query]);
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchResults = async () => {
+      if (!query.trim()) {
+        setProductResults([]);
+        setStoreResults([]);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        if (scope === 'stores') {
+          const response = await marketplaceService.searchStores(query, 0, 60);
+          if (!cancelled) {
+            setStoreResults(response.items);
+            setProductResults([]);
+          }
+        } else {
+          const response = await marketplaceService.searchProducts(query, 0, 120);
+          if (!cancelled) {
+            setProductResults(response.items);
+            setStoreResults([]);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setProductResults([]);
+          setStoreResults([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSearching(false);
+        }
+      }
+    };
+
+    void fetchResults();
+    return () => {
+      cancelled = true;
+    };
+  }, [query, scope]);
 
   const filteredResults = useMemo(() => {
     if (!query) return [];
-    let results = [...searchResults];
+    let results = [...productResults];
 
     if (view.priceRanges.length > 0) {
-      results = results.filter(product => {
-        return view.priceRanges.some(range => {
-          if (range === 'under-200k') return product.price < 200000;
-          if (range === 'from-200k-500k') return product.price >= 200000 && product.price <= 500000;
-          if (range === 'over-500k') return product.price > 500000;
-          return false;
-        });
-      });
+      results = results.filter((product) => view.priceRanges.some((range) => {
+        if (range === 'under-200k') return product.price < 200000;
+        if (range === 'from-200k-500k') return product.price >= 200000 && product.price <= 500000;
+        if (range === 'over-500k') return product.price > 500000;
+        return false;
+      }));
     }
 
     if (view.colors.length > 0) {
@@ -47,15 +91,13 @@ const Search = () => {
         'Xám': '#9ca3af',
         'Xanh Navy': '#1e3a8a',
         'Đỏ': '#ef4444',
-        'Be': '#f5f5dc'
+        Be: '#f5f5dc',
       };
-      results = results.filter(product => {
-        return product.colors && product.colors.some(colorHex =>
-          view.colors.some(selectedColor =>
-            (colorMap[selectedColor] || '').toLowerCase() === colorHex.toLowerCase()
-          )
-        );
-      });
+
+      results = results.filter((product) => product.colors && product.colors.some((colorHex) =>
+        view.colors.some((selectedColor) =>
+          (colorMap[selectedColor] || '').toLowerCase() === colorHex.toLowerCase(),
+        )));
     }
 
     switch (view.sortKey) {
@@ -72,14 +114,12 @@ const Search = () => {
           return discountB - discountA;
         });
         break;
-      case 'newest':
-      case 'bestseller':
       default:
         break;
     }
 
     return results;
-  }, [query, searchResults, view.priceRanges, view.colors, view.sortKey]);
+  }, [query, productResults, view.priceRanges, view.colors, view.sortKey]);
 
   const clearHistory = () => {
     searchService.clearHistory();
@@ -93,8 +133,24 @@ const Search = () => {
 
   const handleKeywordClick = (keyword: string) => {
     searchService.addToHistory(keyword);
-    setSearchParams({ q: keyword });
+    const params = new URLSearchParams();
+    params.set('q', keyword);
+    params.set('scope', scope);
+    setSearchParams(params);
   };
+
+  const handleScopeChange = (nextScope: SearchScope) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('scope', nextScope);
+    if (query.trim()) {
+      params.set('q', query.trim());
+    }
+    setSearchParams(params);
+  };
+
+  const hasNoResults = scope === 'stores'
+    ? storeResults.length === 0
+    : filteredResults.length === 0 && productResults.length === 0;
 
   return (
     <div className="search-page">
@@ -130,7 +186,7 @@ const Search = () => {
                     </button>
                   </div>
                   <div className="search-history-list">
-                    {history.slice(0, 5).map(item => (
+                    {history.slice(0, 5).map((item) => (
                       <motion.div
                         key={item}
                         className="search-history-item"
@@ -186,76 +242,116 @@ const Search = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
-              {filteredResults.length === 0 && searchResults.length === 0 ? (
-                <EmptySearchState query={query} />
+              <div className="plp-header">
+                <h1 className="plp-title">
+                  {t.page.resultsFor(query)}
+                </h1>
+                <span className="plp-count">
+                  {scope === 'stores'
+                    ? `(${storeResults.length} cửa hàng)`
+                    : `(${t.page.productCount(filteredResults.length || productResults.length)})`}
+                </span>
+              </div>
+
+              <div className="search-scope-switch">
+                <button
+                  className={scope === 'products' ? 'active' : ''}
+                  onClick={() => handleScopeChange('products')}
+                >
+                  Sản phẩm
+                </button>
+                <button
+                  className={scope === 'stores' ? 'active' : ''}
+                  onClick={() => handleScopeChange('stores')}
+                >
+                  Cửa hàng
+                </button>
+              </div>
+
+              {isSearching ? (
+                <div className="search-loading-state">Đang tìm kiếm...</div>
+              ) : hasNoResults ? (
+                scope === 'products'
+                  ? <EmptySearchState query={query} />
+                  : (
+                    <div className="store-empty-state">
+                      <p>Không tìm thấy cửa hàng phù hợp cho "{query}".</p>
+                    </div>
+                  )
+              ) : scope === 'stores' ? (
+                <div className="store-results-grid">
+                  {storeResults.map((store) => (
+                    <Link key={store.id} to={`/store/${store.slug}`} className="store-result-card">
+                      <img src={store.logo} alt={store.name} className="store-result-logo" />
+                      <div className="store-result-meta">
+                        <div className="store-result-code">{store.storeCode}</div>
+                        <div className="store-result-name">{store.name}</div>
+                        <div className="store-result-sub">
+                          <span>★ {store.rating.toFixed(1)}</span>
+                          <span>{store.totalOrders} đơn</span>
+                          <span>{store.liveProductCount} sản phẩm</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               ) : (
-                <>
-                  <div className="plp-header">
-                    <h1 className="plp-title">
-                      {t.page.resultsFor(query)}
-                    </h1>
-                    <span className="plp-count">
-                      ({t.page.productCount(filteredResults.length || searchResults.length)})
-                    </span>
-                  </div>
+                <div className="plp-layout">
+                  <motion.button
+                    className="mobile-filter-btn"
+                    onClick={() => setIsMobileFilterOpen(true)}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <SlidersHorizontal size={18} aria-hidden="true" />
+                    {CLIENT_TEXT.filter.title}
+                  </motion.button>
 
-                  <div className="plp-layout">
-                    <motion.button
-                      className="mobile-filter-btn"
-                      onClick={() => setIsMobileFilterOpen(true)}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <SlidersHorizontal size={18} aria-hidden="true" />
-                      {CLIENT_TEXT.filter.title}
-                    </motion.button>
-
-                    <aside className={`plp-sidebar ${isMobileFilterOpen ? 'is-open' : ''}`}>
-                      <div className="mobile-filter-header">
-                        <h3>{CLIENT_TEXT.filter.title}</h3>
-                        <button
-                          className="close-filter-btn"
-                          onClick={() => setIsMobileFilterOpen(false)}
-                          aria-label="Đóng bộ lọc"
-                        >
-                          <X size={24} aria-hidden="true" />
-                        </button>
-                      </div>
-                      <div className="sidebar-content">
-                        <FilterSidebar
-                          selectedPriceRanges={view.priceRanges}
-                          selectedSizes={view.sizes}
-                          selectedColors={view.colors}
-                          onTogglePrice={(id) => view.togglePrice(id)}
-                          onToggleSize={(size) => view.toggleSize(size)}
-                          onToggleColor={(color) => view.toggleColor(color)}
-                          onReset={() => view.reset()}
-                        />
-                      </div>
-                    </aside>
-
-                    {isMobileFilterOpen && (
-                      <motion.div
-                        className="filter-overlay"
+                  <aside className={`plp-sidebar ${isMobileFilterOpen ? 'is-open' : ''}`}>
+                    <div className="mobile-filter-header">
+                      <h3>{CLIENT_TEXT.filter.title}</h3>
+                      <button
+                        className="close-filter-btn"
                         onClick={() => setIsMobileFilterOpen(false)}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
+                        aria-label="Đóng bộ lọc"
+                      >
+                        <X size={24} aria-hidden="true" />
+                      </button>
+                    </div>
+                    <div className="sidebar-content">
+                      <FilterSidebar
+                        selectedPriceRanges={view.priceRanges}
+                        selectedSizes={view.sizes}
+                        selectedColors={view.colors}
+                        onTogglePrice={(id) => view.togglePrice(id)}
+                        onToggleSize={(size) => view.toggleSize(size)}
+                        onToggleColor={(color) => view.toggleColor(color)}
+                        onReset={() => view.reset()}
                       />
-                    )}
+                    </div>
+                  </aside>
 
-                    <main className="plp-main">
-                      <ProductGrid
-                        customResults={filteredResults.length > 0 ? filteredResults : searchResults}
-                        viewState={{
-                          priceRanges: view.priceRanges,
-                          colors: view.colors,
-                          sortKey: view.sortKey,
-                          setSort: (value) => view.setSort(value),
-                        }}
-                      />
-                    </main>
-                  </div>
-                </>
+                  {isMobileFilterOpen && (
+                    <motion.div
+                      className="filter-overlay"
+                      onClick={() => setIsMobileFilterOpen(false)}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    />
+                  )}
+
+                  <main className="plp-main">
+                    <ProductGrid
+                      customResults={filteredResults.length > 0 ? filteredResults : productResults}
+                      viewState={{
+                        priceRanges: view.priceRanges,
+                        colors: view.colors,
+                        sortKey: view.sortKey,
+                        setSort: (value) => view.setSort(value),
+                      }}
+                    />
+                  </main>
+                </div>
               )}
             </motion.div>
           )}

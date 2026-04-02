@@ -142,3 +142,7 @@ input, button, textarea, select {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--co-gray-600); 
 }
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

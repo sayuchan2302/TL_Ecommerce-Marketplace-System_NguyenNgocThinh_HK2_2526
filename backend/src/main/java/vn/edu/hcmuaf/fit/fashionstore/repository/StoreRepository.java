@@ -1,6 +1,10 @@
 package vn.edu.hcmuaf.fit.fashionstore.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Store;
 
@@ -38,4 +42,25 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     List<Store> findByStatus(Store.StoreStatus status);
 
     List<Store> findByApprovalStatusAndStatus(Store.ApprovalStatus approvalStatus, Store.StoreStatus status);
+
+    @Query("""
+            SELECT s FROM Store s
+            WHERE s.approvalStatus = 'APPROVED'
+              AND s.status = 'ACTIVE'
+            ORDER BY COALESCE(s.rating, 0.0) DESC, COALESCE(s.totalOrders, 0) DESC, s.createdAt DESC
+            """)
+    List<Store> findTopPublicStores(Pageable pageable);
+
+    @Query("""
+            SELECT s FROM Store s
+            WHERE s.approvalStatus = 'APPROVED'
+              AND s.status = 'ACTIVE'
+              AND (
+                COALESCE(:keyword, '') = ''
+                OR LOWER(COALESCE(s.name, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(COALESCE(s.slug, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(COALESCE(s.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
+            """)
+    Page<Store> searchPublicStores(@Param("keyword") String keyword, Pageable pageable);
 }

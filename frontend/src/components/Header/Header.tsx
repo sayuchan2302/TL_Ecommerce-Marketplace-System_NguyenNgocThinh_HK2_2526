@@ -14,6 +14,8 @@ import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_TOAST_MESSAGES } from '../../utils/clientMessages';
 import './Header.css';
 
+type SearchScope = 'products' | 'stores';
+
 const Header = () => {
   const navigate = useNavigate();
   const { totalItems } = useCart();
@@ -28,6 +30,7 @@ const Header = () => {
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const { unreadCount } = useNotifications();
+  const [searchScope, setSearchScope] = useState<SearchScope>('products');
 
   const toggleMobileSubMenu = (menuId: string) => {
     setExpandedMobileMenu(prev => prev === menuId ? null : menuId);
@@ -50,11 +53,14 @@ const Header = () => {
     prevItemsRef.current = totalItems;
   }, [totalItems]);
 
-const handleSearchSubmit = (query: string) => {
+const handleSearchSubmit = (query: string, scope: SearchScope = searchScope) => {
     if (query.trim()) {
       searchService.addToHistory(query);
       setSearchValue(query);
-      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+      const params = new URLSearchParams();
+      params.set('q', query.trim());
+      params.set('scope', scope);
+      navigate(`/search?${params.toString()}`);
       setIsSearchDropdownOpen(false);
     }
   };
@@ -238,10 +244,22 @@ const handleSearchSubmit = (query: string) => {
         {/* Actions */}
         <div className="header-actions">
           <form className="search-box" onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(searchValue); }}>
+            <label className="search-scope-wrap" htmlFor="header-search-scope">
+              <select
+                id="header-search-scope"
+                className="search-scope"
+                value={searchScope}
+                onChange={(event) => setSearchScope(event.target.value as SearchScope)}
+                aria-label="Bộ lọc tìm kiếm"
+              >
+                <option value="products">Sản phẩm</option>
+                <option value="stores">Cửa hàng</option>
+              </select>
+            </label>
             <Search size={18} className="search-icon" />
             <input
               type="text"
-              placeholder={CLIENT_TEXT.search.dropdown.placeholder}
+              placeholder={searchScope === 'stores' ? 'Tìm tên cửa hàng...' : CLIENT_TEXT.search.dropdown.placeholder}
               className="search-input"
               value={searchValue}
               onChange={e => setSearchValue(e.target.value)}
@@ -376,9 +394,23 @@ const handleSearchSubmit = (query: string) => {
       {/* Mobile Drawer */}
       <div className={`mobile-drawer ${isMobileMenuOpen ? 'open' : ''}`}>
         {/* Mobile Search */}
-        <form className="mobile-search" onSubmit={(e) => { e.preventDefault(); if (searchValue.trim()) { navigate(`/search?q=${encodeURIComponent(searchValue.trim())}`); closeMobileMenu(); } }}>
+        <form className="mobile-search" onSubmit={(e) => { e.preventDefault(); if (searchValue.trim()) { handleSearchSubmit(searchValue); closeMobileMenu(); } }}>
+          <select
+            className="mobile-search-scope"
+            value={searchScope}
+            onChange={(event) => setSearchScope(event.target.value as SearchScope)}
+            aria-label="Bộ lọc tìm kiếm"
+          >
+            <option value="products">Sản phẩm</option>
+            <option value="stores">Cửa hàng</option>
+          </select>
           <Search size={18} />
-          <input type="text" placeholder="Tìm kiếm sản phẩm..." value={searchValue} onChange={e => setSearchValue(e.target.value)} />
+          <input
+            type="text"
+            placeholder={searchScope === 'stores' ? 'Tìm cửa hàng...' : 'Tìm kiếm sản phẩm...'}
+            value={searchValue}
+            onChange={e => setSearchValue(e.target.value)}
+          />
         </form>
 
         {/* Mobile Nav */}

@@ -1,27 +1,22 @@
 import './TrustBadges.css';
-import { Truck, RefreshCcw, HeadphonesIcon, ShieldCheck } from 'lucide-react';
+import { Truck, RefreshCcw, HeadphonesIcon } from 'lucide-react';
 
 const TrustBadges = () => {
   const badges = [
     {
       icon: <Truck size={32} strokeWidth={1.5} />,
-      title: "Vận chuyển nhanh chóng",
-      desc: "Miễn phí đơn từ 200k"
+      title: "Sàn bảo đảm thanh toán",
+      desc: "Tiền đơn hàng giữ tại escrow đến khi giao thành công"
     },
     {
       icon: <RefreshCcw size={32} strokeWidth={1.5} />,
-      title: "Đổi trả dễ dàng",
-      desc: "Trong vòng 60 ngày"
+      title: "Chính sách đổi trả sàn",
+      desc: "Sàn can thiệp hoàn tiền nếu vendor không xử lý đúng hạn"
     },
     {
       icon: <HeadphonesIcon size={32} strokeWidth={1.5} />,
-      title: "Hỗ trợ 24/7",
-      desc: "Luôn luôn lắng nghe"
-    },
-    {
-      icon: <ShieldCheck size={32} strokeWidth={1.5} />,
-      title: "Thanh toán an toàn",
-      desc: "Bảo mật tuyệt đối"
+      title: "Hỗ trợ sàn 24/7",
+      desc: "Đội ngũ marketplace hỗ trợ xuyên suốt mua bán"
     }
   ];
 
