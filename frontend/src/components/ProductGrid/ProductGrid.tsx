@@ -54,23 +54,21 @@ const ProductGrid = ({ customResults, viewState }: ProductGridProps) => {
   const filteredProducts = useMemo(() => {
     let results = customResults || catalog;
 
-    if (!customResults) {
-      if (view.priceRanges.length > 0) {
-        results = results.filter((product) => {
-          return view.priceRanges.some((range) => {
-            if (range === 'under-200k') return product.price < 200000;
-            if (range === 'from-200k-500k') return product.price >= 200000 && product.price <= 500000;
-            if (range === 'over-500k') return product.price > 500000;
-            return false;
-          });
+    if (view.priceRanges.length > 0) {
+      results = results.filter((product) => {
+        return view.priceRanges.some((range) => {
+          if (range === 'under-200k') return product.price < 200000;
+          if (range === 'from-200k-500k') return product.price >= 200000 && product.price <= 500000;
+          if (range === 'over-500k') return product.price > 500000;
+          return false;
         });
-      }
+      });
+    }
 
-      if (view.colors.length > 0) {
-        results = results.filter((product) => {
-          return product.colors && product.colors.some((colorHex) => view.colors.some((selectedColor) => selectedColor.toLowerCase() === colorHex.toLowerCase()));
-        });
-      }
+    if (view.colors.length > 0) {
+      results = results.filter((product) => {
+        return product.colors && product.colors.some((colorHex) => view.colors.some((selectedColor) => selectedColor.toLowerCase() === colorHex.toLowerCase()));
+      });
     }
 
     switch (view.sortKey) {

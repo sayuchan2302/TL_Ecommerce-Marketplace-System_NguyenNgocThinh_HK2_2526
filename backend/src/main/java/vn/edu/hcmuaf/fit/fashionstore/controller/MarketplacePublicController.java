@@ -31,10 +31,11 @@ public class MarketplacePublicController {
     @GetMapping("/search/products")
     public ResponseEntity<Page<MarketplaceProductCardResponse>> searchProducts(
             @RequestParam(name = "q", required = false) String keyword,
+            @RequestParam(name = "category", required = false) String categorySlug,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(marketplacePublicService.searchProducts(keyword, pageable));
+        return ResponseEntity.ok(marketplacePublicService.searchProducts(keyword, categorySlug, pageable));
     }
 
     @GetMapping("/search/stores")

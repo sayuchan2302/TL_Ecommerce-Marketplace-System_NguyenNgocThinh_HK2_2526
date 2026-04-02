@@ -165,6 +165,32 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
             Pageable pageable
     );
 
+    @EntityGraph(attributePaths = {"category", "images"})
+    @Query("""
+            SELECT DISTINCT p FROM Product p
+            LEFT JOIN p.category c
+            WHERE p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
+              AND p.storeId IS NOT NULL
+              AND p.storeId IN (
+                  SELECT s.id FROM Store s
+                  WHERE s.approvalStatus = 'APPROVED'
+                    AND s.status = 'ACTIVE'
+              )
+              AND c.id IN :categoryIds
+              AND (
+                COALESCE(:keyword, '') = ''
+                OR LOWER(COALESCE(p.name, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(COALESCE(p.description, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(COALESCE(p.sku, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
+            """)
+    Page<Product> searchPublicMarketplaceProductsByCategoryIds(
+            @Param("keyword") String keyword,
+            @Param("categoryIds") List<UUID> categoryIds,
+            Pageable pageable
+    );
+
     @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images WHERE p.id = :id")
     Optional<Product> findByIdWithDetails(UUID id);
 

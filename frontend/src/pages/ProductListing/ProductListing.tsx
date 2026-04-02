@@ -4,6 +4,8 @@ import { ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import FilterSidebar from '../../components/FilterSidebar/FilterSidebar';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
 import { useFilter } from '../../contexts/FilterContext';
+import { marketplaceService } from '../../services/marketplaceService';
+import type { Product } from '../../types';
 import './ProductListing.css';
 import { useClientViewState } from '../../hooks/useClientViewState';
 import { CLIENT_TEXT } from '../../utils/texts';
@@ -18,6 +20,7 @@ const PRICE_LABEL: Record<string, string> = {
 const ProductListing = () => {
   const { id } = useParams<{ id: string }>();
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [categoryProducts, setCategoryProducts] = useState<Product[]>([]);
   const { setFiltersState } = useFilter();
   const view = useClientViewState({
     validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'],
@@ -35,6 +38,45 @@ const ProductListing = () => {
 
   const dictionary = CLIENT_DICTIONARY.listing;
   const currentCategoryName = id && categoryNames[id] ? categoryNames[id] : dictionary.header.title;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCategoryProducts = async () => {
+      setCategoryProducts([]);
+      try {
+        const resolvedCategory = (id || '').trim();
+        const response = await marketplaceService.searchProducts(
+          '',
+          0,
+          160,
+          resolvedCategory && resolvedCategory !== 'all' && resolvedCategory !== 'sale' && resolvedCategory !== 'new'
+            ? resolvedCategory
+            : undefined,
+        );
+
+        const items = (response.items || []).filter((item) => {
+          if (resolvedCategory === 'sale') {
+            return typeof item.originalPrice === 'number' && item.originalPrice > item.price;
+          }
+          return true;
+        });
+
+        if (!cancelled) {
+          setCategoryProducts(items);
+        }
+      } catch {
+        if (!cancelled) {
+          setCategoryProducts([]);
+        }
+      }
+    };
+
+    void loadCategoryProducts();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   // Sync filters <-> URL query params for deep linking
   useEffect(() => {
@@ -152,6 +194,7 @@ const ProductListing = () => {
           {/* Right Column: Main Content */}
           <main className="plp-main">
             <ProductGrid
+              customResults={categoryProducts}
               viewState={{
                 priceRanges: view.priceRanges,
                 colors: view.colors,

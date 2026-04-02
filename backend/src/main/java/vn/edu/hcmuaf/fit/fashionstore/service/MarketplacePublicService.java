@@ -10,18 +10,23 @@ import org.springframework.transaction.annotation.Transactional;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.MarketplaceHomeResponse;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.MarketplaceProductCardResponse;
 import vn.edu.hcmuaf.fit.fashionstore.dto.response.MarketplaceStoreCardResponse;
+import vn.edu.hcmuaf.fit.fashionstore.entity.Category;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Product;
 import vn.edu.hcmuaf.fit.fashionstore.entity.ProductImage;
 import vn.edu.hcmuaf.fit.fashionstore.entity.ProductVariant;
 import vn.edu.hcmuaf.fit.fashionstore.entity.Store;
+import vn.edu.hcmuaf.fit.fashionstore.repository.CategoryRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.ProductRepository;
 import vn.edu.hcmuaf.fit.fashionstore.repository.StoreRepository;
 
 import java.math.BigDecimal;
+import java.util.ArrayDeque;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -41,10 +46,16 @@ public class MarketplacePublicService {
 
     private final ProductRepository productRepository;
     private final StoreRepository storeRepository;
+    private final CategoryRepository categoryRepository;
 
-    public MarketplacePublicService(ProductRepository productRepository, StoreRepository storeRepository) {
+    public MarketplacePublicService(
+            ProductRepository productRepository,
+            StoreRepository storeRepository,
+            CategoryRepository categoryRepository
+    ) {
         this.productRepository = productRepository;
         this.storeRepository = storeRepository;
+        this.categoryRepository = categoryRepository;
     }
 
     @Transactional(readOnly = true)
@@ -92,8 +103,30 @@ public class MarketplacePublicService {
 
     @Transactional(readOnly = true)
     public Page<MarketplaceProductCardResponse> searchProducts(String keyword, Pageable pageable) {
+        return searchProducts(keyword, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MarketplaceProductCardResponse> searchProducts(String keyword, String categorySlug, Pageable pageable) {
         Pageable resolved = resolveProductSearchPageable(pageable);
-        Page<Product> productPage = productRepository.searchPublicMarketplaceProducts(normalizeKeyword(keyword), resolved);
+        String normalizedKeyword = normalizeKeyword(keyword);
+        String normalizedCategorySlug = normalizeCategorySlug(categorySlug);
+
+        Page<Product> productPage;
+        if (!hasText(normalizedCategorySlug)) {
+            productPage = productRepository.searchPublicMarketplaceProducts(normalizedKeyword, resolved);
+        } else {
+            List<UUID> scopedCategoryIds = resolveCategoryScopeIds(normalizedCategorySlug);
+            if (scopedCategoryIds.isEmpty()) {
+                return new PageImpl<>(List.of(), resolved, 0);
+            }
+            productPage = productRepository.searchPublicMarketplaceProductsByCategoryIds(
+                    normalizedKeyword,
+                    scopedCategoryIds,
+                    resolved
+            );
+        }
+
         Map<UUID, Store> storesById = loadStoresByProductOwnership(productPage.getContent());
 
         List<MarketplaceProductCardResponse> rows = productPage.getContent().stream()
@@ -157,6 +190,53 @@ public class MarketplacePublicService {
         }
         String normalized = keyword.trim().toLowerCase(Locale.ROOT);
         return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String normalizeCategorySlug(String categorySlug) {
+        if (categorySlug == null) {
+            return null;
+        }
+        String normalized = categorySlug.trim().toLowerCase(Locale.ROOT);
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private List<UUID> resolveCategoryScopeIds(String categorySlug) {
+        Category root = categoryRepository.findBySlugIgnoreCase(categorySlug)
+                .orElse(null);
+        if (root == null || root.getId() == null) {
+            return List.of();
+        }
+
+        Map<UUID, List<UUID>> childIdsByParentId = new HashMap<>();
+        for (Category category : categoryRepository.findAll()) {
+            if (category == null || category.getId() == null) {
+                continue;
+            }
+            UUID parentId = category.getParent() != null ? category.getParent().getId() : null;
+            if (parentId == null) {
+                continue;
+            }
+            childIdsByParentId.computeIfAbsent(parentId, ignored -> new ArrayList<>())
+                    .add(category.getId());
+        }
+
+        LinkedHashSet<UUID> scopeIds = new LinkedHashSet<>();
+        Deque<UUID> stack = new ArrayDeque<>();
+        stack.push(root.getId());
+
+        while (!stack.isEmpty()) {
+            UUID current = stack.pop();
+            if (!scopeIds.add(current)) {
+                continue;
+            }
+            for (UUID childId : childIdsByParentId.getOrDefault(current, List.of())) {
+                if (childId != null) {
+                    stack.push(childId);
+                }
+            }
+        }
+
+        return new ArrayList<>(scopeIds);
     }
 
     private List<Product> buildDistinctInStockProductList(List<List<Product>> pools, int limit) {

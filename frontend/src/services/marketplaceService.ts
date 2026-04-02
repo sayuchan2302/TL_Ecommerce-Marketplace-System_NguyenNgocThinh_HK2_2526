@@ -321,11 +321,15 @@ export const marketplaceService = {
     }
   },
 
-  async searchProducts(query: string, page = 0, size = 20) {
+  async searchProducts(query: string, page = 0, size = 20, categorySlug?: string) {
     const params = new URLSearchParams();
     params.set('q', query);
     params.set('page', String(Math.max(page, 0)));
     params.set('size', String(Math.max(size, 1)));
+    const normalizedCategory = (categorySlug || '').trim();
+    if (normalizedCategory) {
+      params.set('category', normalizedCategory);
+    }
 
     const payload = await apiRequest<BackendPage<MarketplaceProductCardPayload>>(
       `/api/public/marketplace/search/products?${params.toString()}`,
