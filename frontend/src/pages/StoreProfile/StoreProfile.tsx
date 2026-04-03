@@ -32,7 +32,6 @@ const formatShortNumber = (value: number) => {
 };
 
 const getProductLink = (product: StoreProduct) => product.slug || product.sku || String(product.id);
-const PRODUCTS_BATCH_SIZE = 12;
 
 const buildLoginRedirectTarget = () => {
   if (typeof window === 'undefined') return '/login';
@@ -77,7 +76,6 @@ const StoreProfilePage = () => {
   const [followSubmitting, setFollowSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<StoreTab>('browse');
-  const [visibleProductsCount, setVisibleProductsCount] = useState(PRODUCTS_BATCH_SIZE);
   const [isTabPending, startTabTransition] = useTransition();
   const [visitedTabs, setVisitedTabs] = useState<Record<StoreTab, boolean>>({
     browse: true,
@@ -146,10 +144,6 @@ const StoreProfilePage = () => {
     };
   }, [slug]);
 
-  useEffect(() => {
-    setVisibleProductsCount(PRODUCTS_BATCH_SIZE);
-  }, [products.length, slug]);
-
   const handleToggleFollow = async () => {
     if (!store || followSubmitting) return;
 
@@ -198,18 +192,6 @@ const StoreProfilePage = () => {
     }
     return Array.from(groups.entries()).map(([name, rows]) => ({ name, rows }));
   }, [products]);
-
-  const visibleProducts = useMemo(
-    () => products.slice(0, visibleProductsCount),
-    [products, visibleProductsCount],
-  );
-  const hasMoreProducts = visibleProductsCount < products.length;
-
-  const handleLoadMoreProducts = () => {
-    startTabTransition(() => {
-      setVisibleProductsCount((prev) => Math.min(prev + PRODUCTS_BATCH_SIZE, products.length));
-    });
-  };
 
   const renderGrid = (rows: StoreProduct[]) => {
     if (rows.length === 0) {
@@ -408,23 +390,9 @@ const StoreProfilePage = () => {
               <div className="storefront-panel">
                 <div className="storefront-panel-head">
                   <h2>Tất cả sản phẩm</h2>
-                  <span>
-                    Hiển thị {Math.min(visibleProducts.length, products.length)}/{products.length}
-                  </span>
+                  <span>{products.length} sản phẩm</span>
                 </div>
-                {renderGrid(visibleProducts)}
-                {hasMoreProducts ? (
-                  <div className="storefront-load-more-wrap">
-                    <button
-                      type="button"
-                      className="storefront-load-more-btn"
-                      onClick={handleLoadMoreProducts}
-                      disabled={isTabPending}
-                    >
-                      {isTabPending ? 'Đang tải...' : 'Xem thêm sản phẩm'}
-                    </button>
-                  </div>
-                ) : null}
+                {renderGrid(products)}
               </div>
             </div>
           ) : null}
