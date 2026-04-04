@@ -65,6 +65,11 @@
   min-width: 220px;
 }
 
+.product-section-compact .slider-item {
+  min-width: 195px;
+  flex-basis: 195px;
+}
+
 /* Navigation Buttons */
 .slider-nav {
   position: absolute;
@@ -111,6 +116,7 @@
 @media (max-width: 600px) {
   .product-grid:not(.slider-view) { grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
   .slider-item { flex: 0 0 calc(50% - (var(--space-4) / 2)); min-width: 160px;}
+  .product-section-compact .slider-item { min-width: 155px; flex-basis: 155px; }
   .section-title { font-size: 1.5rem; }
   .slider-nav { width: 36px; height: 36px; }
   .slider-nav.prev-btn { left: -10px; }

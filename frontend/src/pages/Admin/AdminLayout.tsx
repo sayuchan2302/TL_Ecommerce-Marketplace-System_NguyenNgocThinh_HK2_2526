@@ -4,7 +4,7 @@ import { LayoutGrid, Search, Bell, Settings, ChevronRight, LogOut, Home } from '
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ADMIN_DICTIONARY } from './adminDictionary';
-import { authService } from '../../services/authService';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { adminPanelNav } from '../../config/panelNavigation';
 import { AdminShellContext } from './AdminShellContext';
@@ -57,17 +57,16 @@ const AdminLayout = ({
   const location = useLocation();
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { user: sessionUser, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const t = ADMIN_DICTIONARY.layout;
 
-  const sessionUser = authService.getSession()?.user || authService.getAdminSession()?.user;
   const displayName = sessionUser?.name?.trim() || t.adminName;
   const displayEmail = sessionUser?.email?.trim() || 'Chưa có email';
   const displayAvatar = sessionUser?.avatar || displayName.charAt(0).toUpperCase() || '?';
 
   const handleLogout = () => {
-    authService.logout();
-    authService.adminLogout();
+    logout();
     addToast('Đã đăng xuất', 'info');
     navigate('/');
   };

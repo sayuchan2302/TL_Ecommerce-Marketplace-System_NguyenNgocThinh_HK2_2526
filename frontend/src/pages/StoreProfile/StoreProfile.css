@@ -64,10 +64,11 @@
 }
 
 .storefront-summary {
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .storefront-summary-main {
@@ -245,9 +246,9 @@
 }
 
 .storefront-metric-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
   padding: 10px;
 }
 
@@ -296,9 +297,9 @@
 }
 
 .storefront-tab-active {
-  background: #2563eb;
-  border-color: #1d4ed8;
-  color: #fff;
+  background: var(--co-blue);
+  border-color: var(--co-blue-dark);
+  color: var(--co-white);
 }
 
 .storefront-tab.storefront-tab-active:hover {
@@ -328,12 +329,41 @@
   gap: 14px;
 }
 
-.storefront-panel {
+.storefront-category-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.storefront-category-item {
   border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  background: #fff;
-  padding: 14px;
-  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.storefront-category-name {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.storefront-category-count {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.storefront-panel {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-primary);
+  padding: 24px;
+  box-shadow: var(--shadow-sm);
 }
 
 .storefront-panel > h2 {
@@ -476,9 +506,8 @@
 }
 
 .storefront-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  /* Inherits .product-grid from global namespace */
+  margin-top: var(--space-4);
 }
 
 .storefront-card {
@@ -611,7 +640,7 @@
 
 @media (max-width: 1200px) {
   .storefront-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   }
 }
 
@@ -626,6 +655,10 @@
 
   .storefront-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .storefront-category-list {
+    grid-template-columns: 1fr;
   }
 
   .storefront-campaign-content h3 {
@@ -671,6 +704,6 @@
   }
 
   .storefront-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

@@ -1,6 +1,6 @@
 import { useRef, useState, memo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Heart, Eye, Store } from 'lucide-react';
+import { Plus, Heart, Eye, Store, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useCartAnimation } from '../../context/CartAnimationContext';
 import { useWishlist } from '../../contexts/WishlistContext';
@@ -26,6 +26,17 @@ interface ProductCardProps {
   storeSlug?: string;
   isOfficialStore?: boolean;
   staticMode?: boolean;
+  onQuickAdd?: (item: {
+    id: string | number;
+    backendId?: string;
+    name: string;
+    price: number;
+    originalPrice?: number;
+    image: string;
+    storeId?: string;
+    storeName?: string;
+    isOfficialStore?: boolean;
+  }) => void;
 }
 
 const DEFAULT_SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL'];
@@ -216,7 +227,6 @@ const ProductCardInteractive = ({ id, sku, name, price, originalPrice, image, ba
         {(storeName || storeId) && (
           <div className="product-store-attribution">
             <Store size={12} />
-            <span className="store-prefix">Bán bởi:</span>
             {hasStoreSlug ? (
               <Link
                 to={`/store/${storeSlug}`}
@@ -259,16 +269,32 @@ const ProductCardInteractive = ({ id, sku, name, price, originalPrice, image, ba
   );
 };
 
-const ProductCardDisplay = ({ id, name, price, originalPrice, image, badge, storeId, storeName, storeSlug }: ProductCardProps) => {
+const ProductCardDisplay = ({
+  id,
+  name,
+  price,
+  originalPrice,
+  image,
+  badge,
+  backendId,
+  storeId,
+  storeName,
+  storeSlug,
+  isOfficialStore,
+  onQuickAdd,
+}: ProductCardProps) => {
   const productRouteKey = String(id);
   const discount = originalPrice ? Math.round((1 - price / originalPrice) * 100) : 0;
   const hasStoreSlug = isCanonicalStoreSlug(storeSlug);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const { triggerAnimation } = useCartAnimation();
 
   return (
     <div className="product-card">
       <div className="product-image-container">
         <Link to={`/product/${productRouteKey}`}>
           <img
+            ref={imageRef}
             src={image}
             alt={name}
             className="product-image"
@@ -279,6 +305,36 @@ const ProductCardDisplay = ({ id, name, price, originalPrice, image, badge, stor
           {badge && <span className={`product-badge ${badge === 'SALE' ? 'badge-sale' : ''}`}>{badge}</span>}
           {!badge && discount > 0 ? <span className="product-badge badge-sale">-{discount}%</span> : null}
         </Link>
+        {onQuickAdd ? (
+          <button
+            type="button"
+            className="product-static-quick-add"
+            title="Thêm vào giỏ"
+            aria-label="Thêm vào giỏ"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              triggerAnimation({
+                imgSrc: image,
+                imageRect: imageRef.current?.getBoundingClientRect() || null,
+                fallbackPoint: { x: e.clientX, y: e.clientY },
+              });
+              onQuickAdd({
+                id,
+                backendId,
+                name,
+                price,
+                originalPrice,
+                image,
+                storeId,
+                storeName,
+                isOfficialStore,
+              });
+            }}
+          >
+            <ShoppingBag size={15} strokeWidth={2.5} />
+          </button>
+        ) : null}
       </div>
 
       <div className="product-info">
@@ -294,7 +350,6 @@ const ProductCardDisplay = ({ id, name, price, originalPrice, image, badge, stor
         {(storeName || storeId) ? (
           <div className="product-store-attribution">
             <Store size={12} />
-            <span className="store-prefix">Bán bởi:</span>
             {hasStoreSlug ? (
               <Link
                 to={`/store/${storeSlug}`}
@@ -338,7 +393,8 @@ function arePropsEqual(prev: ProductCardProps, next: ProductCardProps) {
     prev.storeName === next.storeName &&
     prev.storeSlug === next.storeSlug &&
     prev.isOfficialStore === next.isOfficialStore &&
-    prev.staticMode === next.staticMode
+    prev.staticMode === next.staticMode &&
+    prev.onQuickAdd === next.onQuickAdd
   );
 }
 

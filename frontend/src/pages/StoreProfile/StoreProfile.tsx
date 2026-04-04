@@ -6,7 +6,9 @@ import { couponService, type Coupon } from '../../services/couponService';
 import { reviewService, type Review } from '../../services/reviewService';
 import { storeFollowService } from '../../services/storeFollowService';
 import { hasBackendJwt } from '../../services/apiClient';
+import { useCart } from '../../contexts/CartContext';
 import ProductCard from '../../components/ProductCard/ProductCard';
+import '../../components/ProductSection/ProductSection.css';
 import './StoreProfile.css';
 
 type StoreTab = 'browse' | 'products' | 'categories' | 'reviews';
@@ -39,31 +41,32 @@ const buildLoginRedirectTarget = () => {
   return `/login?reason=${encodeURIComponent('auth-required')}&redirect=${encodeURIComponent(current)}`;
 };
 
-interface ProductCardProps {
+interface StoreProductCardProps {
   product: StoreProduct;
   storeName: string;
+  onQuickAdd?: (item: any) => void;
 }
 
-const StoreProductCard = ({ product, storeName }: ProductCardProps) => {
-  return (
-    <ProductCard
-      staticMode
-      id={getProductLink(product)}
-      sku={product.sku}
-      name={product.name}
-      price={product.price}
-      originalPrice={product.originalPrice}
-      image={product.image}
-      badge={product.badge}
-      colors={product.colors}
-      sizes={product.sizes}
-      storeId={product.storeId}
-      storeName={product.storeName || storeName}
-      storeSlug={product.storeSlug}
-      isOfficialStore={product.isOfficialStore}
-    />
-  );
-};
+const StoreProductCard = ({ product, storeName, onQuickAdd }: StoreProductCardProps) => (
+  <ProductCard
+    staticMode
+    id={getProductLink(product)}
+    sku={product.sku}
+    name={product.name}
+    price={product.price}
+    originalPrice={product.originalPrice}
+    image={product.image}
+    badge={product.badge}
+    colors={product.colors}
+    sizes={product.sizes}
+    backendId={String(product.id)}
+    storeId={product.storeId}
+    storeName={product.storeName || storeName}
+    storeSlug={product.storeSlug}
+    isOfficialStore={product.isOfficialStore}
+    onQuickAdd={onQuickAdd}
+  />
+);
 
 const StoreProfilePage = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -144,6 +147,25 @@ const StoreProfilePage = () => {
     };
   }, [slug]);
 
+  const { addToCart } = useCart();
+
+  const handleQuickAdd = (item: any) => {
+    addToCart({
+      id: String(item.id),
+      backendProductId: item.backendId,
+      backendVariantId: undefined,
+      name: item.name,
+      price: item.price,
+      originalPrice: item.originalPrice,
+      image: item.image,
+      color: 'Mặc định',
+      size: 'F',
+      storeId: item.storeId || 'default-store',
+      storeName: item.storeName || 'Cửa hàng',
+      isOfficialStore: item.isOfficialStore || false,
+    });
+  };
+
   const handleToggleFollow = async () => {
     if (!store || followSubmitting) return;
 
@@ -198,9 +220,14 @@ const StoreProfilePage = () => {
       return <p className="storefront-empty">Hiện chưa có sản phẩm công khai.</p>;
     }
     return (
-      <div className="storefront-grid">
+      <div className="product-grid storefront-grid">
         {rows.map((product) => (
-          <StoreProductCard key={`${product.id}-${product.sku}`} product={product} storeName={store?.name || ''} />
+          <StoreProductCard 
+            key={`${product.id}-${product.sku}`} 
+            product={product} 
+            storeName={store?.name || ''} 
+            onQuickAdd={handleQuickAdd}
+          />
         ))}
       </div>
     );
@@ -399,16 +426,23 @@ const StoreProfilePage = () => {
 
           {visitedTabs.categories ? (
             <div className={`storefront-tab-panel ${activeTab === 'categories' ? 'is-active' : ''}`} hidden={activeTab !== 'categories'}>
-              <div className="storefront-stack">
-                {groupedByCategory.map((group) => (
-                  <div key={group.name} className="storefront-panel">
-                    <div className="storefront-panel-head">
-                      <h2>{group.name}</h2>
-                      <span>{group.rows.length} sản phẩm</span>
-                    </div>
-                    {renderGrid(group.rows.slice(0, 8))}
+              <div className="storefront-panel">
+                <div className="storefront-panel-head">
+                  <h2>Danh mục của cửa hàng</h2>
+                  <span>{groupedByCategory.length} danh mục</span>
+                </div>
+                {groupedByCategory.length === 0 ? (
+                  <p className="storefront-empty">Hiện chưa có danh mục có sản phẩm.</p>
+                ) : (
+                  <div className="storefront-category-list">
+                    {groupedByCategory.map((group) => (
+                      <div key={group.name} className="storefront-category-item">
+                        <p className="storefront-category-name">{group.name}</p>
+                        <span className="storefront-category-count">{group.rows.length} sản phẩm</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </div>
           ) : null}

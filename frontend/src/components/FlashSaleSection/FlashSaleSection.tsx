@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShoppingBag, ChevronLeft, ChevronRight, Store } from 'lucide-react';
+import { useCartAnimation } from '../../context/CartAnimationContext';
 import './FlashSaleSection.css';
 
 export interface FlashSaleItem {
@@ -50,6 +51,8 @@ const FlashSaleSection = ({
 }: FlashSaleSectionProps) => {
   const [remainingSeconds, setRemainingSeconds] = useState(getRemainingSecondsToEndOfDay());
   const sliderRef = useRef<HTMLDivElement>(null);
+  const imageRefs = useRef<Record<string, HTMLImageElement | null>>({});
+  const { triggerAnimation } = useCartAnimation();
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -113,6 +116,9 @@ const FlashSaleSection = ({
                   <Link to={`/product/${item.id}`} className="flash-card-image-link" style={{ display: 'block' }}>
                     {item.image ? (
                       <img
+                        ref={(node) => {
+                          imageRefs.current[String(item.id)] = node;
+                        }}
                         src={item.image}
                         alt={item.name}
                         className="flash-card-image"
@@ -141,7 +147,14 @@ const FlashSaleSection = ({
                     type="button"
                     className="flash-card-quick-add"
                     title={'Th\u00eam v\u00e0o gi\u1ecf'}
-                    onClick={() => onQuickAdd?.(item)}
+                    onClick={(e) => {
+                      triggerAnimation({
+                        imgSrc: item.image,
+                        imageRect: imageRefs.current[String(item.id)]?.getBoundingClientRect() || null,
+                        fallbackPoint: { x: e.clientX, y: e.clientY },
+                      });
+                      onQuickAdd?.(item);
+                    }}
                   >
                     <ShoppingBag size={15} strokeWidth={2.5} />
                   </button>

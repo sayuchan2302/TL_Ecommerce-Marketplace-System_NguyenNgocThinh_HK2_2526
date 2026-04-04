@@ -25,9 +25,29 @@ interface ProductSectionProps {
   title: string;
   products: ProductSectionItem[];
   viewAllLink?: string;
+  staticCards?: boolean;
+  onQuickAdd?: (item: {
+    id: number | string;
+    backendId?: string;
+    name: string;
+    price: number;
+    originalPrice?: number;
+    image: string;
+    storeId?: string;
+    storeName?: string;
+    isOfficialStore?: boolean;
+  }) => void;
+  className?: string;
 }
 
-const ProductSection = ({ title, products, viewAllLink = '/search?scope=products' }: ProductSectionProps) => {
+const ProductSection = ({
+  title,
+  products,
+  viewAllLink = '/search?scope=products',
+  staticCards = false,
+  onQuickAdd,
+  className = '',
+}: ProductSectionProps) => {
   const sliderRef = useRef<HTMLDivElement>(null);
 
   const scrollLeft = () => {
@@ -43,7 +63,7 @@ const ProductSection = ({ title, products, viewAllLink = '/search?scope=products
   };
 
   return (
-    <section className="product-section container">
+    <section className={`product-section container ${staticCards ? 'product-section-compact' : ''} ${className}`}>
       <div className="section-header">
         <h2 className="section-title">{title}</h2>
         <Link to={viewAllLink} className="view-all-link">{'Xem t\u1ea5t c\u1ea3'}</Link>
@@ -57,7 +77,7 @@ const ProductSection = ({ title, products, viewAllLink = '/search?scope=products
         <div className="product-grid slider-view" ref={sliderRef}>
           {products.map((product) => (
             <div key={product.id} className="slider-item">
-              <ProductCard {...product} />
+              <ProductCard {...product} staticMode={staticCards} onQuickAdd={onQuickAdd} />
             </div>
           ))}
         </div>

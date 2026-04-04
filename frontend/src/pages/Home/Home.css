@@ -13,6 +13,10 @@
   margin-top: var(--space-12);
 }
 
+.product-section.product-section-no-pt {
+  padding-top: 0 !important;
+}
+
 /* Keep Home section headings visually consistent across blocks */
 .home-page .product-section .section-title {
   font-size: 1.5rem;

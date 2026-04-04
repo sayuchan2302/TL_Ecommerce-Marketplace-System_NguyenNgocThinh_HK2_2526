@@ -244,18 +244,18 @@
 
 .search-icon {
   position: absolute;
-  left: 102px;
+  left: 112px;
   color: var(--co-gray-500);
 }
 
 .search-input {
   background-color: var(--co-white);
   border: 1px solid var(--co-gray-300);
-  padding: 10px 16px 10px 130px;
+  padding: 10px 16px 10px 144px;
   border-radius: var(--radius-full);
   color: var(--co-black);
   font-size: 14px;
-  width: 250px;
+  width: 285px;
   transition: width 0.2s ease, border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -265,14 +265,14 @@
 
 .search-input:focus {
   outline: none;
-  width: 300px;
+  width: 340px;
   border-color: var(--co-blue);
   box-shadow: 0 0 0 3px rgba(47, 90, 207, 0.1);
 }
 
 .search-input:focus-visible {
   outline: none;
-  width: 300px;
+  width: 340px;
   border-color: var(--co-blue);
   box-shadow: 0 0 0 3px rgba(47, 90, 207, 0.2);
 }
@@ -545,7 +545,7 @@
 }
 
 .portal-button.admin {
-  background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 
 /* Portal Quick Access Button */
@@ -573,13 +573,13 @@
 }
 
 .portal-quick-btn.super_admin {
-  background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   color: white;
 }
 
 .portal-quick-btn.super_admin:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.3);
 }
 
 .auth-link {

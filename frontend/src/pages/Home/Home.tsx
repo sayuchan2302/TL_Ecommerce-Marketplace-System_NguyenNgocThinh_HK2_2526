@@ -187,6 +187,32 @@ const Home = () => {
     });
   };
 
+  const handleQuickAddTrendingItem = (item: {
+    id: number | string;
+    backendId?: string;
+    name: string;
+    price: number;
+    originalPrice?: number;
+    image: string;
+    storeId?: string;
+    storeName?: string;
+    isOfficialStore?: boolean;
+  }) => {
+    addToCart({
+      id: item.id,
+      backendProductId: item.backendId,
+      name: item.name,
+      price: item.price,
+      originalPrice: item.originalPrice,
+      image: item.image,
+      color: 'Mặc định',
+      size: 'M',
+      storeId: item.storeId || 'default-store',
+      storeName: item.storeName || 'Cửa hàng',
+      isOfficialStore: Boolean(item.isOfficialStore),
+    });
+  };
+
   return (
     <div className="home-page">
       <main className="main-content">
@@ -200,10 +226,25 @@ const Home = () => {
                 <Skeleton key={i} type="circular" width={80} height={80} />
               ))}
             </div>
+            {/* Skeleton for Featured Products */}
             <div className="product-section-skeleton">
               <Skeleton type="text" width={240} height={28} />
               <div className="product-grid-skeleton">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="product-card-skeleton">
+                    <Skeleton type="rectangular" height={280} />
+                    <Skeleton type="text" width="80%" />
+                    <Skeleton type="text" width="40%" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Skeleton for Suggested Products */}
+            <div className="product-section-skeleton">
+              <Skeleton type="text" width={240} height={28} />
+              <div className="product-grid-skeleton">
+                {[1, 2, 3, 4].map((i) => (
                   <div key={i} className="product-card-skeleton">
                     <Skeleton type="rectangular" height={280} />
                     <Skeleton type="text" width="80%" />
@@ -266,13 +307,15 @@ const Home = () => {
               </section>
             </div>
 
-            <div className="home-section-gap">
+            <section className="home-section-gap">
               <ProductSection
-                title={'G\u1ee2I \u00dd H\u00d4M NAY'}
+                title={'GỢI Ý HÔM NAY'}
                 products={trendingProducts}
                 viewAllLink="/search?scope=products"
+                staticCards
+                onQuickAdd={handleQuickAddTrendingItem}
               />
-            </div>
+            </section>
           </>
         )}
       </main>
