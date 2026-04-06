@@ -1077,12 +1077,13 @@
 .admin-table-row.vendor-reviews {
   grid-template-columns:
     44px
+    minmax(210px, 1.6fr)
+    minmax(108px, 0.82fr)
     minmax(230px, 1.8fr)
+    minmax(150px, 1.1fr)
+    minmax(116px, 0.88fr)
     minmax(120px, 0.9fr)
-    minmax(250px, 2fr)
-    minmax(118px, 0.9fr)
-    minmax(122px, 0.95fr)
-    minmax(126px, 0.9fr);
+    minmax(118px, 0.86fr);
 }
 
 .admin-table-row.vendor-analytics-trend {
@@ -1827,12 +1828,13 @@
   .admin-table-row.vendor-reviews {
     grid-template-columns:
       40px
+      minmax(190px, 1.5fr)
+      minmax(104px, 0.82fr)
       minmax(200px, 1.6fr)
-      minmax(112px, 0.9fr)
-      minmax(220px, 1.8fr)
-      minmax(108px, 0.88fr)
-      minmax(116px, 0.92fr)
-      minmax(118px, 0.88fr);
+      minmax(140px, 1.04fr)
+      minmax(104px, 0.84fr)
+      minmax(110px, 0.86fr)
+      minmax(112px, 0.84fr);
   }
 
   .admin-table-row.vendor-order-items {
@@ -1894,7 +1896,7 @@
   }
 
   .admin-table-row.vendor-reviews {
-    min-width: 1180px;
+    min-width: 1280px;
   }
 
   .admin-table-row.vendor-order-items {
@@ -1924,5 +1926,408 @@
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid var(--co-gray-200);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VENDOR ANALYTICS - synced with vendor panel
+   ══════════════════════════════════════════════════════════════ */
+
+/* ─── Main Row ───────────────────────────────────────────── */
+
+.analytics-main-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.analytics-chart-section,
+.analytics-summary-section {
+  min-width: 0;
+}
+
+.analytics-panel {
+  background: white;
+  border: 1px solid var(--co-gray-200);
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+
+.analytics-panel:hover {
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  border-color: #cbd5e1;
+}
+
+.analytics-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.analytics-panel-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.analytics-muted {
+  font-size: 13px;
+  color: var(--co-gray-500);
+  font-weight: 600;
+}
+
+/* ─── Empty States ───────────────────────────────────────── */
+
+.analytics-empty-chart,
+.analytics-empty-products {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 20px;
+  text-align: center;
+}
+
+.analytics-empty-chart p,
+.analytics-empty-products p {
+  margin: 12px 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--co-admin-text);
+}
+
+.analytics-empty-icon {
+  color: var(--co-gray-300);
+}
+
+/* ─── Financial Summary ──────────────────────────────────── */
+
+.financial-summary-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.financial-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 14px;
+}
+
+.financial-label {
+  color: #475569;
+  font-weight: 600;
+}
+
+.financial-value {
+  font-weight: 700;
+  color: var(--co-admin-text);
+}
+
+.financial-value.negative { color: #d97706; }
+.financial-value.primary { color: var(--co-vendor-primary); font-size: 18px; }
+
+.financial-summary-row.deduction .financial-label {
+  color: var(--co-gray-500);
+}
+
+.financial-divider {
+  height: 1px;
+  background: var(--co-gray-200);
+  margin: 2px 0;
+}
+
+.financial-summary-row.total {
+  padding: 14px 0 10px;
+  border-top: 1px dashed #99f6e4;
+}
+
+.financial-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--co-gray-200);
+}
+
+.financial-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.financial-metric-label {
+  font-size: 12px;
+  color: var(--co-gray-500);
+  font-weight: 600;
+}
+
+.financial-metric-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--co-admin-text);
+}
+
+/* ─── Bottom Row ─────────────────────────────────────────── */
+
+.analytics-bottom-row {
+  margin-bottom: 14px;
+}
+
+.top-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.top-product-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fafbfc;
+  border-radius: 10px;
+  border: 1px solid var(--co-gray-200);
+  transition: box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.top-product-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  border-color: #cbd5e1;
+}
+
+.top-product-rank {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--co-gray-400);
+  flex-shrink: 0;
+  width: 28px;
+}
+
+.top-product-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.top-product-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--co-admin-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-product-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--co-gray-500);
+  font-weight: 600;
+}
+
+.top-product-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.top-product-stat.revenue {
+  color: var(--co-vendor-primary);
+  font-weight: 700;
+}
+
+.top-product-bar {
+  height: 4px;
+  background: var(--co-gray-200);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.top-product-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--co-vendor-primary), #34d399);
+  border-radius: 2px;
+  transition: width 0.5s ease;
+}
+
+.top-product-payout {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.top-product-payout-label {
+  font-size: 11px;
+  color: var(--co-gray-500);
+  font-weight: 600;
+}
+
+.top-product-payout-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--co-vendor-primary);
+}
+
+/* ─── Toggle Table ───────────────────────────────────────── */
+
+.analytics-toggle-table-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 10px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--co-vendor-primary);
+  cursor: pointer;
+  width: 100%;
+  transition: color 0.2s;
+}
+
+.analytics-toggle-table-btn:hover {
+  color: var(--co-vendor-primary-hover);
+}
+
+.analytics-toggle-chevron {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.analytics-toggle-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* ─── Custom Tooltip ─────────────────────────────────────── */
+
+.analytics-tooltip {
+  background: #0f172a;
+  color: white;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.analytics-tooltip-date {
+  font-weight: 700;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #334155;
+}
+
+.analytics-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.analytics-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.analytics-tooltip-label {
+  color: #94a3b8;
+  flex: 1;
+}
+
+.analytics-tooltip-value {
+  font-weight: 700;
+  color: white;
+}
+
+/* ─── Skeleton ───────────────────────────────────────────── */
+
+.analytics-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.analytics-skeleton-card {
+  background: white;
+  border: 1px solid var(--co-gray-200);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.analytics-skeleton-line {
+  height: 14px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: vendorShimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+.analytics-skeleton-label { width: 60%; }
+.analytics-skeleton-value { height: 26px; width: 80%; }
+.analytics-skeleton-sub { width: 90%; }
+
+@keyframes vendorShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ─── Responsive ─────────────────────────────────────────── */
+
+@media (max-width: 1200px) {
+  .analytics-main-row {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-summary-section {
+    order: -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .analytics-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .top-products-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .analytics-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .analytics-panel {
+    padding: 12px;
+  }
+
+  .analytics-stat-value {
+    font-size: 22px;
+  }
+
+  .analytics-stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
   }
 }

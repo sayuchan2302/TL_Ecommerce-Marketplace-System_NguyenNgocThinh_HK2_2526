@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { X, CheckCircle2 } from 'lucide-react';
+import { X, MapPin, Home, Building2, Phone, Loader2 } from 'lucide-react';
 import { addressService } from '../../services/addressService';
 import type { Address } from '../../types';
 import './AddressBookModal.css';
@@ -61,60 +61,92 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
     onClose();
   };
 
+  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) onClose();
+  };
+
   if (!isOpen) return null;
 
+  const addressIcon = (address: Address) => {
+    const label = (address.addressType || '').toLowerCase();
+    if (label.includes('nhà') || label.includes('home')) return <Home size={16} />;
+    if (label.includes('công ty') || label.includes('office') || label.includes('cơ quan')) return <Building2 size={16} />;
+    return <MapPin size={16} />;
+  };
+
   return (
-    <div className="address-modal-overlay">
+    <div className="address-modal-overlay" onClick={handleOverlayClick} role="dialog" aria-modal="true" aria-label="Chọn địa chỉ giao hàng">
       <div className="address-modal-container">
         <div className="address-modal-header">
-          <h2>Chọn từ sổ địa chỉ</h2>
-          <button className="close-btn" onClick={onClose} aria-label="Đóng">
-            <X size={24} aria-hidden="true" />
+          <div className="address-modal-title">
+            <MapPin size={20} className="address-modal-title-icon" />
+            <h2>Chọn từ sổ địa chỉ</h2>
+          </div>
+          <button className="address-close-btn" onClick={onClose} aria-label="Đóng">
+            <X size={20} />
           </button>
         </div>
 
         <div className="address-modal-body">
           {isLoading ? (
-            <div className="empty-address-msg">Đang tải sổ địa chỉ...</div>
+            <div className="address-state address-state-loading">
+              <Loader2 size={28} className="address-state-spinner" />
+              <p>Đang tải sổ địa chỉ...</p>
+            </div>
           ) : null}
 
           {!isLoading && loadError ? (
-            <div className="empty-address-msg">
+            <div className="address-state address-state-error">
               <p>{loadError}</p>
-              <button className="address-confirm-btn" onClick={() => void loadAddresses()}>
+              <button className="address-retry-btn" onClick={() => void loadAddresses()}>
                 Tải lại
               </button>
             </div>
           ) : null}
 
           {!isLoading && !loadError && addresses.length === 0 ? (
-            <div className="empty-address-msg">Bạn chưa có địa chỉ nào trong sổ.</div>
+            <div className="address-state address-state-empty">
+              <MapPin size={32} className="address-state-icon" />
+              <p>Bạn chưa có địa chỉ nào trong sổ.</p>
+            </div>
           ) : null}
 
           {!isLoading && !loadError && addresses.length > 0 ? (
             <div className="address-list">
-              {addresses.map((address) => (
-                <button
-                  key={address.id}
-                  className={`address-item ${selectedId === address.id ? 'selected' : ''}`}
-                  onClick={() => setSelectedId(address.id)}
-                  aria-pressed={selectedId === address.id}
-                >
-                  <div className="address-item-header">
-                    <span className="address-name">{address.fullName}</span>
-                    {address.isDefault && <span className="address-badge">Mặc định</span>}
-                  </div>
-                  <div className="address-phone">{address.phone}</div>
-                  <div className="address-full">
-                    {addressService.formatFullAddress(address)}
-                  </div>
-                  {selectedId === address.id && (
-                    <div className="address-check-icon">
-                      <CheckCircle2 fill="var(--co-blue)" color="white" size={24} />
+              {addresses.map((address) => {
+                const isSelected = selectedId === address.id;
+                return (
+                  <button
+                    key={address.id}
+                    className={`address-item ${isSelected ? 'selected' : ''}`}
+                    onClick={() => setSelectedId(address.id)}
+                    aria-pressed={isSelected}
+                  >
+                    <div className={`address-radio ${isSelected ? 'active' : ''}`}>
+                      {isSelected && <span className="address-radio-dot" />}
                     </div>
-                  )}
-                </button>
-              ))}
+                    <div className="address-content">
+                      <div className="address-top-row">
+                        <div className="address-name-row">
+                          {addressIcon(address)}
+                          <span className="address-name">{address.fullName}</span>
+                        </div>
+                        {address.isDefault && (
+                          <span className="address-badge">Mặc định</span>
+                        )}
+                      </div>
+                      <div className="address-contact">
+                        <Phone size={13} />
+                        <span>{address.phone}</span>
+                      </div>
+                      <div className="address-location">
+                        <MapPin size={13} />
+                        <span>{addressService.formatFullAddress(address)}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : null}
         </div>

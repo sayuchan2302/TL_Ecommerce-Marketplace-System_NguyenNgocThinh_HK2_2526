@@ -50,8 +50,8 @@ type PendingAction = {
 
 const PAGE_SIZE = 8;
 const TABS: Array<{ key: VendorOrderTab; label: string }> = [
-  { key: 'confirmed', label: 'Đã xác nhận' },
   { key: 'all', label: 'Tất cả' },
+  { key: 'confirmed', label: 'Đã xác nhận' },
   { key: 'pending', label: 'Chờ xác nhận' },
   { key: 'processing', label: 'Đang xử lý' },
   { key: 'shipped', label: 'Đang giao' },

@@ -1,6 +1,7 @@
 import './Vendor.css';
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, Download, Package, Percent, ShoppingCart, TrendingUp } from 'lucide-react';
+import { Calendar, Download, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, DollarSign, Percent, ShoppingCart, Package } from 'lucide-react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import VendorLayout from './VendorLayout';
 import { formatCurrency } from '../../services/commissionService';
 import { vendorPortalService } from '../../services/vendorPortalService';
@@ -48,12 +49,6 @@ const periodLabels: Record<Period, string> = {
   month: '30 ngày',
 };
 
-const PERIOD_TO_DAYS: Record<Period, 1 | 7 | 30> = {
-  today: 1,
-  week: 7,
-  month: 30,
-};
-
 const VendorAnalytics = () => {
   const { addToast } = useToast();
   const [activePeriod, setActivePeriod] = useState<Period>('week');
@@ -92,58 +87,78 @@ const VendorAnalytics = () => {
   const periodData = analytics.periods[activePeriod];
   const commission = { commission: periodData.commission, payout: periodData.payout };
   const prevCommission = { commission: periodData.previousCommission, payout: periodData.previousPayout };
-  const revenueChange = ((periodData.revenue - periodData.previousRevenue) / Math.max(periodData.previousRevenue, 1)) * 100;
-  const ordersChange = ((periodData.orders - periodData.previousOrders) / Math.max(periodData.previousOrders, 1)) * 100;
-  const payoutChange = ((commission.payout - prevCommission.payout) / Math.max(prevCommission.payout, 1)) * 100;
+  const revenueChange = periodData.previousRevenue > 0
+    ? ((periodData.revenue - periodData.previousRevenue) / periodData.previousRevenue) * 100
+    : 0;
+  const ordersChange = periodData.previousOrders > 0
+    ? ((periodData.orders - periodData.previousOrders) / periodData.previousOrders) * 100
+    : 0;
+  const payoutChange = prevCommission.payout > 0
+    ? ((commission.payout - prevCommission.payout) / prevCommission.payout) * 100
+    : 0;
+  const commissionChange = prevCommission.commission > 0
+    ? ((commission.commission - prevCommission.commission) / prevCommission.commission) * 100
+    : 0;
 
-  const stats: Array<{ label: string; value: string; sub: string; tone?: 'warning' | 'success' | 'info' }> = [
-    {
-      label: 'Doanh thu gộp',
-      value: formatCurrency(periodData.revenue),
-      sub: `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(1)}% so với kỳ trước`,
-    },
-    {
-      label: 'Phí hoa hồng',
-      value: formatCurrency(commission.commission),
-      sub: `Tỷ lệ sàn ${analytics.commissionRate}%`,
-      tone: 'warning',
-    },
-    {
-      label: 'Thực nhận',
-      value: formatCurrency(commission.payout),
-      sub: `${payoutChange >= 0 ? '+' : ''}${payoutChange.toFixed(1)}% so với kỳ trước`,
-      tone: 'success',
-    },
-    {
-      label: 'Đơn hàng',
-      value: periodData.orders.toString(),
-      sub: `${ordersChange >= 0 ? '+' : ''}${ordersChange.toFixed(1)}% so với kỳ trước`,
-      tone: 'info',
-    },
-  ] as const;
+  const chartData = useMemo(() =>
+    analytics.dailyData.map((d) => ({
+      date: d.date,
+      dateLabel: new Date(d.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+      revenue: d.revenue,
+      payout: d.payout,
+      commission: d.commission,
+      orders: d.orders,
+    })),
+    [analytics.dailyData]
+  );
 
   const topRevenue = Math.max(...analytics.topProducts.map((item) => item.revenue), 1);
 
-  const trendRows = useMemo(
-    () =>
-      analytics.dailyData.map((item) => ({
-        ...item,
-        payout: item.payout,
-      })),
-    [analytics.dailyData],
-  );
+  const TrendIndicator = ({ value, label }: { value: number; label: string }) => {
+    const isPositive = value >= 0;
+    return (
+      <div className={`trend-indicator ${isPositive ? 'positive' : 'negative'}`}>
+        {isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+        <span>{Math.abs(value).toFixed(1)}% {label}</span>
+      </div>
+    );
+  };
+
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }> }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="analytics-tooltip">
+        <div className="analytics-tooltip-date">{payload[0].payload.dateLabel}</div>
+        {payload.map((entry) => (
+          <div key={entry.name} className="analytics-tooltip-row">
+            <span className="analytics-tooltip-dot" style={{ backgroundColor: entry.color }} />
+            <span className="analytics-tooltip-label">{entry.name}:</span>
+            <span className="analytics-tooltip-value">{formatCurrency(entry.value)}</span>
+          </div>
+        ))}
+        <div className="analytics-tooltip-row">
+          <span className="analytics-tooltip-dot" style={{ backgroundColor: '#94a3b8' }} />
+          <span className="analytics-tooltip-label">Đơn hàng:</span>
+          <span className="analytics-tooltip-value">{payload[0].payload.orders}</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <VendorLayout
-      title="Doanh thu thực nhận và hiệu suất shop"
-      breadcrumbs={['Kênh Người Bán', 'Doanh thu thực nhận']}
+      title="Doanh thu & Hiệu suất"
+      breadcrumbs={['Kênh Người Bán', 'Dashboard']}
       actions={(
         <>
-          <div className="admin-tabs vendor-inline-tabs">
+          <div className="segmented-control">
             {(['today', 'week', 'month'] as Period[]).map((period) => (
-              <button key={period} className={`admin-tab ${activePeriod === period ? 'active vendor-active-tab' : ''}`} onClick={() => setActivePeriod(period)}>
-                <Calendar size={14} />
-                <span>{periodLabels[period]}</span>
+              <button
+                key={period}
+                className={`segmented-btn ${activePeriod === period ? 'active' : ''}`}
+                onClick={() => setActivePeriod(period)}
+              >
+                {periodLabels[period]}
               </button>
             ))}
           </div>
@@ -155,147 +170,217 @@ const VendorAnalytics = () => {
       )}
     >
       {loading ? (
-        <AdminStateBlock
-          type="empty"
-          title="Đang tải thống kê người bán"
-          description="Doanh thu, thực nhận và hiệu suất đơn hàng con đang được đồng bộ."
-        />
+        <div className="analytics-skeleton-grid">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="analytics-skeleton-card">
+              <div className="analytics-skeleton-line analytics-skeleton-label" />
+              <div className="analytics-skeleton-line analytics-skeleton-value" />
+              <div className="analytics-skeleton-line analytics-skeleton-sub" />
+            </div>
+          ))}
+        </div>
       ) : loadError ? (
         <AdminStateBlock
           type="error"
-          title="Không tải được thống kê người bán"
+          title="Không tải được thống kê"
           description={loadError}
           actionLabel="Thử lại"
           onAction={() => setReloadKey((key) => key + 1)}
         />
       ) : (
         <>
+          {/* ─── Stat Cards ─────────────────────────────────────────────── */}
           <div className="admin-stats grid-4">
-            {stats.map((item) => (
-              <div key={item.label} className={`admin-stat-card ${item.tone || ''}`}>
-                <div className="admin-stat-label">{item.label}</div>
-                <div className="admin-stat-value">{item.value}</div>
-                <div className="admin-stat-sub">{item.sub}</div>
+            <div className="admin-stat-card">
+              <div className="admin-stat-label">Doanh thu gộp</div>
+              <div className="admin-stat-value">{formatCurrency(periodData.revenue)}</div>
+              <div className="admin-stat-sub">
+                <TrendIndicator value={revenueChange} label="so với kỳ trước" />
               </div>
-            ))}
+            </div>
+
+            <div className="admin-stat-card warning">
+              <div className="admin-stat-label">Phí hoa hồng</div>
+              <div className="admin-stat-value">{formatCurrency(commission.commission)}</div>
+              <div className="admin-stat-sub">Tỷ lệ sàn {analytics.commissionRate}%</div>
+            </div>
+
+            <div className="admin-stat-card success">
+              <div className="admin-stat-label">Thực nhận</div>
+              <div className="admin-stat-value">{formatCurrency(commission.payout)}</div>
+              <div className="admin-stat-sub">
+                <TrendIndicator value={payoutChange} label="so với kỳ trước" />
+              </div>
+            </div>
+
+            <div className="admin-stat-card info">
+              <div className="admin-stat-label">Đơn hàng</div>
+              <div className="admin-stat-value">{periodData.orders}</div>
+              <div className="admin-stat-sub">
+                <TrendIndicator value={ordersChange} label="so với kỳ trước" />
+              </div>
+            </div>
           </div>
 
-          <section className="admin-panels">
-            <div className="admin-left">
-              <section className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2>Tổng quan kỳ hiện tại</h2>
-                  <span className="admin-muted">{periodLabels[activePeriod]} là kỳ đối chiếu chính của shop</span>
+          {/* ─── Main Row: Chart + Financial Summary ────────────────────── */}
+          <div className="analytics-main-row">
+            <div className="analytics-chart-section">
+              <div className="analytics-panel">
+                <div className="analytics-panel-head">
+                  <h2>Biểu đồ doanh thu</h2>
+                  <span className="analytics-muted">{periodLabels[activePeriod]}</span>
                 </div>
-                <div className="admin-card-list">
-                  <div className="admin-card-row">
-                    <span className="admin-bold"><TrendingUp size={15} style={{ verticalAlign: -2, marginRight: 6 }} /> Tỷ lệ giao thành công</span>
-                    <span className="admin-muted">{periodData.conversionRate}% trên tổng đơn đã phát sinh trong kỳ.</span>
+                {chartData.length === 0 ? (
+                  <div className="analytics-empty-chart">
+                    <TrendingUp size={40} className="analytics-empty-icon" />
+                    <p>Chưa có dữ liệu doanh thu</p>
+                    <span className="analytics-muted">Dữ liệu sẽ xuất hiện khi có đơn hàng</span>
                   </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold"><ShoppingCart size={15} style={{ verticalAlign: -2, marginRight: 6 }} /> Giá trị đơn trung bình</span>
-                    <span className="admin-muted">{formatCurrency(periodData.avgOrderValue)} cho mỗi đơn hàng con.</span>
-                  </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold"><Percent size={15} style={{ verticalAlign: -2, marginRight: 6 }} /> Hoa hồng sàn</span>
-                    <span className="admin-muted">Áp dụng mức {analytics.commissionRate}% để ra thực nhận của shop.</span>
-                  </div>
-                </div>
-              </section>
-
-              <section className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2>Nhịp doanh thu và đối soát</h2>
-                  <span className="admin-muted">{trendRows.length} mốc dữ liệu gần nhất</span>
-                </div>
-                {trendRows.length === 0 ? (
-                  <AdminStateBlock
-                    type="empty"
-                    title="Chưa có dữ liệu doanh thu"
-                    description="Dữ liệu biểu đồ sẽ xuất hiện sau khi shop phát sinh đơn hàng và đối soát."
-                  />
                 ) : (
-                  <div className="admin-table" role="table" aria-label="Bảng xu hướng doanh thu">
-                    <div className="admin-table-row vendor-analytics-trend admin-table-head" role="row">
-                      <div role="columnheader">Ngày</div>
-                      <div role="columnheader">Doanh thu gộp</div>
-                      <div role="columnheader">Đơn hàng</div>
-                      <div role="columnheader">Thực nhận</div>
-                    </div>
-                    {trendRows.map((item) => (
-                      <div key={item.date} className="admin-table-row vendor-analytics-trend" role="row">
-                        <div role="cell" className="admin-bold">{item.date}</div>
-                        <div role="cell">{formatCurrency(item.revenue)}</div>
-                        <div role="cell">{item.orders}</div>
-                        <div role="cell"><span className="badge green">{formatCurrency(item.payout)}</span></div>
-                      </div>
-                    ))}
-                  </div>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="payoutGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis
+                        dataKey="dateLabel"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12, fill: '#94a3b8' }}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12, fill: '#94a3b8' }}
+                        tickFormatter={(v: number) => `${(v / 1000000).toFixed(1)}M`}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend
+                        verticalAlign="top"
+                        align="right"
+                        iconType="circle"
+                        formatter={(value: string) => (
+                          <span style={{ fontSize: 13, color: '#64748b' }}>{value}</span>
+                        )}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        name="Doanh thu gộp"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        fill="url(#revenueGradient)"
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="payout"
+                        name="Thực nhận"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        fill="url(#payoutGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 )}
-              </section>
+              </div>
             </div>
 
-            <div className="admin-right">
-              <section className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2>Phân rã đối soát</h2>
+            <div className="analytics-summary-section">
+              <div className="analytics-panel financial-summary">
+                <div className="analytics-panel-head">
+                  <h2>Tổng kết tài chính</h2>
                 </div>
-                <div className="admin-card-list">
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Doanh thu gộp</span>
-                    <span className="admin-muted">{formatCurrency(periodData.revenue)}</span>
+                <div className="financial-summary-content">
+                  <div className="financial-summary-row">
+                    <span className="financial-label">Doanh thu gộp</span>
+                    <span className="financial-value">{formatCurrency(periodData.revenue)}</span>
                   </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Phí hoa hồng</span>
-                    <span className="admin-muted">-{formatCurrency(commission.commission)}</span>
+                  <div className="financial-summary-row deduction">
+                    <span className="financial-label">
+                      Phí hoa hồng ({analytics.commissionRate}%)
+                    </span>
+                    <span className="financial-value negative">
+                      -{formatCurrency(commission.commission)}
+                    </span>
                   </div>
-                  <div className="admin-card-row">
-                    <span className="admin-bold">Thực nhận</span>
-                    <span className="admin-muted">{formatCurrency(commission.payout)}</span>
+                  <div className="financial-divider" />
+                  <div className="financial-summary-row total">
+                    <span className="financial-label">Thực nhận</span>
+                    <span className="financial-value primary">
+                      {formatCurrency(commission.payout)}
+                    </span>
+                  </div>
+                  <div className="financial-metrics">
+                    <div className="financial-metric">
+                      <span className="financial-metric-label">Giá trị TB/đơn</span>
+                      <span className="financial-metric-value">{formatCurrency(periodData.avgOrderValue)}</span>
+                    </div>
+                    <div className="financial-metric">
+                      <span className="financial-metric-label">Tỷ lệ chuyển đổi</span>
+                      <span className="financial-metric-value">{periodData.conversionRate.toFixed(1)}%</span>
+                    </div>
                   </div>
                 </div>
-              </section>
+              </div>
+            </div>
+          </div>
 
-              <section className="admin-panel">
-                <div className="admin-panel-head">
-                  <h2>Top SKU theo thực nhận</h2>
+          {/* ─── Bottom Row: Top Products ───────────────────────────────── */}
+          <div className="analytics-bottom-row">
+            <div className="analytics-panel">
+              <div className="analytics-panel-head">
+                <h2>Sản phẩm bán chạy</h2>
+                <span className="analytics-muted">
+                  {analytics.topProducts.length > 0 ? `${analytics.topProducts.length} sản phẩm` : 'Chưa có dữ liệu'}
+                </span>
+              </div>
+              {analytics.topProducts.length === 0 ? (
+                <div className="analytics-empty-products">
+                  <Package size={32} className="analytics-empty-icon" />
+                  <p>Chưa có sản phẩm nổi bật</p>
+                  <span className="analytics-muted">Top sản phẩm sẽ xuất hiện khi có doanh thu</span>
                 </div>
-                {analytics.topProducts.length === 0 ? (
-                  <AdminStateBlock
-                    type="empty"
-                    title="Chưa có sản phẩm nổi bật"
-                    description="Top SKU sẽ xuất hiện khi shop phát sinh doanh thu."
-                  />
-                ) : (
-                  <div className="vendor-top-products-grid">
-                    {analytics.topProducts.map((product, index) => {
-                      const payout = product.revenue * (1 - analytics.commissionRate / 100);
-                      return (
-                        <div key={product.id} className="vendor-analytics-product">
-                          <div className="vendor-analytics-product-rank">#{index + 1}</div>
-                          <img src={product.img} alt={product.name} className="vendor-analytics-product-img" />
-                          <div className="vendor-analytics-product-info">
-                            <span className="name">{product.name}</span>
-                            <div className="stats">
-                              <span className="stat"><Package size={12} /> {product.sales} đã bán</span>
-                              <span className="stat revenue">{formatCurrency(product.revenue)}</span>
-                            </div>
-                            <div className="vendor-top-product-bar">
-                              <span style={{ width: `${(product.revenue / topRevenue) * 100}%` }} />
-                            </div>
+              ) : (
+                <div className="top-products-grid">
+                  {analytics.topProducts.map((product, index) => {
+                    const payout = product.revenue * (1 - analytics.commissionRate / 100);
+                    const pct = (product.revenue / topRevenue) * 100;
+                    return (
+                      <div key={product.id} className="top-product-card">
+                        <div className="top-product-rank">#{index + 1}</div>
+                        <div className="top-product-info">
+                          <span className="top-product-name">{product.name}</span>
+                          <div className="top-product-stats">
+                            <span className="top-product-stat">
+                              <ShoppingCart size={12} /> {product.sales} đã bán
+                            </span>
+                            <span className="top-product-stat revenue">
+                              {formatCurrency(product.revenue)}
+                            </span>
                           </div>
-                          <div className="vendor-analytics-product-payout">
-                            <span className="label">Thực nhận</span>
-                            <span className="value">{formatCurrency(payout)}</span>
+                          <div className="top-product-bar">
+                            <div className="top-product-bar-fill" style={{ width: `${pct}%` }} />
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
+                        <div className="top-product-payout">
+                          <span className="top-product-payout-label">Thực nhận</span>
+                          <span className="top-product-payout-value">{formatCurrency(payout)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </section>
+          </div>
         </>
       )}
     </VendorLayout>

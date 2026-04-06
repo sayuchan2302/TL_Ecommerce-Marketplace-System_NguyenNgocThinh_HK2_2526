@@ -311,6 +311,7 @@ const VendorReviews = () => {
                 <div role="columnheader">Sản phẩm</div>
                 <div role="columnheader">Đánh giá</div>
                 <div role="columnheader">Nội dung</div>
+                <div role="columnheader">Thời gian</div>
                 <div role="columnheader">Trạng thái</div>
                 <div role="columnheader">Phản hồi</div>
                 <div role="columnheader">Hành động</div>
@@ -349,9 +350,9 @@ const VendorReviews = () => {
                   </div>
                   <div role="cell">
                     <RatingStars rating={review.rating} />
-                    <div className="admin-muted small">{review.createdAt}</div>
                   </div>
                   <div role="cell" className="vendor-review-content">{review.content}</div>
+                  <div role="cell" className="admin-muted small">{formatDateTime(review.createdAt)}</div>
                   <div role="cell">
                     <span className={`admin-pill ${review.rating <= 3 ? 'pending' : 'success'}`}>
                       {review.rating <= 3 ? 'Cần chăm sóc' : 'Ổn định'}
@@ -361,7 +362,6 @@ const VendorReviews = () => {
                     {review.shopReply ? (
                       <div className="vendor-reply-badge">
                         <span className="admin-bold">Đã phản hồi</span>
-                        <span className="admin-muted small">{review.shopReply.createdAt}</span>
                       </div>
                     ) : (
                       <span className="badge amber">Chưa phản hồi</span>
