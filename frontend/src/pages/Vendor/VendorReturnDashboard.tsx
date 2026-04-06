@@ -303,13 +303,11 @@ const VendorReturnDashboard = () => {
         <div className="admin-panel">
           <div className="admin-panel-head">
             <h2>Danh sách yêu cầu hoàn trả</h2>
-            <div className="admin-actions">
-              <PanelSearchField
-                placeholder="Tìm theo mã hoàn trả, mã đơn, khách hàng..."
-                value={searchQuery}
-                onChange={setSearchQuery}
-              />
-            </div>
+            <PanelSearchField
+              placeholder="Tìm theo mã hoàn trả, mã đơn, khách hàng..."
+              value={searchQuery}
+              onChange={setSearchQuery}
+            />
           </div>
 
           {isLoading ? (

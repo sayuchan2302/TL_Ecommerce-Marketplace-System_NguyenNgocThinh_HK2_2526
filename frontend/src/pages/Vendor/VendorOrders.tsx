@@ -550,6 +550,9 @@ const VendorOrders = () => {
                       <div className="admin-muted small">{order.items} SP</div>
                       <div className="admin-muted small">{formatVendorOrderDate(order.date)}</div>
                       <div className="admin-actions vendor-order-actions">
+                        <Link to={`/vendor/orders/${resolveDetailRouteKey(order.code, order.id)}`} className="admin-icon-btn subtle" title="Chi tiết đơn hàng">
+                          <Eye size={16} />
+                        </Link>
                         {order.status === 'pending' && (
                           <button
                             className="admin-icon-btn subtle"
@@ -620,9 +623,6 @@ const VendorOrders = () => {
                         ) : (
                           <span className="vendor-order-action-slot" aria-hidden="true" />
                         )}
-                        <Link to={`/vendor/orders/${resolveDetailRouteKey(order.code, order.id)}`} className="admin-icon-btn subtle" title="Chi tiết đơn hàng">
-                          <Eye size={16} />
-                        </Link>
                       </div>
                     </motion.div>
                   );

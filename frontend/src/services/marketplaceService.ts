@@ -149,7 +149,7 @@ const mapProductCard = (row: MarketplaceProductCardPayload): Product => {
 
 const mapStoreCard = (row: MarketplaceStoreCardPayload): MarketplaceStoreCard => ({
   id: row.id,
-  storeCode: row.storeCode || `SHOP-${row.id.slice(0, 8).toUpperCase()}`,
+  storeCode: (row.slug || row.storeCode || '').trim(),
   name: row.name,
   slug: row.slug,
   logo: row.logo,

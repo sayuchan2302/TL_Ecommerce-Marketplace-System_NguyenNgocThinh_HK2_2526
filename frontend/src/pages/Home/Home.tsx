@@ -42,7 +42,7 @@ const fallbackTopVendors: MarketplaceStoreCard[] = [
   {
     id: 'store-coolmate-mall',
     name: 'Coolmate Mall',
-    storeCode: 'SHOP-CM-001',
+    storeCode: 'coolmate-mall',
     slug: 'coolmate-mall',
     logo: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=200&auto=format&fit=crop',
     rating: 4.9,
@@ -52,7 +52,7 @@ const fallbackTopVendors: MarketplaceStoreCard[] = [
   {
     id: 'store-thinh-fashion',
     name: 'Th\u1ecbnh Fashion Shop',
-    storeCode: 'SHOP-TF-028',
+    storeCode: 'thinh-fashion',
     slug: 'thinh-fashion',
     logo: 'https://images.unsplash.com/photo-1503341455253-b2e723bb3dbb?q=80&w=200&auto=format&fit=crop',
     rating: 4.8,
@@ -62,7 +62,7 @@ const fallbackTopVendors: MarketplaceStoreCard[] = [
   {
     id: 'store-mina-boutique',
     name: 'Mina Boutique',
-    storeCode: 'SHOP-MB-104',
+    storeCode: 'mina-boutique',
     slug: 'mina-boutique',
     logo: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?q=80&w=200&auto=format&fit=crop',
     rating: 4.7,
@@ -72,7 +72,7 @@ const fallbackTopVendors: MarketplaceStoreCard[] = [
   {
     id: 'store-athleisure-pro',
     name: 'Athleisure Pro',
-    storeCode: 'SHOP-AP-233',
+    storeCode: 'athleisure-pro',
     slug: 'athleisure-pro',
     logo: 'https://images.unsplash.com/photo-1542272604-787c3835535d?q=80&w=200&auto=format&fit=crop',
     rating: 4.8,
@@ -290,7 +290,7 @@ const Home = () => {
                     <Link key={store.id} to={`/store/${store.slug}`} className="top-vendor-card">
                       <img src={store.logo} alt={store.name} className="top-vendor-logo" />
                       <div className="top-vendor-meta">
-                        <span className="top-vendor-code">{store.storeCode}</span>
+                        <span className="top-vendor-code">{store.slug || store.storeCode}</span>
                         <span className="top-vendor-name">{store.name}</span>
                         <div className="top-vendor-stats">
                           <span className="top-vendor-rating">

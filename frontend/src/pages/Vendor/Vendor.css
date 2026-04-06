@@ -1041,13 +1041,13 @@
 }
 
 .admin-table-row.vendor-orders .admin-actions.vendor-order-actions {
-  display: inline-flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(4, 32px);
   gap: 8px;
   align-items: center;
   justify-content: center;
   justify-self: center;
-  white-space: nowrap;
+  width: max-content;
 }
 
 .admin-table-row.vendor-orders .admin-actions.vendor-order-actions .admin-icon-btn {
