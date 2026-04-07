@@ -694,9 +694,9 @@ const Profile = () => {
                     <div className="order-card-items">
                       {order.items.slice(0, 2).map((item, idx) => (
                         <div key={idx} className="order-item">
-                          <div className="order-item-img">
+                          <Link to={`/product/${encodeURIComponent(item.id)}`} className="order-item-img">
                             <img src={item.image} alt={item.name} />
-                          </div>
+                          </Link>
                           <div className="order-item-info">
                             <p className="order-item-name">{item.name}</p>
                             {item.color && <p className="order-item-variant">Màu: {item.color}</p>}
@@ -889,10 +889,10 @@ const Profile = () => {
                     {pendingReviews.map((product) => (
                       <div key={product.productId} className="review-pending-card">
                         <div className="review-pending-product">
-                          <div className="review-product-img">
+                          <Link to={`/product/${encodeURIComponent(product.productId)}`} className="review-product-img">
                             <img src={product.productImage} alt={product.productName} />
-                          </div>
-                          <div className="review-product-info">
+                          </Link>
+                            <div className="review-product-info">
                             <p className="review-product-name">{product.productName}</p>
                             <p className="review-product-variant">{product.variant}</p>
                             <p className="review-product-order">Đơn hàng: #{getOrderDisplayCode(product.orderId, product.orderCode)}</p>
@@ -924,12 +924,12 @@ const Profile = () => {
                       <div key={review.id} className="review-completed-card">
                         <div className="review-completed-header">
                           <div className="review-pending-product">
-                            <div className="review-product-img">
+                            <Link to={`/product/${encodeURIComponent(review.productId)}`} className="review-product-img">
                               <img
                                 src={review.productImage || 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=80&h=80&fit=crop'}
                                 alt={review.productName}
                               />
-                            </div>
+                            </Link>
                             <div className="review-product-info">
                               <p className="review-product-name">{review.productName}</p>
                               <p className="review-product-variant">Đơn hàng: #{getOrderDisplayCode(review.orderId, review.orderCode)}</p>
@@ -1474,4 +1474,5 @@ const Profile = () => {
 };
 
 export default Profile;
+
 

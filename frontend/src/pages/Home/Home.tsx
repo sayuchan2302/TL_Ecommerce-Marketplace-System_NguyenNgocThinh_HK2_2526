@@ -173,10 +173,24 @@ const Home = () => {
   );
 
   const topVendors = useMemo(() => {
-    if (featuredStores.length > 0) {
-      return featuredStores.slice(0, 4);
+    const source = featuredStores.length > 0 ? featuredStores : fallbackTopVendors;
+    if (source.length >= 4) {
+      return source.slice(0, 4);
     }
-    return fallbackTopVendors;
+
+    const seen = new Set(source.map((store) => store.id));
+    const padded = [...source];
+    for (const fallback of fallbackTopVendors) {
+      if (padded.length >= 4) {
+        break;
+      }
+      if (!seen.has(fallback.id)) {
+        padded.push(fallback);
+        seen.add(fallback.id);
+      }
+    }
+
+    return padded.slice(0, 4);
   }, [featuredStores]);
 
   return (
@@ -222,23 +236,19 @@ const Home = () => {
           </div>
         ) : (
           <>
-            <div className="home-hero-wrap container">
-              <HeroSlider />
-            </div>
+            <HeroSlider className="home-hero-wrap container" />
             <Categories
               categoryTabs={categoryTabs}
               featuredStores={featuredStores}
               showFeaturedStores={false}
             />
 
-            <div className="home-section-gap">
-              <FlashSaleSection
-                items={flashSaleItems}
-              />
-            </div>
+            <FlashSaleSection
+              className="home-section-gap"
+              items={flashSaleItems}
+            />
 
-            <div className="home-section-gap container">
-              <section className="top-vendor-section">
+            <section className="top-vendor-section container home-section-gap">
                 <div className="top-vendor-head">
                   <div className="top-vendor-title-wrap">
                     <span className="top-vendor-eyebrow">
@@ -272,7 +282,6 @@ const Home = () => {
                   ))}
                 </div>
               </section>
-            </div>
 
             <section className="home-section-gap">
               <ProductSection

@@ -30,6 +30,7 @@ export interface FlashSaleItem {
 interface FlashSaleSectionProps {
   items?: FlashSaleItem[];
   viewAllLink?: string;
+  className?: string;
 }
 
 const getRemainingSecondsToEndOfDay = () => {
@@ -53,6 +54,7 @@ const toTimeParts = (seconds: number) => {
 const FlashSaleSection = ({
   items = [],
   viewAllLink = '/search?scope=products&sort=discount',
+  className = '',
 }: FlashSaleSectionProps) => {
   const [remainingSeconds, setRemainingSeconds] = useState(getRemainingSecondsToEndOfDay());
   const sliderRef = useRef<HTMLDivElement>(null);
@@ -81,7 +83,7 @@ const FlashSaleSection = ({
   if (!items || items.length === 0) return null;
 
   return (
-    <section className="flash-sale-section container">
+    <section className={`flash-sale-section container ${className}`.trim()}>
       <div className="flash-sale-header">
         <div className="flash-sale-header-left">
           <h2 className="flash-sale-title">Flash Sale</h2>

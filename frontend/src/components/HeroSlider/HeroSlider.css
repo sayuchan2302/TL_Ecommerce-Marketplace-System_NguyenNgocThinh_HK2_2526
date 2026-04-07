@@ -1,8 +1,9 @@
 .hero-slider {
   position: relative;
   width: 100%;
-  height: calc(90vh - var(--header-height) - var(--topbar-height));
-  min-height: 520px;
+  height: auto;
+  aspect-ratio: 21 / 8;
+  max-height: 460px;
   overflow: hidden;
   touch-action: pan-y;
   user-select: none;
@@ -119,6 +120,6 @@
 .hero-nav.next { right: 16px; }
 
 @media (max-width: 768px) {
-  .hero-slider { height: 70vh; min-height: 420px; }
+  .hero-slider { aspect-ratio: 16 / 9; max-height: none; }
   .hero-content { padding: 24px 18px; }
 }

@@ -107,7 +107,25 @@ const Categories = ({
   const activeTab = tabs.some((tab) => tab.id === selectedTab) ? selectedTab : (tabs[0]?.id || 'nam');
   const currentTab = tabs.find((tab) => tab.id === activeTab) || tabs[0];
   const currentData = currentTab?.items || [];
-  const visibleStores = featuredStores.length > 0 ? featuredStores : featuredStoresFallback;
+  const visibleStores = useMemo(() => {
+    const source = featuredStores.length > 0 ? featuredStores : featuredStoresFallback;
+    if (source.length >= 4) {
+      return source.slice(0, 4);
+    }
+
+    const seen = new Set(source.map((store) => store.id));
+    const padded = [...source];
+    for (const fallback of featuredStoresFallback) {
+      if (padded.length >= 4) {
+        break;
+      }
+      if (!seen.has(fallback.id)) {
+        padded.push(fallback);
+        seen.add(fallback.id);
+      }
+    }
+    return padded.slice(0, 4);
+  }, [featuredStores]);
   const toCategoryLink = (slug: string) => `/category/${encodeURIComponent(slug)}`;
 
   return (

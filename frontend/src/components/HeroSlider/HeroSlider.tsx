@@ -31,7 +31,11 @@ const slides = [
 
 const AUTO_DELAY = 5500;
 
-const HeroSlider = () => {
+interface HeroSliderProps {
+  className?: string;
+}
+
+const HeroSlider = ({ className = '' }: HeroSliderProps) => {
   const navigate = useNavigate();
   const loopSlides = [slides[slides.length - 1], ...slides, slides[0]];
   const [position, setPosition] = useState(1);
@@ -159,7 +163,7 @@ const HeroSlider = () => {
   const dragOffsetPercent = isDragging && trackWidth ? (dragOffset / trackWidth) * 100 : 0;
 
   return (
-    <section className="hero-slider">
+    <section className={`hero-slider ${className}`.trim()}>
       <div
         className="hero-track"
         ref={trackRef}
