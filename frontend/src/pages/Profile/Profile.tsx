@@ -52,6 +52,7 @@ const tCommon = CLIENT_TEXT.common;
 
 type TabId = 'account' | 'orders' | 'vouchers' | 'addresses' | 'reviews' | 'notifications';
 const VALID_PROFILE_TABS: TabId[] = ['account', 'orders', 'vouchers', 'addresses', 'reviews', 'notifications'];
+const NOTIFICATIONS_PREVIEW_LIMIT = 7;
 
 interface PendingProduct {
   productId: string;
@@ -188,6 +189,19 @@ const Profile = () => {
   const [followingStores, setFollowingStores] = useState<FollowedStoreItem[]>([]);
   const [followingStoresLoading, setFollowingStoresLoading] = useState(false);
   const [followingStoresError, setFollowingStoresError] = useState<string | null>(null);
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
+
+  const displayedNotifications = useMemo(
+    () => (showAllNotifications ? notifications : notifications.slice(0, NOTIFICATIONS_PREVIEW_LIMIT)),
+    [notifications, showAllNotifications],
+  );
+  const hasMoreNotifications = notifications.length > NOTIFICATIONS_PREVIEW_LIMIT;
+
+  useEffect(() => {
+    if (activeTab !== 'notifications' && showAllNotifications) {
+      setShowAllNotifications(false);
+    }
+  }, [activeTab, showAllNotifications]);
 
   const handleOpenReviewModal = (product: PendingProduct) => {
     setReviewProduct(product);
@@ -990,7 +1004,7 @@ const Profile = () => {
               </div>
             ) : (
               <div className="notifications-list">
-                {notifications.map((notif) => (
+                {displayedNotifications.map((notif) => (
                   <div 
                     key={notif.id} 
                     className={`notification-card ${!notif.read ? 'unread' : ''}`}
@@ -1032,6 +1046,18 @@ const Profile = () => {
                     {!notif.read && <span className="notification-dot" />}
                   </div>
                 ))}
+
+                {!showAllNotifications && hasMoreNotifications && (
+                  <div className="notifications-show-all-wrap">
+                    <button
+                      type="button"
+                      className="notifications-show-all-btn"
+                      onClick={() => setShowAllNotifications(true)}
+                    >
+                      Xem tất cả
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

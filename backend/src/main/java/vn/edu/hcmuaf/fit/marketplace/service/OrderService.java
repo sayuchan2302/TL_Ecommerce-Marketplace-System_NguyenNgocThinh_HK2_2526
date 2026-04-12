@@ -58,6 +58,7 @@ public class OrderService {
     private final PublicCodeService publicCodeService;
     private final ApplicationEventPublisher applicationEventPublisher;
     private final AdminAuditLogService adminAuditLogService;
+    private final NotificationDomainService notificationDomainService;
 
     @Autowired
     public OrderService(OrderRepository orderRepository, UserRepository userRepository,
@@ -66,7 +67,8 @@ public class OrderService {
                         StoreRepository storeRepository, CouponRepository couponRepository,
                         VoucherRepository voucherRepository, PublicCodeService publicCodeService,
                         ApplicationEventPublisher applicationEventPublisher,
-                        AdminAuditLogService adminAuditLogService) {
+                        AdminAuditLogService adminAuditLogService,
+                        NotificationDomainService notificationDomainService) {
         this.orderRepository = orderRepository;
         this.userRepository = userRepository;
         this.addressRepository = addressRepository;
@@ -79,6 +81,7 @@ public class OrderService {
         this.publicCodeService = publicCodeService;
         this.applicationEventPublisher = applicationEventPublisher;
         this.adminAuditLogService = adminAuditLogService;
+        this.notificationDomainService = notificationDomainService;
     }
 
     public OrderService(OrderRepository orderRepository, UserRepository userRepository,
@@ -99,6 +102,7 @@ public class OrderService {
                 voucherRepository,
                 publicCodeService,
                 applicationEventPublisher,
+                null,
                 null
         );
     }
@@ -118,6 +122,15 @@ public class OrderService {
                     Order.OrderStatus.WAITING_FOR_VENDOR,
                     Order.OrderStatus.CONFIRMED,
                     Order.OrderStatus.PROCESSING
+            );
+    private static final EnumSet<Order.OrderStatus> CUSTOMER_NOTIFICATION_STATUSES =
+            EnumSet.of(
+                    Order.OrderStatus.WAITING_FOR_VENDOR,
+                    Order.OrderStatus.CONFIRMED,
+                    Order.OrderStatus.PROCESSING,
+                    Order.OrderStatus.SHIPPED,
+                    Order.OrderStatus.DELIVERED,
+                    Order.OrderStatus.CANCELLED
             );
 
     private record PreparedOrderItem(
@@ -388,6 +401,7 @@ public class OrderService {
             savedOrder = syncParentOrderStatus(savedOrder.getId());
         }
         consumeDiscountUsageIfEligible(savedOrder);
+        notifyCustomerPaymentSuccess(savedOrder);
         return toAdminOrderResponse(savedOrder);
     }
 
@@ -839,6 +853,7 @@ public class OrderService {
             );
             created = processOrderAfterCheckout(created);
             consumeDiscountUsageIfEligible(created);
+            notifyCustomerOrderCreated(created);
             return toAdminOrderResponse(created);
         }
 
@@ -853,6 +868,7 @@ public class OrderService {
         );
         parent = processOrderAfterCheckout(parent);
         consumeDiscountUsageIfEligible(parent);
+        notifyCustomerOrderCreated(parent);
         return toAdminOrderResponse(parent);
     }
 
@@ -1034,7 +1050,13 @@ public class OrderService {
         }
 
         if (savedOrder.isParentOrder()) {
-            return syncParentOrderStatus(savedOrder.getId());
+            Order syncedParent = syncParentOrderStatus(savedOrder.getId());
+            notifyCustomerOrderStatusChanged(syncedParent, previousStatus, syncedParent.getStatus());
+            return syncedParent;
+        }
+
+        if (savedOrder.getParentOrder() == null) {
+            notifyCustomerOrderStatusChanged(savedOrder, previousStatus, savedOrder.getStatus());
         }
 
         return savedOrder;
@@ -1921,6 +1943,7 @@ public class OrderService {
 
     private Order syncParentOrderStatus(UUID parentOrderId) {
         Order parentOrder = findById(parentOrderId);
+        Order.OrderStatus previousStatus = parentOrder.getStatus();
         List<Order> subOrders = orderRepository.findByParentOrderIdOrderByCreatedAtDesc(parentOrderId);
         if (subOrders.isEmpty()) {
             return parentOrder;
@@ -1945,6 +1968,7 @@ public class OrderService {
         if (savedParent.getPaymentStatus() == Order.PaymentStatus.PAID) {
             consumeDiscountUsageIfEligible(savedParent);
         }
+        notifyCustomerOrderStatusChanged(savedParent, previousStatus, savedParent.getStatus());
         return savedParent;
     }
 
@@ -1982,6 +2006,106 @@ public class OrderService {
         }
 
         return Order.OrderStatus.PENDING;
+    }
+
+    private void notifyCustomerOrderCreated(Order order) {
+        if (notificationDomainService == null || order == null || order.getUser() == null) {
+            return;
+        }
+        if (order.getParentOrder() != null) {
+            return;
+        }
+        String code = resolveOrderDisplayCode(order);
+        String title = "Đơn #" + code + " đã được tạo";
+        String message = "Đơn hàng của bạn đã được tiếp nhận thành công.";
+        notificationDomainService.createAndPush(
+                order.getUser().getId(),
+                Notification.NotificationType.ORDER,
+                title,
+                message,
+                buildOrderDetailLink(order)
+        );
+    }
+
+    private void notifyCustomerPaymentSuccess(Order order) {
+        if (notificationDomainService == null || order == null || order.getUser() == null) {
+            return;
+        }
+        if (order.getParentOrder() != null) {
+            return;
+        }
+        String code = resolveOrderDisplayCode(order);
+        String title = "Thanh toán thành công cho đơn #" + code;
+        String message = "Hệ thống đã ghi nhận thanh toán của bạn.";
+        notificationDomainService.createAndPush(
+                order.getUser().getId(),
+                Notification.NotificationType.ORDER,
+                title,
+                message,
+                buildOrderDetailLink(order)
+        );
+    }
+
+    private void notifyCustomerOrderStatusChanged(Order order, Order.OrderStatus previousStatus, Order.OrderStatus currentStatus) {
+        if (notificationDomainService == null || order == null || order.getUser() == null) {
+            return;
+        }
+        if (order.getParentOrder() != null) {
+            return;
+        }
+        if (previousStatus == currentStatus || currentStatus == null || !CUSTOMER_NOTIFICATION_STATUSES.contains(currentStatus)) {
+            return;
+        }
+
+        String code = resolveOrderDisplayCode(order);
+        String title = "Đơn #" + code + " " + customerStatusTitle(currentStatus);
+        String message = customerStatusMessage(currentStatus);
+        notificationDomainService.createAndPush(
+                order.getUser().getId(),
+                Notification.NotificationType.ORDER,
+                title,
+                message,
+                buildOrderDetailLink(order)
+        );
+    }
+
+    private String customerStatusTitle(Order.OrderStatus status) {
+        return switch (status) {
+            case WAITING_FOR_VENDOR -> "đã được tiếp nhận";
+            case CONFIRMED -> "đã được xác nhận";
+            case PROCESSING -> "đang được chuẩn bị";
+            case SHIPPED -> "đang được giao";
+            case DELIVERED -> "đã giao thành công";
+            case CANCELLED -> "đã bị hủy";
+            default -> "đã được cập nhật";
+        };
+    }
+
+    private String customerStatusMessage(Order.OrderStatus status) {
+        return switch (status) {
+            case WAITING_FOR_VENDOR -> "Người bán sẽ xác nhận đơn của bạn trong thời gian sớm nhất.";
+            case CONFIRMED -> "Người bán đã xác nhận đơn hàng của bạn.";
+            case PROCESSING -> "Đơn hàng đang được chuẩn bị để bàn giao đơn vị vận chuyển.";
+            case SHIPPED -> "Đơn hàng đang trên đường giao tới bạn.";
+            case DELIVERED -> "Đơn hàng đã được giao thành công.";
+            case CANCELLED -> "Đơn hàng đã bị hủy. Nếu đã thanh toán, hệ thống sẽ xử lý hoàn tiền theo chính sách.";
+            default -> "Trạng thái đơn hàng của bạn đã được cập nhật.";
+        };
+    }
+
+    private String buildOrderDetailLink(Order order) {
+        return "/profile/orders/" + resolveOrderDisplayCode(order);
+    }
+
+    private String resolveOrderDisplayCode(Order order) {
+        if (order == null) {
+            return "";
+        }
+        String orderCode = normalizeOptionalText(order.getOrderCode());
+        if (!orderCode.isEmpty()) {
+            return orderCode;
+        }
+        return order.getId() == null ? "" : order.getId().toString();
     }
 
     private String safeEnumName(Enum<?> value) {

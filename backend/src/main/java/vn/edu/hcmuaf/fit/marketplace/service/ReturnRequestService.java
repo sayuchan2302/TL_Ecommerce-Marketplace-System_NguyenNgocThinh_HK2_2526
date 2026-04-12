@@ -12,6 +12,7 @@ import vn.edu.hcmuaf.fit.marketplace.dto.request.ReturnAdminVerdictRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.ReturnSubmitRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.ReturnRequestResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.VendorReturnSummaryResponse;
+import vn.edu.hcmuaf.fit.marketplace.entity.Notification;
 import vn.edu.hcmuaf.fit.marketplace.entity.Order;
 import vn.edu.hcmuaf.fit.marketplace.entity.OrderItem;
 import vn.edu.hcmuaf.fit.marketplace.entity.ReturnRequest;
@@ -42,6 +43,7 @@ public class ReturnRequestService {
     private final PublicCodeService publicCodeService;
     private final WalletService walletService;
     private final AdminAuditLogService adminAuditLogService;
+    private final NotificationDomainService notificationDomainService;
 
     @Autowired
     public ReturnRequestService(
@@ -50,7 +52,8 @@ public class ReturnRequestService {
             StoreRepository storeRepository,
             PublicCodeService publicCodeService,
             WalletService walletService,
-            AdminAuditLogService adminAuditLogService
+            AdminAuditLogService adminAuditLogService,
+            NotificationDomainService notificationDomainService
     ) {
         this.returnRequestRepository = returnRequestRepository;
         this.orderRepository = orderRepository;
@@ -58,6 +61,7 @@ public class ReturnRequestService {
         this.publicCodeService = publicCodeService;
         this.walletService = walletService;
         this.adminAuditLogService = adminAuditLogService;
+        this.notificationDomainService = notificationDomainService;
     }
 
     public ReturnRequestService(
@@ -73,6 +77,7 @@ public class ReturnRequestService {
                 storeRepository,
                 publicCodeService,
                 walletService,
+                null,
                 null
         );
     }
@@ -153,7 +158,9 @@ public class ReturnRequestService {
                 .updatedBy(userId.toString())
                 .build();
 
-        return toResponse(returnRequestRepository.save(request));
+        ReturnRequest saved = returnRequestRepository.save(request);
+        notifyCustomerReturnCreated(saved);
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -255,7 +262,9 @@ public class ReturnRequestService {
         request.setStatus(ReturnRequest.ReturnStatus.ACCEPTED);
         request.setVendorReason(null);
         request.setUpdatedBy(actor);
-        return toResponse(returnRequestRepository.save(request));
+        ReturnRequest saved = returnRequestRepository.save(request);
+        notifyCustomerReturnStatusChanged(saved);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -275,7 +284,9 @@ public class ReturnRequestService {
         request.setVendorReason(normalizedReason);
         request.setAdminFinalized(false);
         request.setUpdatedBy(actor);
-        return toResponse(returnRequestRepository.save(request));
+        ReturnRequest saved = returnRequestRepository.save(request);
+        notifyCustomerReturnStatusChanged(saved);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -301,7 +312,9 @@ public class ReturnRequestService {
         request.setStatus(ReturnRequest.ReturnStatus.RECEIVED);
         request.setReceivedAt(LocalDateTime.now());
         request.setUpdatedBy(actor);
-        return toResponse(returnRequestRepository.save(request));
+        ReturnRequest saved = returnRequestRepository.save(request);
+        notifyCustomerReturnStatusChanged(saved);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -332,6 +345,7 @@ public class ReturnRequestService {
                 refundAmount,
                 "Refund for return " + resolveReturnCode(saved)
         );
+        notifyCustomerReturnStatusChanged(saved);
         return toResponse(saved);
     }
 
@@ -421,6 +435,7 @@ public class ReturnRequestService {
                         true,
                         normalizeOptionalText(adminNote)
                 );
+                notifyCustomerReturnStatusChanged(saved);
                 return toResponse(saved);
             }
 
@@ -442,6 +457,7 @@ public class ReturnRequestService {
                     true,
                     normalizedAdminNote
             );
+            notifyCustomerReturnStatusChanged(saved);
             return toResponse(saved);
         } catch (RuntimeException ex) {
             writeAdminAuditLog(
@@ -457,6 +473,73 @@ public class ReturnRequestService {
             );
             throw ex;
         }
+    }
+
+    private void notifyCustomerReturnCreated(ReturnRequest request) {
+        if (notificationDomainService == null || request == null || request.getUser() == null || request.getUser().getId() == null) {
+            return;
+        }
+        String code = resolveReturnCode(request);
+        String title = "Yêu cầu #" + code + " đã được tạo";
+        String message = "Yêu cầu đổi/trả của bạn đã được gửi tới người bán.";
+        notificationDomainService.createAndPush(
+                request.getUser().getId(),
+                Notification.NotificationType.SYSTEM,
+                title,
+                message,
+                buildReturnDetailLink(request)
+        );
+    }
+
+    private void notifyCustomerReturnStatusChanged(ReturnRequest request) {
+        if (notificationDomainService == null || request == null || request.getUser() == null || request.getUser().getId() == null) {
+            return;
+        }
+        ReturnRequest.ReturnStatus status = request.getStatus();
+        if (status == null) {
+            return;
+        }
+        String code = resolveReturnCode(request);
+        String title = "Yêu cầu #" + code + " " + returnStatusTitle(status);
+        String message = returnStatusMessage(status);
+        notificationDomainService.createAndPush(
+                request.getUser().getId(),
+                Notification.NotificationType.SYSTEM,
+                title,
+                message,
+                buildReturnDetailLink(request)
+        );
+    }
+
+    private String returnStatusTitle(ReturnRequest.ReturnStatus status) {
+        return switch (status) {
+            case PENDING_VENDOR -> "đã gửi tới người bán";
+            case ACCEPTED -> "được chấp nhận";
+            case SHIPPING -> "đang vận chuyển";
+            case RECEIVED -> "đã được người bán nhận";
+            case COMPLETED -> "đã hoàn tất";
+            case REJECTED -> "bị từ chối";
+            case DISPUTED -> "đang được xử lý tranh chấp";
+            case CANCELLED -> "đã bị hủy";
+        };
+    }
+
+    private String returnStatusMessage(ReturnRequest.ReturnStatus status) {
+        return switch (status) {
+            case PENDING_VENDOR -> "Người bán sẽ phản hồi yêu cầu đổi/trả của bạn sớm.";
+            case ACCEPTED -> "Người bán đã chấp nhận yêu cầu đổi/trả của bạn.";
+            case SHIPPING -> "Bạn đã cập nhật vận chuyển cho yêu cầu đổi/trả.";
+            case RECEIVED -> "Người bán đã nhận được kiện hàng hoàn trả.";
+            case COMPLETED -> "Yêu cầu đổi/trả đã hoàn tất.";
+            case REJECTED -> "Yêu cầu đổi/trả đã bị từ chối.";
+            case DISPUTED -> "Yêu cầu đổi/trả đang trong quá trình xử lý tranh chấp.";
+            case CANCELLED -> "Yêu cầu đổi/trả đã được hủy.";
+        };
+    }
+
+    private String buildReturnDetailLink(ReturnRequest request) {
+        String code = resolveReturnCode(request);
+        return "/returns?code=" + code;
     }
 
     private ReturnRequest findById(UUID id) {

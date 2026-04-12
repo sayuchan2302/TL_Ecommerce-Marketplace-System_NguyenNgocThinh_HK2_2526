@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle, Package, ArrowRight, Home, Truck, Gift } from 'lucide-react';
 import { orderService } from '../../services/orderService';
@@ -8,36 +8,36 @@ import './OrderSuccess.css';
 const getPaymentMethodLabel = (paymentMethod?: string) => {
   switch ((paymentMethod || '').toUpperCase()) {
     case 'VNPAY':
-      return 'Thanh to�n qua VNPay';
+      return 'Thanh toán qua VNPay';
     case 'MOMO':
-      return 'Thanh to�n qua MoMo';
+      return 'Thanh toán qua MoMo';
     case 'ZALOPAY':
-      return 'Thanh to�n qua ZaloPay';
+      return 'Thanh toán qua ZaloPay';
     case 'BANK_TRANSFER':
-      return 'Chuy?n kho?n ng�n h�ng';
+      return 'Chuyển khoản ngân hàng';
     case 'COD':
-      return 'Thanh to�n khi nh?n h�ng';
+      return 'Thanh toán khi nhận hàng';
     default:
-      return 'Thanh to�n khi nh?n h�ng';
+      return 'Thanh toán khi nhận hàng';
   }
 };
 
 const getOrderStatusLabel = (status?: Order['status']) => {
   switch (status) {
     case 'pending':
-      return 'Ch? x�c nh?n';
+      return 'Chờ xác nhận';
     case 'processing':
-      return '�ang x? l�';
+      return 'Đang xử lý';
     case 'shipping':
-      return '�ang giao';
+      return 'Đang giao';
     case 'delivered':
-      return '�� giao';
+      return 'Đã giao';
     case 'cancelled':
-      return '�� h?y';
+      return 'Đã hủy';
     case 'refunded':
-      return '�� ho�n ti?n';
+      return 'Đã hoàn tiền';
     default:
-      return '�ang x? l�';
+      return 'Đang xử lý';
   }
 };
 
@@ -174,22 +174,22 @@ const OrderSuccess = () => {
             </div>
           </div>
 
-          <h1 className="os-title">�?t h�ng th�nh c�ng! ??</h1>
-          <p className="os-subtitle">C?m on b?n d� tin tu?ng mua s?m t?i Coolmate</p>
+          <h1 className="os-title">Đặt hàng thành công!</h1>
+          <p className="os-subtitle">Cảm ơn bạn đã tin tưởng mua sắm tại Coolmate</p>
 
           <div className="os-order-info">
             <div className="os-info-row">
-              <span className="os-label">M� don h�ng</span>
+              <span className="os-label">Mã đơn hàng</span>
               <span className="os-value os-order-id">#{orderId}</span>
             </div>
             <div className="os-info-row">
-              <span className="os-label">Tr?ng th�i</span>
+              <span className="os-label">Trạng thái</span>
               <span className="os-value os-status">
                 <Package size={14} /> {statusLabel}
               </span>
             </div>
             <div className="os-info-row">
-              <span className="os-label">Phuong th?c thanh to�n</span>
+              <span className="os-label">Phương thức thanh toán</span>
               <span className="os-value">{paymentMethodLabel}</span>
             </div>
           </div>
@@ -197,35 +197,35 @@ const OrderSuccess = () => {
           <div className="os-delivery-estimate">
             <Truck size={18} className="os-delivery-icon" />
             <div>
-              <p className="os-delivery-label">D? ki?n giao h�ng</p>
+              <p className="os-delivery-label">Dự kiến giao hàng</p>
               <p className="os-delivery-date">{formattedDate}</p>
             </div>
           </div>
 
           <p className="os-note">
-            B?n s? nh?n du?c email x�c nh?n trong v�i ph�t t?i.
-            Theo d�i don h�ng trong ph?n <strong>L?ch s? don h�ng</strong>.
+            Bạn sẽ nhận được email xác nhận trong vài phút tới.
+            Theo dõi đơn hàng trong phần <strong>Lịch sử đơn hàng</strong>.
           </p>
 
           <div className="os-actions">
             <Link to={`/profile/orders/${encodeURIComponent(orderId)}`} className="os-btn os-btn-outline">
               <Package size={16} />
-              Xem don h�ng
+              Xem đơn hàng
             </Link>
             <Link to={`/payment-result?status=success&orderCode=${orderId}`} className="os-btn os-btn-outline">
               <Home size={16} />
-              Xem thanh to�n
+              Xem thanh toán
             </Link>
             <Link to="/" className="os-btn os-btn-primary">
               <Home size={16} />
-              Ti?p t?c mua s?m
+              Tiếp tục mua sắm
               <ArrowRight size={16} />
             </Link>
           </div>
 
           <div className="os-loyalty-hint">
             <Gift size={16} />
-            <span>B?n d� t�ch luy th�m <strong>di?m CoolClub</strong> t? don h�ng n�y!</span>
+            <span>Bạn đã tích lũy thêm <strong>điểm CoolClub</strong> từ đơn hàng này!</span>
           </div>
         </div>
 

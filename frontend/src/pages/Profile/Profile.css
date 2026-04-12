@@ -1958,6 +1958,28 @@ body.modal-open {
   background: #fef2f2;
 }
 
+.notifications-show-all-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 16px 0 8px;
+}
+
+.notifications-show-all-btn {
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.notifications-show-all-btn:hover {
+  background: #dbeafe;
+}
+
 .notification-dot {
   position: absolute;
   top: 20px;
