@@ -951,7 +951,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
 }
 
 .admin-panel-head h2 {
@@ -2790,6 +2790,11 @@ body {
   border-color: var(--co-blue);
 }
 
+.page-btn.active:hover {
+  background: #0d5dd7;
+  border-color: #0d5dd7;
+}
+
 .page-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -3973,7 +3978,7 @@ input:disabled,
 }
 
 .admin-table-row.taxonomy-audit {
-  grid-template-columns: minmax(170px, 1.4fr) minmax(280px, 2.4fr) minmax(100px, 0.8fr) minmax(110px, 0.8fr) minmax(120px, 0.9fr) minmax(150px, 1fr);
+  grid-template-columns: 50px minmax(150px, 1.2fr) minmax(220px, 2fr) minmax(90px, 0.7fr) minmax(90px, 0.7fr) minmax(100px, 0.8fr) minmax(130px, 0.9fr);
 }
 
 @media (max-width: 1180px) {
@@ -4530,13 +4535,13 @@ textarea:focus-visible {
 .admin-table-row.moderation-row {
   grid-template-columns:
     38px
-    minmax(280px, 2.35fr)
-    minmax(165px, 1.2fr)
-    minmax(150px, 1fr)
-    minmax(120px, 0.8fr)
-    minmax(124px, 0.9fr)
-    minmax(110px, 0.86fr)
-    minmax(130px, 0.96fr);
+    50px
+    minmax(200px, 2.4fr)
+    minmax(140px, 1.1fr)
+    minmax(130px, 1fr)
+    minmax(100px, 0.75fr)
+    minmax(110px, 0.85fr)
+    minmax(120px, 0.9fr);
   min-width: 0;
 }
 

@@ -293,24 +293,14 @@ const AdminPromotions = () => {
         await adminPromotionService.update(editingId, toUpsertInput(form));
         pushToast('Đã cập nhật chiến dịch.');
       } else if (isAllMarketplaceSelection(form.storeId)) {
-        const targetStores = selectableStores.map((store) => store.id);
-        const requests = targetStores.map((storeId) =>
-          adminPromotionService.create(toUpsertInput(form, storeId)),
-        );
-        const settled = await Promise.allSettled(requests);
-        const successCount = settled.filter((result) => result.status === 'fulfilled').length;
-        const failedCount = settled.length - successCount;
-
-        if (successCount === 0) {
-          const firstReject = settled.find((result) => result.status === 'rejected');
-          const reason = firstReject && firstReject.status === 'rejected' ? firstReject.reason : null;
-          throw reason instanceof Error ? reason : new Error('Không thể tạo chiến dịch toàn sàn.');
+        const campaign = await adminPromotionService.createMarketplaceCampaign(toUpsertInput(form));
+        if (campaign.createdCount <= 0) {
+          throw new Error('Không thể tạo chiến dịch toàn sàn.');
         }
-
-        if (failedCount > 0) {
-          pushToast(`Đã tạo ${successCount} voucher toàn sàn (${failedCount} gian hàng lỗi).`);
+        if (campaign.failedCount > 0) {
+          pushToast(`Đã tạo ${campaign.createdCount} voucher toàn sàn (${campaign.failedCount} gian hàng lỗi).`);
         } else {
-          pushToast(`Đã tạo voucher toàn sàn cho ${successCount} gian hàng.`);
+          pushToast(`Đã tạo voucher toàn sàn cho ${campaign.createdCount} gian hàng.`);
         }
       } else {
         await adminPromotionService.create(toUpsertInput(form));

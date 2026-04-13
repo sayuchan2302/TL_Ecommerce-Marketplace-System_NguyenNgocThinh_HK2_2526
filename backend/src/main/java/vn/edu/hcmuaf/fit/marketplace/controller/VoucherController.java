@@ -17,8 +17,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import vn.edu.hcmuaf.fit.marketplace.dto.request.MarketplaceCampaignRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.VoucherRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.VoucherStatusUpdateRequest;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceCampaignResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.VoucherListResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.VoucherResponse;
 import vn.edu.hcmuaf.fit.marketplace.entity.Voucher;
@@ -144,6 +146,17 @@ public class VoucherController {
             @Valid @RequestBody VoucherRequest request) {
         UserContext ctx = authContext.requireAdmin(authHeader);
         VoucherResponse response = voucherService.createAdmin(request, ctx.getEmail());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/admin/marketplace-campaign")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<MarketplaceCampaignResponse> createMarketplaceCampaign(
+            @RequestHeader("Authorization") String authHeader,
+            @Valid @RequestBody MarketplaceCampaignRequest request
+    ) {
+        UserContext ctx = authContext.requireAdmin(authHeader);
+        MarketplaceCampaignResponse response = voucherService.createAdminMarketplaceCampaign(request, ctx.getEmail());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

@@ -410,7 +410,6 @@ public class MarketplaceSeeder implements ApplicationRunner {
         Address addressLan = createAddress(customerLan, "Đỗ Ngọc Lan", "0901000002", "TP. Hồ Chí Minh", "Quận 3", "Phường Võ Thị Sáu", "212 Nam Kỳ Khởi Nghĩa", true, "Công ty");
         Address addressHuy = createAddress(customerHuy, "Vũ Đức Huy", "0901000003", "Đà Nẵng", "Hải Châu", "Phường Thạch Thang", "55 Trần Phú", true, "Nhà riêng");
 
-        createCart(customerMinh, List.of(new SeederCartLine(quanJeanSlim, jeanXanh32, 1), new SeederCartLine(blazerNu, blazerBeM, 1)));
         createCart(customerLan, List.of(new SeederCartLine(tuiDaMem, tuiDenFree, 1), new SeederCartLine(aoThunPremium, aoThunTrangL, 2)));
         createCart(customerHuy, List.of(new SeederCartLine(damMidi, damKemS, 1)));
 

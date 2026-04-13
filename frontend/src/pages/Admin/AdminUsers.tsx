@@ -407,7 +407,7 @@ const AdminUsers = () => {
           ) : (
             <>
               <div className="admin-table" role="table" aria-label="Bảng người dùng hệ sinh thái">
-                <div className="admin-table-row users admin-table-head" role="row">
+<div className="admin-table-row users admin-table-head" role="row">
                   <div role="columnheader">
                     <input
                       type="checkbox"
@@ -417,6 +417,7 @@ const AdminUsers = () => {
                       }
                     />
                   </div>
+                  <div role="columnheader">STT</div>
                   <div role="columnheader">Tài khoản</div>
                   <div role="columnheader">Vai trò</div>
                   <div role="columnheader">Tổng chi</div>
@@ -425,7 +426,7 @@ const AdminUsers = () => {
                   <div role="columnheader">Hành động</div>
                 </div>
 
-                {pagedUsers.map((user) => {
+                {pagedUsers.map((user, index) => {
                   return (
                     <motion.div
                       key={user.id}
@@ -447,6 +448,7 @@ const AdminUsers = () => {
                           }}
                         />
                       </div>
+                      <div role="cell" className="admin-mono">{(safePage - 1) * pageSize + index + 1}</div>
                       <div role="cell" className="user-cell">
                         {renderUserAvatar(user)}
                         <div className="user-copy">

@@ -251,7 +251,7 @@ const AdminProductGovernance = () => {
             />
           ) : (
             <>
-              <div className="admin-table moderation-table" role="table" aria-label="Danh sách sản phẩm vendor">
+                <div className="admin-table moderation-table" role="table" aria-label="Danh sách sản phẩm vendor">
                 <div className="admin-table-row admin-table-head moderation-row" role="row">
                   <div role="columnheader">
                     <input
@@ -263,16 +263,16 @@ const AdminProductGovernance = () => {
                       aria-label="Chọn tất cả"
                     />
                   </div>
+                  <div role="columnheader">STT</div>
                   <div role="columnheader">Sản phẩm</div>
                   <div role="columnheader">Gian hàng</div>
                   <div role="columnheader" className="moderation-col-category">Danh mục</div>
                   <div role="columnheader">Giá</div>
-                  <div role="columnheader">Sales / Stock</div>
                   <div role="columnheader">Trạng thái</div>
                   <div role="columnheader" className="moderation-col-actions">Hành động</div>
                 </div>
 
-                {rows.map((product) => (
+                {rows.map((product, index) => (
                   <motion.div key={product.id} className="admin-table-row moderation-row" role="row" whileHover={{ y: -1 }}>
                     <div role="cell">
                       <input
@@ -286,6 +286,9 @@ const AdminProductGovernance = () => {
                         }}
                         aria-label={`Chọn ${product.productCode}`}
                       />
+                    </div>
+                    <div role="cell" className="admin-mono">
+                      {page * PAGE_SIZE + index + 1}
                     </div>
                     <div role="cell" className="moderation-product-cell">
                       <img src={product.thumbnail || ''} alt={product.name} className="moderation-thumb" />
@@ -312,11 +315,6 @@ const AdminProductGovernance = () => {
                     </div>
 
                     <div role="cell" className="admin-bold">{formatCurrency(product.price)}</div>
-
-                    <div role="cell" className="moderation-sales-stock">
-                      <span>Sales: {product.sales.toLocaleString('vi-VN')}</span>
-                      <small>Stock: {product.stock.toLocaleString('vi-VN')}</small>
-                    </div>
 
                     <div role="cell">
                       <span className={statusPillClass(product.approvalStatus)}>{statusLabel[product.approvalStatus]}</span>

@@ -7,8 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import vn.edu.hcmuaf.fit.marketplace.dto.request.MarketplaceCampaignRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.VoucherRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.VoucherStatusUpdateRequest;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceCampaignResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.VoucherListResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.VoucherResponse;
 import java.math.BigDecimal;
@@ -17,6 +19,7 @@ import vn.edu.hcmuaf.fit.marketplace.entity.Voucher;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.VoucherRepository;
 
+import java.util.ArrayList;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
@@ -28,10 +31,16 @@ public class VoucherService {
 
     private final VoucherRepository voucherRepository;
     private final StoreRepository storeRepository;
+    private final PromotionNotificationService promotionNotificationService;
 
-    public VoucherService(VoucherRepository voucherRepository, StoreRepository storeRepository) {
+    public VoucherService(
+            VoucherRepository voucherRepository,
+            StoreRepository storeRepository,
+            PromotionNotificationService promotionNotificationService
+    ) {
         this.voucherRepository = voucherRepository;
         this.storeRepository = storeRepository;
+        this.promotionNotificationService = promotionNotificationService;
     }
 
     @Transactional(readOnly = true)
@@ -113,24 +122,24 @@ public class VoucherService {
         validateRequest(request);
         String normalizedCode = normalizeCode(request.getCode());
 
-        Voucher voucher = Voucher.builder()
-                .storeId(storeId)
-                .name(request.getName().trim())
-                .code(normalizedCode)
-                .description(normalizeDescription(request.getDescription()))
-                .discountType(request.getDiscountType())
-                .discountValue(request.getDiscountValue())
-                .minOrderValue(safeMinOrder(request.getMinOrderValue()))
-                .totalIssued(request.getTotalIssued())
-                .usedCount(0)
-                .startDate(request.getStartDate())
-                .endDate(request.getEndDate())
-                .status(request.getStatus() == null ? Voucher.VoucherStatus.DRAFT : request.getStatus())
-                .updatedBy(actor)
-                .build();
+        Voucher voucher = buildVoucher(
+                storeId,
+                request.getName(),
+                normalizedCode,
+                request.getDescription(),
+                request.getDiscountType(),
+                request.getDiscountValue(),
+                request.getMinOrderValue(),
+                request.getTotalIssued(),
+                request.getStartDate(),
+                request.getEndDate(),
+                request.getStatus(),
+                actor
+        );
 
         try {
             Voucher saved = voucherRepository.save(voucher);
+            notifyStoreFollowersIfRunningTransition(null, saved);
             return toResponse(saved);
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Voucher code already exists in this store");
@@ -143,24 +152,24 @@ public class VoucherService {
         UUID storeId = resolveStoreIdForAdmin(request);
         String normalizedCode = normalizeCode(request.getCode());
 
-        Voucher voucher = Voucher.builder()
-                .storeId(storeId)
-                .name(request.getName().trim())
-                .code(normalizedCode)
-                .description(normalizeDescription(request.getDescription()))
-                .discountType(request.getDiscountType())
-                .discountValue(request.getDiscountValue())
-                .minOrderValue(safeMinOrder(request.getMinOrderValue()))
-                .totalIssued(request.getTotalIssued())
-                .usedCount(0)
-                .startDate(request.getStartDate())
-                .endDate(request.getEndDate())
-                .status(request.getStatus() == null ? Voucher.VoucherStatus.DRAFT : request.getStatus())
-                .updatedBy(actor)
-                .build();
+        Voucher voucher = buildVoucher(
+                storeId,
+                request.getName(),
+                normalizedCode,
+                request.getDescription(),
+                request.getDiscountType(),
+                request.getDiscountValue(),
+                request.getMinOrderValue(),
+                request.getTotalIssued(),
+                request.getStartDate(),
+                request.getEndDate(),
+                request.getStatus(),
+                actor
+        );
 
         try {
             Voucher saved = voucherRepository.save(voucher);
+            notifyStoreFollowersIfRunningTransition(null, saved);
             return toResponse(saved);
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Voucher code already exists in this store");
@@ -171,6 +180,7 @@ public class VoucherService {
     public VoucherResponse update(UUID storeId, UUID voucherId, VoucherRequest request, String actor) {
         validateRequest(request);
         Voucher voucher = getOwnedVoucher(storeId, voucherId);
+        Voucher.VoucherStatus previousStatus = voucher.getStatus();
         String normalizedCode = normalizeCode(request.getCode());
 
         if (request.getTotalIssued() < safeUsedCount(voucher.getUsedCount())) {
@@ -193,6 +203,7 @@ public class VoucherService {
 
         try {
             Voucher saved = voucherRepository.save(voucher);
+            notifyStoreFollowersIfRunningTransition(previousStatus, saved);
             return toResponse(saved);
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Voucher code already exists in this store");
@@ -203,6 +214,7 @@ public class VoucherService {
     public VoucherResponse updateAdmin(UUID voucherId, VoucherRequest request, String actor) {
         validateRequest(request);
         Voucher voucher = getVoucherById(voucherId);
+        Voucher.VoucherStatus previousStatus = voucher.getStatus();
         UUID nextStoreId = request.getStoreId() != null ? request.getStoreId() : voucher.getStoreId();
         if (nextStoreId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Store is required");
@@ -231,6 +243,7 @@ public class VoucherService {
 
         try {
             Voucher saved = voucherRepository.save(voucher);
+            notifyStoreFollowersIfRunningTransition(previousStatus, saved);
             return toResponse(saved);
         } catch (DataIntegrityViolationException ex) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Voucher code already exists in this store");
@@ -240,18 +253,23 @@ public class VoucherService {
     @Transactional
     public VoucherResponse updateStatus(UUID storeId, UUID voucherId, VoucherStatusUpdateRequest request, String actor) {
         Voucher voucher = getOwnedVoucher(storeId, voucherId);
+        Voucher.VoucherStatus previousStatus = voucher.getStatus();
         voucher.setStatus(request.getStatus());
         voucher.setUpdatedBy(actor);
         Voucher saved = voucherRepository.save(voucher);
+        notifyStoreFollowersIfRunningTransition(previousStatus, saved);
         return toResponse(saved);
     }
 
     @Transactional
     public VoucherResponse updateAdminStatus(UUID voucherId, VoucherStatusUpdateRequest request, String actor) {
         Voucher voucher = getVoucherById(voucherId);
+        Voucher.VoucherStatus previousStatus = voucher.getStatus();
         voucher.setStatus(request.getStatus());
         voucher.setUpdatedBy(actor);
-        return toResponse(voucherRepository.save(voucher));
+        Voucher saved = voucherRepository.save(voucher);
+        notifyStoreFollowersIfRunningTransition(previousStatus, saved);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -263,6 +281,157 @@ public class VoucherService {
     @Transactional
     public void deleteAdmin(UUID voucherId) {
         voucherRepository.delete(getVoucherById(voucherId));
+    }
+
+    @Transactional
+    public MarketplaceCampaignResponse createAdminMarketplaceCampaign(MarketplaceCampaignRequest request, String actor) {
+        validateMarketplaceCampaignRequest(request);
+
+        List<Store> approvedStores = storeRepository.findByApprovalStatusAndStatus(
+                Store.ApprovalStatus.APPROVED,
+                Store.StoreStatus.ACTIVE
+        );
+        if (approvedStores.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No approved active store found for marketplace campaign");
+        }
+
+        String normalizedCode = normalizeCode(request.getCode());
+        List<MarketplaceCampaignResponse.StoreFailure> failures = new ArrayList<>();
+        int createdCount = 0;
+
+        for (Store store : approvedStores) {
+            if (store == null || store.getId() == null) {
+                continue;
+            }
+            boolean duplicatedCode = voucherRepository.findByStoreIdAndCode(store.getId(), normalizedCode).isPresent();
+            if (duplicatedCode) {
+                failures.add(MarketplaceCampaignResponse.StoreFailure.builder()
+                        .storeId(store.getId())
+                        .storeName(store.getName())
+                        .reason("Voucher code already exists in this store")
+                        .build());
+                continue;
+            }
+
+            Voucher voucher = buildVoucher(
+                    store.getId(),
+                    request.getName(),
+                    normalizedCode,
+                    request.getDescription(),
+                    request.getDiscountType(),
+                    request.getDiscountValue(),
+                    request.getMinOrderValue(),
+                    request.getTotalIssued(),
+                    request.getStartDate(),
+                    request.getEndDate(),
+                    request.getStatus(),
+                    actor
+            );
+            voucherRepository.save(voucher);
+            createdCount++;
+        }
+
+        if (createdCount > 0 && isCampaignRunningAndPubliclyAvailable(request)) {
+            promotionNotificationService.notifyMarketplaceCampaign(normalizedCode);
+        }
+
+        return MarketplaceCampaignResponse.builder()
+                .code(normalizedCode)
+                .createdCount(createdCount)
+                .failedCount(failures.size())
+                .failures(failures)
+                .build();
+    }
+
+    private Voucher buildVoucher(
+            UUID storeId,
+            String name,
+            String normalizedCode,
+            String description,
+            Voucher.DiscountType discountType,
+            BigDecimal discountValue,
+            BigDecimal minOrderValue,
+            Integer totalIssued,
+            LocalDate startDate,
+            LocalDate endDate,
+            Voucher.VoucherStatus status,
+            String actor
+    ) {
+        return Voucher.builder()
+                .storeId(storeId)
+                .name(name == null ? "" : name.trim())
+                .code(normalizedCode)
+                .description(normalizeDescription(description))
+                .discountType(discountType)
+                .discountValue(discountValue)
+                .minOrderValue(safeMinOrder(minOrderValue))
+                .totalIssued(totalIssued)
+                .usedCount(0)
+                .startDate(startDate)
+                .endDate(endDate)
+                .status(status == null ? Voucher.VoucherStatus.DRAFT : status)
+                .updatedBy(actor)
+                .build();
+    }
+
+    private void notifyStoreFollowersIfRunningTransition(Voucher.VoucherStatus previousStatus, Voucher savedVoucher) {
+        if (promotionNotificationService == null || savedVoucher == null) {
+            return;
+        }
+        if (!hasTransitionedToRunning(previousStatus, savedVoucher.getStatus())) {
+            return;
+        }
+        if (!isVoucherPubliclyAvailable(savedVoucher)) {
+            return;
+        }
+        promotionNotificationService.notifyStoreFollowersForRunningVoucher(savedVoucher);
+    }
+
+    private boolean hasTransitionedToRunning(Voucher.VoucherStatus previousStatus, Voucher.VoucherStatus currentStatus) {
+        return currentStatus == Voucher.VoucherStatus.RUNNING
+                && previousStatus != Voucher.VoucherStatus.RUNNING;
+    }
+
+    private boolean isVoucherPubliclyAvailable(Voucher voucher) {
+        if (voucher == null) {
+            return false;
+        }
+        if (voucher.getStatus() != Voucher.VoucherStatus.RUNNING) {
+            return false;
+        }
+
+        LocalDate today = LocalDate.now();
+        if (voucher.getStartDate() != null && voucher.getStartDate().isAfter(today)) {
+            return false;
+        }
+        if (voucher.getEndDate() != null && voucher.getEndDate().isBefore(today)) {
+            return false;
+        }
+
+        int usedCount = safeUsedCount(voucher.getUsedCount());
+        int totalIssued = voucher.getTotalIssued() == null ? 0 : Math.max(voucher.getTotalIssued(), 0);
+        return usedCount < totalIssued;
+    }
+
+    private boolean isCampaignRunningAndPubliclyAvailable(MarketplaceCampaignRequest request) {
+        if (request == null) {
+            return false;
+        }
+
+        Voucher.VoucherStatus status = request.getStatus() == null ? Voucher.VoucherStatus.DRAFT : request.getStatus();
+        if (status != Voucher.VoucherStatus.RUNNING) {
+            return false;
+        }
+
+        LocalDate today = LocalDate.now();
+        if (request.getStartDate() != null && request.getStartDate().isAfter(today)) {
+            return false;
+        }
+        if (request.getEndDate() != null && request.getEndDate().isBefore(today)) {
+            return false;
+        }
+
+        return request.getTotalIssued() != null && request.getTotalIssued() > 0;
     }
 
     private Voucher getOwnedVoucher(UUID storeId, UUID voucherId) {
@@ -289,12 +458,30 @@ public class VoucherService {
     }
 
     private void validateRequest(VoucherRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Voucher payload is required");
+        }
         if (request.getStartDate() != null && request.getEndDate() != null
                 && request.getEndDate().isBefore(request.getStartDate())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date must be after start date");
         }
 
         if (request.getDiscountType() == Voucher.DiscountType.PERCENT && request.getDiscountValue().compareTo(new BigDecimal("100")) > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Percent discount cannot exceed 100");
+        }
+    }
+
+    private void validateMarketplaceCampaignRequest(MarketplaceCampaignRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Campaign payload is required");
+        }
+        if (request.getStartDate() != null && request.getEndDate() != null
+                && request.getEndDate().isBefore(request.getStartDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "End date must be after start date");
+        }
+        if (request.getDiscountType() == Voucher.DiscountType.PERCENT
+                && request.getDiscountValue() != null
+                && request.getDiscountValue().compareTo(new BigDecimal("100")) > 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Percent discount cannot exceed 100");
         }
     }

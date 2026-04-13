@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import vn.edu.hcmuaf.fit.marketplace.entity.Store;
 import vn.edu.hcmuaf.fit.marketplace.entity.StoreFollow;
+import vn.edu.hcmuaf.fit.marketplace.entity.User;
 
 import java.util.List;
 import java.util.UUID;
@@ -48,4 +49,16 @@ public interface StoreFollowRepository extends JpaRepository<StoreFollow, UUID> 
             GROUP BY sf.store.id
             """)
     List<StoreFollowerCountProjection> countFollowersByStoreIds(@Param("storeIds") List<UUID> storeIds);
+
+    @Query("""
+            SELECT DISTINCT sf.user.id
+            FROM StoreFollow sf
+            WHERE sf.store.id = :storeId
+              AND sf.user.role = :role
+              AND sf.user.isActive = true
+            """)
+    List<UUID> findFollowerUserIdsByStoreIdAndRoleAndActive(
+            @Param("storeId") UUID storeId,
+            @Param("role") User.Role role
+    );
 }

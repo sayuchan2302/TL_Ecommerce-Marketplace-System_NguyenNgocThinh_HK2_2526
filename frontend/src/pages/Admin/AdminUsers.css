@@ -1,12 +1,13 @@
 .admin-table-row.users {
   grid-template-columns:
+    38px
     44px
-    minmax(240px, 2fr)
-    minmax(120px, 0.9fr)
-    minmax(150px, 1.1fr)
-    minmax(112px, 0.9fr)
-    minmax(144px, 1fr)
-    minmax(170px, 1.15fr);
+    minmax(200px, 1.8fr)
+    minmax(100px, 0.8fr)
+    minmax(130px, 1fr)
+    minmax(100px, 0.8fr)
+    minmax(130px, 0.9fr)
+    minmax(150px, 1fr);
 }
 
 .admin-table-row.users > [role='cell'],

@@ -6,7 +6,7 @@ import AdminLayout from './AdminLayout';
 import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminStateBlock } from './AdminStateBlocks';
 import { useAdminToast } from './useAdminToast';
-import { PanelStatsGrid, PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelStatsGrid, PanelTabs, PanelTableFooter } from '../../components/Panel/PanelPrimitives';
 
 import { adminCategoryService, type Category } from './adminCategoryService';
 
@@ -63,6 +63,8 @@ const AdminCategories = () => {
   const [draftMode, setDraftMode] = useState<DraftMode>('view');
   const [draft, setDraft] = useState<CategoryDraft>(emptyDraft);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 12;
 
   const loadCategories = useCallback(async () => {
     setIsLoading(true);
@@ -212,6 +214,17 @@ const AdminCategories = () => {
         return a.order - b.order || a.name.localeCompare(b.name, 'vi');
       });
   }, [byId, categories, passesFilter, searchMatches]);
+
+  const paginatedCategories = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return flatFilteredCategories.slice(start, start + PAGE_SIZE);
+  }, [flatFilteredCategories, page]);
+
+  const totalPages = Math.ceil(flatFilteredCategories.length / PAGE_SIZE) || 1;
+
+  useEffect(() => {
+    setPage(0);
+  }, [activeFilter, search]);
 
 
 
@@ -578,7 +591,7 @@ const AdminCategories = () => {
               <h2>Danh sách rà soát danh mục</h2>
             </div>
           </div>
-          {flatFilteredCategories.length === 0 ? (
+              {flatFilteredCategories.length === 0 ? (
             <AdminStateBlock
               type={query ? 'search-empty' : 'empty'}
               title={query ? 'Không tìm thấy danh mục phù hợp' : 'Chưa có dữ liệu danh mục'}
@@ -587,31 +600,43 @@ const AdminCategories = () => {
               onAction={resetView}
             />
           ) : (
-            <div className="admin-table" role="table" aria-label="Bảng danh sách danh mục">
-              <div className="admin-table-row taxonomy-audit admin-table-head" role="row">
-                <div role="columnheader">Danh mục</div>
-                <div role="columnheader">Đường dẫn</div>
-                <div role="columnheader">Cấp</div>
-                <div role="columnheader">Sản phẩm</div>
-                <div role="columnheader">Trạng thái</div>
-                <div role="columnheader">Hành động</div>
+            <>
+              <div className="admin-table" role="table" aria-label="Bảng danh sách danh mục">
+                <div className="admin-table-row taxonomy-audit admin-table-head" role="row">
+                  <div role="columnheader">STT</div>
+                  <div role="columnheader">Danh mục</div>
+                  <div role="columnheader">Đường dẫn</div>
+                  <div role="columnheader">Cấp</div>
+                  <div role="columnheader">Sản phẩm</div>
+                  <div role="columnheader">Trạng thái</div>
+                  <div role="columnheader">Hành động</div>
+                </div>
+                {paginatedCategories.map((item, index) => (
+                  <motion.div key={item.id} className="admin-table-row taxonomy-audit" role="row">
+                    <div role="cell" className="admin-mono">{page * PAGE_SIZE + index + 1}</div>
+                    <div role="cell"><div className="admin-bold">{item.name}</div><div className="admin-muted small">{item.slug}</div></div>
+                    <div role="cell" className="admin-muted">{buildPath(item.id, byId).join(' > ')}</div>
+                    <div role="cell"><span className="badge gray">Cấp {getLevel(item.id, byId)}</span></div>
+                    <div role="cell"><span className="badge blue">{getCategoryProductTotal(item.id)} SP</span></div>
+                    <div role="cell"><span className={`admin-pill ${item.status === 'visible' ? 'success' : 'neutral'}`}>{item.status === 'visible' ? 'Đang hiện' : 'Đã ẩn'}</span></div>
+                    <div role="cell" className="admin-actions">
+                      <button className="admin-icon-btn subtle" title="Xem chi tiết" aria-label="Xem chi tiết" onClick={() => setSelectedId(item.id)}><ChevronRight size={16} /></button>
+                      <button className="admin-icon-btn subtle" title="Chỉnh sửa" aria-label="Chỉnh sửa" onClick={() => openEditor(item)}><Pencil size={16} /></button>
+                      <button className="admin-icon-btn subtle" title={item.status === 'visible' ? 'Ẩn danh mục' : 'Hiện danh mục'} aria-label={item.status === 'visible' ? 'Ẩn danh mục' : 'Hiện danh mục'} onClick={() => toggleVisibility(item.id)}>{item.status === 'visible' ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                      <button className="admin-icon-btn subtle danger-icon" title="Xóa" aria-label="Xóa" onClick={() => requestDelete(item.id)}><Trash2 size={16} /></button>
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-              {flatFilteredCategories.map((item) => (
-                <motion.div key={item.id} className="admin-table-row taxonomy-audit" role="row">
-                  <div role="cell"><div className="admin-bold">{item.name}</div><div className="admin-muted small">{item.slug}</div></div>
-                  <div role="cell" className="admin-muted">{buildPath(item.id, byId).join(' > ')}</div>
-                  <div role="cell"><span className="badge gray">Cấp {getLevel(item.id, byId)}</span></div>
-                  <div role="cell"><span className="badge blue">{getCategoryProductTotal(item.id)} SP</span></div>
-                  <div role="cell"><span className={`admin-pill ${item.status === 'visible' ? 'success' : 'neutral'}`}>{item.status === 'visible' ? 'Đang hiện' : 'Đã ẩn'}</span></div>
-                  <div role="cell" className="admin-actions">
-                    <button className="admin-icon-btn subtle" title="Xem chi tiết" aria-label="Xem chi tiết" onClick={() => setSelectedId(item.id)}><ChevronRight size={16} /></button>
-                    <button className="admin-icon-btn subtle" title="Chỉnh sửa" aria-label="Chỉnh sửa" onClick={() => openEditor(item)}><Pencil size={16} /></button>
-                    <button className="admin-icon-btn subtle" title={item.status === 'visible' ? 'Ẩn danh mục' : 'Hiện danh mục'} aria-label={item.status === 'visible' ? 'Ẩn danh mục' : 'Hiện danh mục'} onClick={() => toggleVisibility(item.id)}>{item.status === 'visible' ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                    <button className="admin-icon-btn subtle danger-icon" title="Xóa" aria-label="Xóa" onClick={() => requestDelete(item.id)}><Trash2 size={16} /></button>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+              <PanelTableFooter
+                meta={`Trang ${page + 1}/${totalPages} · ${paginatedCategories.length} danh mục/trang`}
+                page={page + 1}
+                totalPages={totalPages}
+                onPageChange={(p) => setPage(p - 1)}
+                prevLabel="Trước"
+                nextLabel="Sau"
+              />
+            </>
           )}
         </div>
       </section>

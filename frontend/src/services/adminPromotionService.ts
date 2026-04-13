@@ -52,6 +52,32 @@ interface BackendVoucherRequest {
   status: 'RUNNING' | 'PAUSED' | 'DRAFT';
 }
 
+interface BackendMarketplaceCampaignRequest {
+  name: string;
+  code: string;
+  description?: string;
+  discountType: 'PERCENT' | 'FIXED';
+  discountValue: number;
+  minOrderValue: number;
+  totalIssued: number;
+  startDate: string;
+  endDate: string;
+  status: 'RUNNING' | 'PAUSED' | 'DRAFT';
+}
+
+interface BackendMarketplaceCampaignFailure {
+  storeId?: string;
+  storeName?: string;
+  reason?: string;
+}
+
+interface BackendMarketplaceCampaignResponse {
+  code?: string;
+  createdCount?: number;
+  failedCount?: number;
+  failures?: BackendMarketplaceCampaignFailure[];
+}
+
 export interface AdminPromotionRecord {
   id: string;
   storeId: string;
@@ -96,6 +122,17 @@ export interface AdminPromotionListResult {
     paused: number;
     draft: number;
   };
+}
+
+export interface AdminMarketplaceCampaignResult {
+  code: string;
+  createdCount: number;
+  failedCount: number;
+  failures: Array<{
+    storeId?: string;
+    storeName?: string;
+    reason: string;
+  }>;
 }
 
 const normalizeCode = (value: string) => value.trim().replace(/\s+/g, '').toUpperCase();
@@ -149,6 +186,19 @@ const toRecord = (voucher: BackendVoucher): AdminPromotionRecord => ({
 
 const toRequestPayload = (input: AdminPromotionUpsertInput): BackendVoucherRequest => ({
   storeId: input.storeId,
+  name: input.name.trim(),
+  code: normalizeCode(input.code),
+  description: input.description?.trim() || undefined,
+  discountType: toApiDiscountType(input.discountType),
+  discountValue: Math.max(0.01, Number(input.discountValue || 0)),
+  minOrderValue: Math.max(0, Number(input.minOrderValue || 0)),
+  totalIssued: Math.max(1, Math.round(Number(input.totalIssued || 0))),
+  startDate: sanitizeDate(input.startDate),
+  endDate: sanitizeDate(input.endDate),
+  status: toApiStatus(input.status),
+});
+
+const toMarketplaceCampaignPayload = (input: AdminPromotionUpsertInput): BackendMarketplaceCampaignRequest => ({
   name: input.name.trim(),
   code: normalizeCode(input.code),
   description: input.description?.trim() || undefined,
@@ -219,6 +269,30 @@ export const adminPromotionService = {
       { auth: true },
     );
     return toRecord(created);
+  },
+
+  async createMarketplaceCampaign(input: AdminPromotionUpsertInput): Promise<AdminMarketplaceCampaignResult> {
+    const response = await apiRequest<BackendMarketplaceCampaignResponse>(
+      '/api/vouchers/admin/marketplace-campaign',
+      {
+        method: 'POST',
+        body: JSON.stringify(toMarketplaceCampaignPayload(input)),
+      },
+      { auth: true },
+    );
+
+    return {
+      code: normalizeCode(response.code || input.code || ''),
+      createdCount: Math.max(0, Number(response.createdCount || 0)),
+      failedCount: Math.max(0, Number(response.failedCount || 0)),
+      failures: Array.isArray(response.failures)
+        ? response.failures.map((failure) => ({
+          storeId: failure.storeId || undefined,
+          storeName: (failure.storeName || '').trim() || undefined,
+          reason: (failure.reason || '').trim() || 'Unknown failure',
+        }))
+        : [],
+    };
   },
 
   async update(id: string, input: AdminPromotionUpsertInput): Promise<AdminPromotionRecord> {
