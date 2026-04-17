@@ -5,6 +5,7 @@ import lombok.Getter;
 import vn.edu.hcmuaf.fit.marketplace.entity.ContentPage;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -15,6 +16,7 @@ public class ContentPageResponse {
     private String body;
     private ContentPage.ContentType type;
     private Integer displayOrder;
+    private List<String> keywords;
     private LocalDateTime updatedAt;
     private String updatedBy;
 }

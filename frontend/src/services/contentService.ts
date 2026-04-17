@@ -8,6 +8,7 @@ export interface ContentPage {
   body: string;
   type: ContentType;
   displayOrder?: number;
+  keywords?: string[];
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -17,6 +18,7 @@ interface ContentPagePayload {
   body: string;
   type: ContentType;
   displayOrder?: number;
+  keywords?: string[];
 }
 
 export const contentService = {

@@ -38,6 +38,7 @@ public class ContentPageService {
                 .type(request.getType())
                 .displayOrder(request.getDisplayOrder())
                 .updatedBy(updatedBy)
+                .keywords(ContentKeywordUtils.encodeKeywords(request.getKeywords()))
                 .build();
         return toResponse(contentPageRepository.save(page));
     }
@@ -51,6 +52,7 @@ public class ContentPageService {
         page.setType(request.getType());
         page.setDisplayOrder(request.getDisplayOrder());
         page.setUpdatedBy(updatedBy);
+        page.setKeywords(ContentKeywordUtils.encodeKeywords(request.getKeywords()));
         return toResponse(contentPageRepository.save(page));
     }
 
@@ -76,6 +78,7 @@ public class ContentPageService {
                 .body(page.getBody())
                 .type(page.getType())
                 .displayOrder(page.getDisplayOrder())
+                .keywords(ContentKeywordUtils.decodeKeywords(page.getKeywords()))
                 .updatedAt(page.getUpdatedAt())
                 .updatedBy(page.getUpdatedBy())
                 .build();

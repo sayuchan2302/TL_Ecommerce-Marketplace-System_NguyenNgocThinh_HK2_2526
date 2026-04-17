@@ -37,6 +37,7 @@ import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.UserRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.VoucherRepository;
 import vn.edu.hcmuaf.fit.marketplace.service.PublicCodeService;
+import vn.edu.hcmuaf.fit.marketplace.service.ContentKeywordUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -438,10 +439,34 @@ public class MarketplaceSeeder implements ApplicationRunner {
         createVoucher(storeBinh.getId(), "BINHNEW12", "Chào mừng khách mới", "Giảm 12% toàn bộ sản phẩm của gian hàng.", Voucher.DiscountType.PERCENT, new BigDecimal("12"), new BigDecimal("399000"), 1100, 210, Voucher.VoucherStatus.RUNNING, LocalDate.now().minusDays(20), LocalDate.now().plusDays(35));
         createVoucher(storeBinh.getId(), "BINH50K", "Giảm trực tiếp 50k", "Giảm 50.000đ cho đơn từ 699.000đ.", Voucher.DiscountType.FIXED, new BigDecimal("50000"), new BigDecimal("699000"), 500, 127, Voucher.VoucherStatus.DRAFT, LocalDate.now().plusDays(2), LocalDate.now().plusDays(60));
 
-        createContentPage(ContentPage.ContentType.FAQ, "Thời gian xử lý đơn hàng", "Đơn hàng thường được xác nhận trong 2-6 giờ làm việc và bàn giao đơn vị vận chuyển trong 24 giờ.", 1);
-        createContentPage(ContentPage.ContentType.FAQ, "Tôi có thể đổi size như thế nào?", "Bạn có thể gửi yêu cầu đổi trả trong vòng 7 ngày kể từ khi nhận hàng tại mục Đơn hàng của tôi.", 2);
-        createContentPage(ContentPage.ContentType.POLICY, "Chính sách đổi trả", "Marketplace hỗ trợ đổi/trả cho sản phẩm lỗi hoặc sai mô tả. Sản phẩm cần còn tem nhãn và chưa qua sử dụng.", 1);
-        createContentPage(ContentPage.ContentType.POLICY, "Chính sách hoàn tiền", "Tiền hoàn sẽ được xử lý trong 3-7 ngày làm việc tùy phương thức thanh toán ban đầu.", 2);
+        createContentPage(
+                ContentPage.ContentType.FAQ,
+                "Thời gian xử lý đơn hàng",
+                "Đơn hàng thường được xác nhận trong 2-6 giờ làm việc và bàn giao đơn vị vận chuyển trong 24 giờ.",
+                1,
+                List.of("trang thai don hang", "giao hang", "ship")
+        );
+        createContentPage(
+                ContentPage.ContentType.FAQ,
+                "Tôi có thể đổi size như thế nào?",
+                "Bạn có thể gửi yêu cầu đổi trả trong vòng 7 ngày kể từ khi nhận hàng tại mục Đơn hàng của tôi.",
+                2,
+                List.of("doi size", "doi tra", "tra hang")
+        );
+        createContentPage(
+                ContentPage.ContentType.POLICY,
+                "Chính sách đổi trả",
+                "Marketplace hỗ trợ đổi/trả cho sản phẩm lỗi hoặc sai mô tả. Sản phẩm cần còn tem nhãn và chưa qua sử dụng.",
+                1,
+                List.of()
+        );
+        createContentPage(
+                ContentPage.ContentType.POLICY,
+                "Chính sách hoàn tiền",
+                "Tiền hoàn sẽ được xử lý trong 3-7 ngày làm việc tùy phương thức thanh toán ban đầu.",
+                2,
+                List.of()
+        );
 
         log.info("Seed hoan tat: {} users, {} stores, {} products, {} orders, {} reviews.",
                 userRepository.count(), storeRepository.count(), productRepository.count(), orderRepository.count(), reviewRepository.count());
@@ -867,7 +892,8 @@ public class MarketplaceSeeder implements ApplicationRunner {
             ContentPage.ContentType type,
             String title,
             String body,
-            int displayOrder
+            int displayOrder,
+            List<String> keywords
     ) {
         ContentPage page = new ContentPage();
         page.setType(type);
@@ -875,6 +901,7 @@ public class MarketplaceSeeder implements ApplicationRunner {
         page.setBody(body);
         page.setDisplayOrder(displayOrder);
         page.setUpdatedBy(SEED_ACTOR);
+        page.setKeywords(ContentKeywordUtils.encodeKeywords(keywords));
         contentPageRepository.save(page);
     }
 }

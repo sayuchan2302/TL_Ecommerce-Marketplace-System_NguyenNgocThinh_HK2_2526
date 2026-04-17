@@ -4632,6 +4632,172 @@ textarea:focus-visible {
   max-width: 860px;
 }
 
+/* Bot AI admin */
+.bot-ai-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
+  gap: 16px;
+}
+
+.bot-ai-editor {
+  display: grid;
+  gap: 12px;
+}
+
+.bot-ai-section {
+  border: 1px solid var(--co-gray-200);
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  display: grid;
+  gap: 10px;
+}
+
+.bot-ai-section h3 {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.bot-ai-section label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--co-gray-700);
+  font-weight: 700;
+}
+
+.bot-ai-section input,
+.bot-ai-section textarea,
+.bot-ai-faq-editor input,
+.bot-ai-faq-editor textarea {
+  border: 1px solid var(--co-gray-200);
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+  outline: none;
+}
+
+.bot-ai-section input:focus,
+.bot-ai-section textarea:focus,
+.bot-ai-faq-editor input:focus,
+.bot-ai-faq-editor textarea:focus {
+  border-color: var(--co-admin-blue-light);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+.bot-ai-preview {
+  border: 1px solid var(--co-gray-200);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.bot-ai-preview h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.bot-ai-preview-card {
+  margin-top: 12px;
+  border: 1px dashed var(--co-gray-200);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  background: #f8fafc;
+}
+
+.bot-ai-preview-card p {
+  margin: 0;
+}
+
+.bot-ai-preview-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--co-gray-500);
+  font-weight: 700;
+}
+
+.bot-ai-keyword-wrap {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bot-ai-faq-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr);
+  gap: 16px;
+}
+
+.bot-ai-faq-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bot-ai-faq-card {
+  border: 1px solid var(--co-gray-200);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+}
+
+.bot-ai-faq-card h4 {
+  margin: 0;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bot-ai-faq-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bot-ai-faq-editor {
+  border: 1px solid var(--co-gray-200);
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.bot-ai-faq-editor h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.bot-ai-faq-editor label {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--co-gray-700);
+  font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .bot-ai-grid,
+  .bot-ai-faq-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .moderation-review-header {
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr);

@@ -6,58 +6,73 @@ import vn.edu.hcmuaf.fit.marketplace.entity.Order;
 import vn.edu.hcmuaf.fit.marketplace.exception.ResourceNotFoundException;
 import vn.edu.hcmuaf.fit.marketplace.service.OrderService;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CustomerSupportChatServiceImplTest {
 
+    private static final FaqContentLookupService NOOP_FAQ_LOOKUP = rawQuestion -> Optional.empty();
+
     @Test
     void lookupOrderStatus_returnsSuccessWhenOrderAndPhoneMatch() {
         StubOrderService orderService = new StubOrderService();
         orderService.order = buildOrder("DH-260412-000037", Order.OrderStatus.SHIPPED, Order.PaymentStatus.PAID, "0901 123 456");
-        CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(orderService);
+        CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(orderService, NOOP_FAQ_LOOKUP);
 
         CustomerSupportChatService.OrderLookupResult result = service.lookupOrderStatus("dh-260412-000037", "3456");
 
         assertTrue(result.ok(), result.message());
         assertTrue(result.message().contains("DH-260412-000037"));
-        assertTrue(result.message().contains("Đơn đang giao"));
+        assertTrue(result.message().contains("Don dang giao"));
     }
 
     @Test
     void lookupOrderStatus_returnsFailureWhenPhoneLast4Mismatch() {
         StubOrderService orderService = new StubOrderService();
         orderService.order = buildOrder("DH-260412-000037", Order.OrderStatus.PROCESSING, Order.PaymentStatus.UNPAID, "0901123456");
-        CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(orderService);
+        CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(orderService, NOOP_FAQ_LOOKUP);
 
         CustomerSupportChatService.OrderLookupResult result = service.lookupOrderStatus("DH-260412-000037", "9999");
 
         assertFalse(result.ok());
-        assertTrue(result.message().contains("Không xác minh được"));
+        assertTrue(result.message().contains("Khong xac minh duoc"));
     }
 
     @Test
     void lookupOrderStatus_returnsFailureWhenOrderNotFound() {
         StubOrderService orderService = new StubOrderService();
         orderService.notFound = true;
-        CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(orderService);
+        CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(orderService, NOOP_FAQ_LOOKUP);
 
         CustomerSupportChatService.OrderLookupResult result = service.lookupOrderStatus("DH-NOT-FOUND", "1234");
 
         assertFalse(result.ok());
-        assertTrue(result.message().contains("Không tìm thấy đơn hàng"));
+        assertTrue(result.message().contains("Khong tim thay don hang"));
     }
 
     @Test
     void recommendSize_mapsBoundaryRangesCorrectly() {
-        CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(new StubOrderService());
+        CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(new StubOrderService(), NOOP_FAQ_LOOKUP);
 
         assertEquals("S", service.recommendSize(155, 50).suggestedSize());
         assertEquals("M", service.recommendSize(165, 58).suggestedSize());
         assertEquals("L", service.recommendSize(172, 67).suggestedSize());
         assertEquals("XL", service.recommendSize(180, 75).suggestedSize());
         assertEquals("XXL", service.recommendSize(188, 85).suggestedSize());
+    }
+
+    @Test
+    void answerProductFaq_prefersConfiguredFaqKeywordMatch() {
+        StubOrderService orderService = new StubOrderService();
+        FaqContentLookupService faqLookupService = rawQuestion -> Optional.of("Cau tra loi tu FAQ keyword.");
+        CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(orderService, faqLookupService);
+
+        String result = service.answerProductFaq("toi muon doi size");
+
+        assertEquals("Cau tra loi tu FAQ keyword.", result);
     }
 
     private Order buildOrder(String code, Order.OrderStatus status, Order.PaymentStatus paymentStatus, String phone) {
@@ -88,3 +103,4 @@ class CustomerSupportChatServiceImplTest {
         }
     }
 }
+

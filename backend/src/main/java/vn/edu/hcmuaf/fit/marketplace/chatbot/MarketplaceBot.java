@@ -11,6 +11,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Component;
+import vn.edu.hcmuaf.fit.marketplace.chatbot.scenario.BotScenarioActionKey;
+import vn.edu.hcmuaf.fit.marketplace.chatbot.scenario.BotScenarioPayload;
+import vn.edu.hcmuaf.fit.marketplace.chatbot.scenario.BotScenarioService;
 import vn.edu.hcmuaf.fit.marketplace.chatbot.service.ChatbotAiFallbackService;
 import vn.edu.hcmuaf.fit.marketplace.chatbot.service.CustomerSupportChatService;
 import vn.edu.hcmuaf.fit.marketplace.chatbot.service.CustomerSupportChatService.OrderLookupResult;
@@ -29,28 +32,27 @@ import java.util.concurrent.CompletableFuture;
 @Component
 public class MarketplaceBot extends ActivityHandler {
 
-    private static final String MENU_ORDER = "tra cuu don hang";
-    private static final String MENU_SIZE = "tu van size";
-    private static final String MENU_PRODUCT = "hoi dap san pham";
     private static final String WEBCHAT_JOIN_EVENT = "webchat/join";
-    private static final String WELCOME_PROMPT = "Xin chào! Mình là trợ lý CSKH của FashMarket. Bạn cần hỗ trợ gì?";
 
     private final ConversationState conversationState;
     private final StatePropertyAccessor<Object> sessionAccessor;
     private final CustomerSupportChatService supportChatService;
     private final ChatbotAiFallbackService aiFallbackService;
     private final ChatbotProperties chatbotProperties;
+    private final BotScenarioService botScenarioService;
 
     public MarketplaceBot(
             ConversationState conversationState,
             CustomerSupportChatService supportChatService,
             ChatbotAiFallbackService aiFallbackService,
-            ChatbotProperties chatbotProperties
+            ChatbotProperties chatbotProperties,
+            BotScenarioService botScenarioService
     ) {
         this.conversationState = conversationState;
         this.supportChatService = supportChatService;
         this.aiFallbackService = aiFallbackService;
         this.chatbotProperties = chatbotProperties;
+        this.botScenarioService = botScenarioService;
         this.sessionAccessor = conversationState.createProperty("customerSupportSession");
     }
 
@@ -85,11 +87,13 @@ public class MarketplaceBot extends ActivityHandler {
     @Override
     protected CompletableFuture<Void> onMessageActivity(TurnContext turnContext) {
         String normalizedInput = normalize(turnContext.getActivity().getText());
+        BotScenarioPayload scenario = botScenarioService.getPublishedScenario();
+
         return sessionAccessor.get(turnContext, ChatSessionState::new)
                 .thenCompose(rawState -> {
                     ChatSessionState state = toChatSessionState(rawState);
                     return sessionAccessor.set(turnContext, state)
-                            .thenCompose(ignore -> routeMessage(turnContext, state, normalizedInput));
+                            .thenCompose(ignore -> routeMessage(turnContext, state, normalizedInput, scenario));
                 });
     }
 
@@ -114,7 +118,6 @@ public class MarketplaceBot extends ActivityHandler {
             return remappedState;
         }
 
-        // Fallback for unknown state type.
         return new ChatSessionState();
     }
 
@@ -232,59 +235,64 @@ public class MarketplaceBot extends ActivityHandler {
         return "get" + Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
     }
 
-    private CompletableFuture<Void> routeMessage(TurnContext turnContext, ChatSessionState state, String input) {
+    private CompletableFuture<Void> routeMessage(
+            TurnContext turnContext,
+            ChatSessionState state,
+            String input,
+            BotScenarioPayload scenario
+    ) {
         if (state.step == ConversationStep.AWAIT_ORDER_CODE) {
             state.pendingOrderCode = input == null ? "" : input.trim().toUpperCase(Locale.ROOT);
             state.step = ConversationStep.AWAIT_ORDER_PHONE4;
-            return sendText(turnContext, "Vui lòng nhập 4 số cuối SĐT nhận hàng để xác minh.");
+            return sendText(turnContext, scenario.getAskOrderPhonePrompt());
         }
 
         if (state.step == ConversationStep.AWAIT_ORDER_PHONE4) {
             String phone4 = onlyDigits(input);
             if (phone4.length() != 4) {
-                return sendText(turnContext, "Định dạng chưa đúng. Vui lòng nhập đúng 4 chữ số.");
+                return sendText(turnContext, scenario.getOrderPhoneInvalidPrompt());
             }
 
             OrderLookupResult result = supportChatService.lookupOrderStatus(state.pendingOrderCode, phone4);
             state.reset();
             return sendText(turnContext, result.message())
-                    .thenCompose(ignore -> sendMainMenu(turnContext, "Bạn cần hỗ trợ thêm gì nữa không?"));
+                    .thenCompose(ignore -> sendMainMenu(turnContext, scenario.getOrderLookupContinuePrompt(), scenario));
         }
 
         if (state.step == ConversationStep.AWAIT_HEIGHT) {
             Integer height = parsePositiveInt(input);
             if (height == null || height < 120 || height > 230) {
-                return sendText(turnContext, "Chiều cao chưa hợp lệ. Nhập lại giúp mình (cm), ví dụ: 168.");
+                return sendText(turnContext, scenario.getInvalidHeightPrompt());
             }
             state.heightCm = height;
             state.step = ConversationStep.AWAIT_WEIGHT;
-            return sendText(turnContext, "Cảm ơn bạn. Giờ nhập cân nặng (kg), ví dụ: 58.");
+            return sendText(turnContext, scenario.getAskWeightPrompt());
         }
 
         if (state.step == ConversationStep.AWAIT_WEIGHT) {
             Integer weight = parsePositiveInt(input);
             if (weight == null || weight < 30 || weight > 200) {
-                return sendText(turnContext, "Cân nặng chưa hợp lệ. Nhập lại giúp mình (kg), ví dụ: 58.");
+                return sendText(turnContext, scenario.getInvalidWeightPrompt());
             }
 
             SizeAdviceResult advice = supportChatService.recommendSize(state.heightCm, weight);
             state.reset();
             return sendText(turnContext, advice.message())
-                    .thenCompose(ignore -> sendMainMenu(turnContext, "Bạn muốn tiếp tục với tác vụ nào?"));
+                    .thenCompose(ignore -> sendMainMenu(turnContext, scenario.getSizeAdviceContinuePrompt(), scenario));
         }
 
-        if (MENU_ORDER.equals(input)) {
+        if (matchesQuickAction(scenario, BotScenarioActionKey.ORDER_LOOKUP, input)) {
             state.step = ConversationStep.AWAIT_ORDER_CODE;
-            return sendText(turnContext, "Bạn gửi giúp mình mã đơn hàng (ví dụ: DH-260412-000037).");
+            return sendText(turnContext, scenario.getAskOrderCodePrompt());
         }
-        if (MENU_SIZE.equals(input)) {
+        if (matchesQuickAction(scenario, BotScenarioActionKey.SIZE_ADVICE, input)) {
             state.step = ConversationStep.AWAIT_HEIGHT;
-            return sendText(turnContext, "Bạn cho mình chiều cao (cm) trước nhé.");
+            return sendText(turnContext, scenario.getAskHeightPrompt());
         }
-        if (MENU_PRODUCT.equals(input)) {
+        if (matchesQuickAction(scenario, BotScenarioActionKey.PRODUCT_FAQ, input)) {
             String answer = supportChatService.answerProductFaq(turnContext.getActivity().getText());
             return sendText(turnContext, answer)
-                    .thenCompose(ignore -> sendMainMenu(turnContext, "Bạn muốn hỏi thêm gì?"));
+                    .thenCompose(ignore -> sendMainMenu(turnContext, scenario.getProductFaqContinuePrompt(), scenario));
         }
 
         if (chatbotProperties.isAiFallbackEnabled()) {
@@ -294,10 +302,11 @@ public class MarketplaceBot extends ActivityHandler {
             }
         }
 
-        return sendMainMenu(turnContext, "Mình chưa hiểu yêu cầu. Bạn chọn một chức năng bên dưới nhé.");
+        return sendMainMenu(turnContext, scenario.getUnknownPrompt(), scenario);
     }
 
     private CompletableFuture<Void> sendWelcomeIfNeeded(TurnContext turnContext) {
+        BotScenarioPayload scenario = botScenarioService.getPublishedScenario();
         return sessionAccessor.get(turnContext, ChatSessionState::new)
                 .thenCompose(rawState -> {
                     ChatSessionState state = toChatSessionState(rawState);
@@ -307,16 +316,30 @@ public class MarketplaceBot extends ActivityHandler {
 
                     state.welcomed = true;
                     return sessionAccessor.set(turnContext, state)
-                            .thenCompose(ignore -> sendMainMenu(turnContext, WELCOME_PROMPT));
+                            .thenCompose(ignore -> sendMainMenu(turnContext, scenario.getWelcomePrompt(), scenario));
                 });
     }
 
-    private CompletableFuture<Void> sendMainMenu(TurnContext turnContext, String prompt) {
-        Activity reply = MessageFactory.suggestedActions(
-                List.of("Tra cứu đơn hàng", "Tư vấn size", "Hỏi đáp sản phẩm"),
-                prompt
-        );
+    private CompletableFuture<Void> sendMainMenu(TurnContext turnContext, String prompt, BotScenarioPayload scenario) {
+        List<String> actions = scenario.getQuickActions() == null
+                ? List.of()
+                : scenario.getQuickActions().stream()
+                .filter(action -> action != null && action.getLabel() != null && !action.getLabel().isBlank())
+                .map(action -> action.getLabel().trim())
+                .toList();
+
+        Activity reply = MessageFactory.suggestedActions(actions, prompt);
         return sendActivity(turnContext, reply);
+    }
+
+    private boolean matchesQuickAction(BotScenarioPayload scenario, BotScenarioActionKey key, String normalizedInput) {
+        if (scenario.getQuickActions() == null || normalizedInput == null) {
+            return false;
+        }
+        return scenario.getQuickActions().stream()
+                .filter(action -> action != null && key.equals(action.getKey()))
+                .map(action -> normalize(action.getLabel()))
+                .anyMatch(normalizedInput::equals);
     }
 
     private CompletableFuture<Void> sendText(TurnContext turnContext, String text) {
@@ -371,3 +394,4 @@ public class MarketplaceBot extends ActivityHandler {
         }
     }
 }
+

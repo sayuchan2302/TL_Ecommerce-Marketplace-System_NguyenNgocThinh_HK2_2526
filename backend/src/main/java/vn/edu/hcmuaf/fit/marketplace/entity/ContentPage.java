@@ -32,6 +32,9 @@ public class ContentPage extends BaseEntity {
     @Column(name = "updated_by")
     private String updatedBy;
 
+    @Column(name = "keywords", columnDefinition = "text")
+    private String keywords;
+
     public enum ContentType {
         FAQ, POLICY
     }

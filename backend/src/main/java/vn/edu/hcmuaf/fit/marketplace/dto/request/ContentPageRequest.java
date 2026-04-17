@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.Setter;
 import vn.edu.hcmuaf.fit.marketplace.entity.ContentPage;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class ContentPageRequest {
@@ -19,4 +21,6 @@ public class ContentPageRequest {
     private ContentPage.ContentType type;
 
     private Integer displayOrder;
+
+    private List<String> keywords;
 }
