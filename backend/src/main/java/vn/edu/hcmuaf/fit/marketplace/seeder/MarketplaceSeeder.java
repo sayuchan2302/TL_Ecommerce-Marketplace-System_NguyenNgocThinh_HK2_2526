@@ -131,6 +131,10 @@ public class MarketplaceSeeder implements ApplicationRunner {
         User vendorAn = createUser("an.shop@fashion.local", "Nguyễn Hoàng An", "0900000002", User.Role.VENDOR, User.Gender.MALE, LocalDate.of(1994, 5, 12), 0L);
         User vendorBinh = createUser("binh.store@fashion.local", "Trần Gia Bình", "0900000003", User.Role.VENDOR, User.Gender.FEMALE, LocalDate.of(1995, 8, 22), 0L);
         User vendorDuyet = createUser("duyet.vendor@fashion.local", "Lê Thanh Duyệt", "0900000004", User.Role.VENDOR, User.Gender.MALE, LocalDate.of(1992, 11, 6), 0L);
+        User vendorChi = createUser("chi.trendy@fashion.local", "Ngô Mỹ Chi", "0900000005", User.Role.VENDOR, User.Gender.FEMALE, LocalDate.of(1997, 7, 19), 0L);
+        User vendorPhong = createUser("phong.street@fashion.local", "Phan Đức Phong", "0900000006", User.Role.VENDOR, User.Gender.MALE, LocalDate.of(1993, 4, 2), 0L);
+        User vendorNgoc = createUser("ngoc.linen@fashion.local", "Bùi Nhã Ngọc", "0900000007", User.Role.VENDOR, User.Gender.FEMALE, LocalDate.of(1996, 12, 8), 0L);
+        User vendorKhanh = createUser("khanh.accessory@fashion.local", "Đặng Minh Khánh", "0900000008", User.Role.VENDOR, User.Gender.MALE, LocalDate.of(1991, 10, 28), 0L);
         User customerMinh = createUser("minh.customer@fashion.local", "Phạm Minh Khang", "0901000001", User.Role.CUSTOMER, User.Gender.MALE, LocalDate.of(2000, 3, 14), 4200L);
         User customerLan = createUser("lan.customer@fashion.local", "Đỗ Ngọc Lan", "0901000002", User.Role.CUSTOMER, User.Gender.FEMALE, LocalDate.of(1999, 9, 9), 5100L);
         User customerHuy = createUser("huy.customer@fashion.local", "Vũ Đức Huy", "0901000003", User.Role.CUSTOMER, User.Gender.MALE, LocalDate.of(2001, 1, 25), 1600L);
@@ -159,9 +163,45 @@ public class MarketplaceSeeder implements ApplicationRunner {
                 new BigDecimal("5.0"), 0.0, 0, BigDecimal.ZERO,
                 null, null, "Đang chờ bổ sung giấy phép kinh doanh."
         );
+        Store storeChi = createStore(
+                vendorChi, "Chi Trendy", "chi-trendy",
+                "Thời trang nữ trẻ trung, cập nhật xu hướng theo mùa.",
+                "89 Võ Văn Tần, Quận 3, TP. Hồ Chí Minh",
+                Store.StoreStatus.ACTIVE, Store.ApprovalStatus.APPROVED,
+                new BigDecimal("5.2"), 4.7, 121, new BigDecimal("96300000"),
+                LocalDateTime.now().minusDays(20), admin.getEmail(), null
+        );
+        Store storePhong = createStore(
+                vendorPhong, "Phong Streetwear", "phong-streetwear",
+                "Chuyên đồ streetwear nam, năng động và cá tính.",
+                "211 Lê Văn Sỹ, Quận Phú Nhuận, TP. Hồ Chí Minh",
+                Store.StoreStatus.ACTIVE, Store.ApprovalStatus.APPROVED,
+                new BigDecimal("6.2"), 4.5, 88, new BigDecimal("73400000"),
+                LocalDateTime.now().minusDays(18), admin.getEmail(), null
+        );
+        Store storeNgoc = createStore(
+                vendorNgoc, "Ngọc Linen House", "ngoc-linen-house",
+                "Sản phẩm vải linen tối giản cho phong cách thanh lịch.",
+                "56 Nguyễn Gia Trí, Bình Thạnh, TP. Hồ Chí Minh",
+                Store.StoreStatus.ACTIVE, Store.ApprovalStatus.APPROVED,
+                new BigDecimal("4.8"), 4.4, 64, new BigDecimal("51800000"),
+                LocalDateTime.now().minusDays(12), admin.getEmail(), null
+        );
+        Store storeKhanh = createStore(
+                vendorKhanh, "Khánh Accessories", "khanh-accessories",
+                "Phụ kiện thời trang unisex: túi, ví, thắt lưng và mũ nón.",
+                "101 Âu Cơ, Quận Tân Bình, TP. Hồ Chí Minh",
+                Store.StoreStatus.SUSPENDED, Store.ApprovalStatus.APPROVED,
+                new BigDecimal("5.9"), 4.1, 37, new BigDecimal("27500000"),
+                LocalDateTime.now().minusDays(8), admin.getEmail(), null
+        );
         linkVendorStore(vendorAn, storeAn);
         linkVendorStore(vendorBinh, storeBinh);
         linkVendorStore(vendorDuyet, storeChoDuyet);
+        linkVendorStore(vendorChi, storeChi);
+        linkVendorStore(vendorPhong, storePhong);
+        linkVendorStore(vendorNgoc, storeNgoc);
+        linkVendorStore(vendorKhanh, storeKhanh);
 
         // Category tree 3 tầng: Root (Nam/Nữ/Phụ kiện) -> Nhóm -> Danh mục lá
         // Lưu ý: Category.name đang unique toàn cục, nên tên có hậu tố nam/nữ để tránh trùng.

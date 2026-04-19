@@ -12,6 +12,7 @@ import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
+import { PanelTableFooter } from '../../components/Panel/PanelPrimitives';
 import {
   adjustProductStock,
   applyVariantMatrix,
@@ -81,8 +82,6 @@ const AdminProducts = () => {
     totalPages,
     startIndex,
     endIndex,
-    next,
-    prev,
     setPage,
     toggleSort,
   } = useAdminListState<typeof rows[number]>({
@@ -451,18 +450,14 @@ const AdminProducts = () => {
           </div>
           )}
           {!isLoading && filtered.length > 0 && (
-            <div className="table-footer">
-              <span className="table-footer-meta">{c.showing(startIndex, endIndex, filtered.length, t.selectedNoun)}</span>
-              <div className="pagination">
-                <button className="page-btn" onClick={prev} disabled={page === 1}>{c.previous}</button>
-                {Array.from({ length: totalPages }).map((_, idx) => (
-                  <button key={idx + 1} className={`page-btn ${page === idx + 1 ? 'active' : ''}`} onClick={() => setPage(idx + 1)}>
-                    {idx + 1}
-                  </button>
-                ))}
-                <button className="page-btn" onClick={next} disabled={page === totalPages}>{c.next}</button>
-              </div>
-            </div>
+            <PanelTableFooter
+              meta={c.showing(startIndex, endIndex, filtered.length, t.selectedNoun)}
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              prevLabel={c.previous}
+              nextLabel={c.next}
+            />
           )}
         </div>
       </section>

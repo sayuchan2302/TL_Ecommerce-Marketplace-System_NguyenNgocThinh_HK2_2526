@@ -7,8 +7,12 @@ interface OptimizeOptions {
 }
 
 const CDN_CGI_PREFIX = '/cdn-cgi/image/';
+const WSERV_HOST = 'wsrv.nl';
 
 const isAbsoluteHttpUrl = (value: string) => /^https?:\/\//i.test(value);
+const isWeservHost = (hostname: string) =>
+  hostname === WSERV_HOST || hostname.endsWith(`.${WSERV_HOST}`);
+const stripProtocol = (value: string) => value.replace(/^https?:\/\//i, '');
 
 const optimizeUnsplash = (url: URL, options: Required<OptimizeOptions>) => {
   url.searchParams.set('w', String(options.width));
@@ -50,6 +54,23 @@ const optimizeCloudflarePath = (url: URL, options: Required<OptimizeOptions>) =>
   return url.toString();
 };
 
+const optimizeWeservProxy = (url: URL, options: Required<OptimizeOptions>) => {
+  const proxy = isWeservHost(url.hostname)
+    ? new URL(url.toString())
+    : new URL(`https://${WSERV_HOST}/`);
+
+  if (!isWeservHost(url.hostname)) {
+    proxy.searchParams.set('url', stripProtocol(url.toString()));
+  } else if (!proxy.searchParams.get('url')) {
+    return url.toString();
+  }
+
+  proxy.searchParams.set('w', String(options.width));
+  proxy.searchParams.set('q', String(options.quality));
+  proxy.searchParams.set('output', options.format);
+  return proxy.toString();
+};
+
 export const getOptimizedImageUrl = (
   rawUrl: string | null | undefined,
   options?: OptimizeOptions,
@@ -72,7 +93,7 @@ export const getOptimizedImageUrl = (
     if (url.pathname.includes(CDN_CGI_PREFIX)) {
       return optimizeCloudflarePath(url, normalized);
     }
-    return trimmed;
+    return optimizeWeservProxy(url, normalized);
   } catch {
     return trimmed;
   }

@@ -126,32 +126,76 @@ export const PanelTableFooter = ({
   activePageClassName = '',
   prevLabel = 'Trước',
   nextLabel = 'Tiếp',
-}: PanelTableFooterProps) => (
-  <div className="table-footer">
-    <span className="table-footer-meta">{meta}</span>
-    <div className="pagination">
-      <button className="page-btn" onClick={() => onPageChange(Math.max(page - 1, 1))} disabled={page === 1}>
-        {prevLabel}
-      </button>
-      {Array.from({ length: totalPages }).map((_, index) => (
-        <button
-          key={index + 1}
-          className={`page-btn ${page === index + 1 ? `active ${activePageClassName}`.trim() : ''}`}
-          onClick={() => onPageChange(index + 1)}
-        >
-          {index + 1}
+}: PanelTableFooterProps) => {
+  const safeTotalPages = Math.max(1, totalPages);
+  const safePage = Math.min(Math.max(1, page), safeTotalPages);
+
+  const getVisiblePages = (): Array<number | 'ellipsis'> => {
+    if (safeTotalPages <= 7) {
+      return Array.from({ length: safeTotalPages }, (_, index) => index + 1);
+    }
+
+    const pages: Array<number | 'ellipsis'> = [1];
+    let start = Math.max(2, safePage - 1);
+    let end = Math.min(safeTotalPages - 1, safePage + 1);
+
+    if (safePage <= 3) {
+      start = 2;
+      end = 4;
+    } else if (safePage >= safeTotalPages - 2) {
+      start = safeTotalPages - 3;
+      end = safeTotalPages - 1;
+    }
+
+    if (start > 2) {
+      pages.push('ellipsis');
+    }
+
+    for (let pageNum = start; pageNum <= end; pageNum++) {
+      pages.push(pageNum);
+    }
+
+    if (end < safeTotalPages - 1) {
+      pages.push('ellipsis');
+    }
+
+    pages.push(safeTotalPages);
+    return pages;
+  };
+
+  const visiblePages = getVisiblePages();
+
+  return (
+    <div className="table-footer">
+      <span className="table-footer-meta">{meta}</span>
+      <div className="pagination">
+        <button className="page-btn" onClick={() => onPageChange(Math.max(safePage - 1, 1))} disabled={safePage === 1}>
+          {prevLabel}
         </button>
-      ))}
-      <button
-        className="page-btn"
-        onClick={() => onPageChange(Math.min(page + 1, totalPages))}
-        disabled={page === totalPages}
-      >
-        {nextLabel}
-      </button>
+        {visiblePages.map((entry, index) =>
+          entry === 'ellipsis' ? (
+            <span key={`ellipsis-${index}`} className="page-ellipsis">...</span>
+          ) : (
+            <button
+              key={entry}
+              className={`page-btn ${safePage === entry ? `active ${activePageClassName}`.trim() : ''}`}
+              onClick={() => onPageChange(entry)}
+            >
+              {entry}
+            </button>
+          )
+        )}
+        <button
+          className="page-btn"
+          onClick={() => onPageChange(Math.min(safePage + 1, safeTotalPages))}
+          disabled={safePage === safeTotalPages}
+        >
+          {nextLabel}
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 interface PanelFloatingBarProps {
   show: boolean;
@@ -231,3 +275,4 @@ interface PanelDrawerFooterProps {
 export const PanelDrawerFooter = ({ children }: PanelDrawerFooterProps) => (
   <div className="drawer-footer">{children}</div>
 );
+

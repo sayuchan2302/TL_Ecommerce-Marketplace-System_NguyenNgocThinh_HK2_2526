@@ -27,6 +27,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
 
     boolean existsBySlugIgnoreCaseAndIdNot(String slug, UUID id);
 
+    List<Product> findBySlugStartingWithIgnoreCase(String prefix);
+
     @Query("""
             SELECT p FROM Product p
             WHERE p.status = 'ACTIVE'

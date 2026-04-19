@@ -43,6 +43,12 @@ jwt:
 app:
   seed:
     enabled: ${APP_SEED_ENABLED:true}
+    kaggle:
+      enabled: ${APP_SEED_KAGGLE_ENABLED:true}
+      target-count: ${APP_SEED_KAGGLE_TARGET_COUNT:1000}
+      styles-path: ${APP_SEED_KAGGLE_STYLES_PATH:data/styles.csv}
+      images-path: ${APP_SEED_KAGGLE_IMAGES_PATH:data/images.csv}
+      clean-before-import: ${APP_SEED_KAGGLE_CLEAN_BEFORE_IMPORT:true}
   chatbot:
     ai-fallback-enabled: ${APP_CHATBOT_AI_FALLBACK_ENABLED:false}
     direct-line-secret: ${BOT_DIRECT_LINE_SECRET:}
@@ -55,7 +61,7 @@ app:
         fixed-delay-ms: ${APP_PROMOTION_DISPATCHER_DELAY_MS:15000}
         batch-size: ${APP_PROMOTION_DISPATCHER_BATCH_SIZE:100}
         max-attempts: ${APP_PROMOTION_DISPATCHER_MAX_ATTEMPTS:8}
-        backoff-minutes: ${APP_PROMOTION_DISPATCHER_BACKOFF_MINUTES:1,5,15,60}
+        backoff-minutes: "${APP_PROMOTION_DISPATCHER_BACKOFF_MINUTES:1,5,15,60}"
       reminder:
         cron: ${APP_PROMOTION_REMINDER_CRON:0 */10 * * * *}
 

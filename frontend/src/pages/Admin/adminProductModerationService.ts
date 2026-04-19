@@ -1,4 +1,5 @@
 import { apiRequest } from '../../services/apiClient';
+import { getOptimizedImageUrl } from '../../utils/getOptimizedImageUrl';
 
 export type ProductApprovalStatus = 'APPROVED' | 'BANNED';
 
@@ -66,11 +67,12 @@ const toQueryString = (filters: ProductModerationFilters): string => {
 
 const mapProduct = (item: Partial<AdminModerationProduct>): AdminModerationProduct => {
   const normalizedApprovalStatus = String(item.approvalStatus || '').toUpperCase();
+  const thumbnail = item.thumbnail || '';
   return {
     id: String(item.id || ''),
     productCode: item.productCode || '',
     name: item.name || 'Unnamed product',
-    thumbnail: item.thumbnail || '',
+    thumbnail: getOptimizedImageUrl(thumbnail, { width: 220, format: 'webp', quality: 74 }) || thumbnail,
     storeId: item.storeId,
     storeName: item.storeName || 'Unknown store',
     categoryId: item.categoryId,
@@ -81,7 +83,11 @@ const mapProduct = (item: Partial<AdminModerationProduct>): AdminModerationProdu
     productStatus: item.productStatus || 'DRAFT',
     approvalStatus: normalizedApprovalStatus === 'BANNED' ? 'BANNED' : 'APPROVED',
     description: item.description || '',
-    images: Array.isArray(item.images) ? item.images.filter(Boolean) : [],
+    images: Array.isArray(item.images)
+      ? item.images
+        .map((image) => getOptimizedImageUrl(image, { width: 900, format: 'webp', quality: 76 }) || image)
+        .filter(Boolean)
+      : [],
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || new Date().toISOString(),
   };

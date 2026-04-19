@@ -2,6 +2,7 @@ import { apiRequest } from './apiClient';
 import { storeService } from './storeService';
 import type { Product, ProductVariant, ProductStatusType } from '../types';
 import { normalizeStoreSlug } from '../utils/storeIdentity';
+import { getOptimizedImageUrl } from '../utils/getOptimizedImageUrl';
 import {
   listAdminProducts,
   listAdminProductsSnapshot,
@@ -120,6 +121,9 @@ const mapStatusType = (statusType: string): ProductStatusType => {
   return 'active';
 };
 
+const optimizeProductImage = (rawUrl: string | null | undefined, width: number) =>
+  getOptimizedImageUrl(rawUrl, { width, format: 'webp', quality: 74 });
+
 const mapAdminProductToClient = (record: AdminProductRecord, index: number): Product => {
   const variantRows = Array.isArray(record.variantMatrix) ? record.variantMatrix : [];
   const variants: ProductVariant[] = variantRows.map((row) => ({
@@ -140,7 +144,7 @@ const mapAdminProductToClient = (record: AdminProductRecord, index: number): Pro
     category: record.category,
     price: Number(record.price || 0),
     originalPrice: Number(record.price || 0),
-    image: record.thumb || '',
+    image: optimizeProductImage(record.thumb, 520) || record.thumb || '',
     badge: record.statusType === 'low' ? 'LOW' : undefined,
     colors: Array.from(new Set(variantRows.map((v) => v.color))).map((color) => color),
     stock: Number(record.stock || 0),
@@ -177,6 +181,7 @@ const mapBackendProduct = (product: BackendProduct): Product => {
   const sortedImages = sortImages(product.images);
   const imageUrls = sortedImages
     .map((image) => (image?.url || '').trim())
+    .map((url) => optimizeProductImage(url, 720) || url)
     .filter(Boolean);
   const storeInfo = product.storeId
     ? {

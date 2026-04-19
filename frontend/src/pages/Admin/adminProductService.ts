@@ -1,4 +1,5 @@
 import { apiRequest } from '../../services/apiClient';
+import { getOptimizedImageUrl } from '../../utils/getOptimizedImageUrl';
 import type { VariantRow } from './AdminVariantModal';
 
 type ProductStatusType = 'active' | 'low' | 'out';
@@ -39,6 +40,11 @@ let cachedAdminProducts: AdminProductRecord[] = [];
 const toErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error && error.message.trim() ? error.message : fallback;
 
+const optimizeAdminProductRecord = (record: AdminProductRecord): AdminProductRecord => ({
+  ...record,
+  thumb: getOptimizedImageUrl(record.thumb, { width: 200, format: 'webp', quality: 74 }) || record.thumb,
+});
+
 const notifyListeners = () => {
   listeners.forEach((listener) => listener());
 };
@@ -53,7 +59,7 @@ export const subscribeAdminProducts = (listener: ProductListener) => {
 export const listAdminProducts = async (): Promise<AdminProductRecord[]> => {
   try {
     const data = await apiRequest<{ content?: AdminProductRecord[] }>('/api/admin/products?size=100', {}, { auth: true });
-    const rows = Array.isArray(data?.content) ? data.content : [];
+    const rows = Array.isArray(data?.content) ? data.content.map(optimizeAdminProductRecord) : [];
     cachedAdminProducts = rows;
     return rows;
   } catch (error) {
@@ -66,7 +72,8 @@ export const listAdminProductsSnapshot = (): AdminProductRecord[] => cachedAdmin
 
 export const getProductBySku = async (sku: string): Promise<AdminProductRecord | undefined> => {
   try {
-    return await apiRequest<AdminProductRecord>(`/api/admin/products/${sku}`, {}, { auth: true });
+    const record = await apiRequest<AdminProductRecord>(`/api/admin/products/${sku}`, {}, { auth: true });
+    return optimizeAdminProductRecord(record);
   } catch (error) {
     console.error('Failed to get product by sku:', error);
     return undefined;

@@ -1,4 +1,5 @@
 import { apiRequest } from './apiClient';
+import { getOptimizedImageUrl } from '../utils/getOptimizedImageUrl';
 
 interface BackendCategoryOption {
   id?: string;
@@ -265,7 +266,9 @@ const mapBackendProduct = (product: BackendVendorProduct): VendorProductRecord =
     grossRevenue: Number(product.grossRevenue || 0),
     status,
     visible: Boolean(product.visible),
-    image: normalizeText(product.primaryImage) || FALLBACK_IMAGE,
+    image:
+      getOptimizedImageUrl(normalizeText(product.primaryImage), { width: 520, format: 'webp', quality: 74 })
+      || getOptimizedImageUrl(FALLBACK_IMAGE, { width: 520, format: 'webp', quality: 74 }),
     description: normalizeText(product.description),
     variants: normalizedVariants,
   };

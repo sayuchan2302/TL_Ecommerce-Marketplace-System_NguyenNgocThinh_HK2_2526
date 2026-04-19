@@ -1,5 +1,6 @@
 import { apiRequest } from './apiClient';
 import type { Product } from '../types';
+import { getOptimizedImageUrl } from '../utils/getOptimizedImageUrl';
 
 export interface MarketplaceStoreCard {
   id: string;
@@ -118,6 +119,9 @@ const toNumber = (value: unknown, fallback = 0): number => {
   return fallback;
 };
 
+const optimizeMarketplaceImage = (rawUrl: string | null | undefined, width: number) =>
+  getOptimizedImageUrl(rawUrl, { width, format: 'webp', quality: 74 });
+
 const mapProductCard = (row: MarketplaceProductCardPayload): Product => {
   const price = toNumber(row.priceAmount ?? row.price, 0);
   const originalPrice = toNumber(row.originalPriceAmount ?? row.originalPrice, 0);
@@ -132,7 +136,9 @@ const mapProductCard = (row: MarketplaceProductCardPayload): Product => {
     category: 'Marketplace',
     price,
     originalPrice: resolvedOriginalPrice,
-    image: row.image || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=672&h=990&fit=crop',
+    image:
+      optimizeMarketplaceImage(row.image, 720)
+      || optimizeMarketplaceImage('https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=672&h=990&fit=crop', 720),
     badge: row.badge,
     colors: row.colors || [],
     stock: Number.isFinite(row.stock) ? Number(row.stock) : 0,
