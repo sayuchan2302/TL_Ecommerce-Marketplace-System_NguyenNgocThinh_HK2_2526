@@ -195,6 +195,8 @@ const ProductListing = () => {
           <main className="plp-main">
             <ProductGrid
               customResults={categoryProducts}
+              itemsPerPage={12}
+              scrollToTopOnPageChange
               viewState={{
                 priceRanges: view.priceRanges,
                 colors: view.colors,

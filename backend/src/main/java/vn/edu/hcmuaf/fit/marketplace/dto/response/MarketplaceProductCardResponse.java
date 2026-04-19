@@ -33,5 +33,19 @@ public class MarketplaceProductCardResponse {
     private String storeLogo;
     private Double storeRating;
     private Boolean officialStore;
+    private List<String> sizes;
+    private List<VariantOption> variants;
     private LocalDateTime createdAt;
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class VariantOption {
+        private UUID id;
+        private String sku;
+        private String color;
+        private String size;
+        private Integer stockQuantity;
+    }
 }

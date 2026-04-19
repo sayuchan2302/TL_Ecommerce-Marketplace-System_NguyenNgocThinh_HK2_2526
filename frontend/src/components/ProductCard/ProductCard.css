@@ -102,6 +102,12 @@
   gap: 6px;
 }
 
+.quick-add-status {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .quick-size-btn {
   min-width: 38px;
   height: 34px;

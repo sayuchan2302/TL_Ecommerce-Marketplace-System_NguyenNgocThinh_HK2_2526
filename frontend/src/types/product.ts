@@ -27,6 +27,7 @@ export interface Product {
   images?: string[];
   badge?: string;
   colors?: string[];
+  sizes?: string[];
   stock: number;
   status: string;
   statusType: ProductStatusType;

@@ -337,6 +337,8 @@ public class MarketplacePublicService {
                 .storeLogo(store != null ? store.getLogo() : null)
                 .storeRating(store != null ? defaultDouble(store.getRating()) : 0.0)
                 .officialStore(store != null && isOfficialStore(store))
+                .sizes(resolveSizes(product))
+                .variants(resolveVariants(product))
                 .createdAt(product.getCreatedAt())
                 .build();
     }
@@ -370,6 +372,40 @@ public class MarketplacePublicService {
                 .map(ProductVariant::getColor)
                 .filter(this::hasText)
                 .distinct()
+                .toList();
+    }
+
+    private List<String> resolveSizes(Product product) {
+        List<ProductVariant> variants = product.getVariants();
+        if (variants == null || variants.isEmpty()) {
+            return List.of();
+        }
+
+        return variants.stream()
+                .filter(variant -> !Boolean.FALSE.equals(variant.getIsActive()))
+                .map(ProductVariant::getSize)
+                .filter(this::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+    }
+
+    private List<MarketplaceProductCardResponse.VariantOption> resolveVariants(Product product) {
+        List<ProductVariant> variants = product.getVariants();
+        if (variants == null || variants.isEmpty()) {
+            return List.of();
+        }
+
+        return variants.stream()
+                .filter(variant -> !Boolean.FALSE.equals(variant.getIsActive()))
+                .filter(variant -> hasText(variant.getSize()))
+                .map(variant -> MarketplaceProductCardResponse.VariantOption.builder()
+                        .id(variant.getId())
+                        .sku(variant.getSku())
+                        .color(hasText(variant.getColor()) ? variant.getColor().trim() : "")
+                        .size(variant.getSize().trim())
+                        .stockQuantity(variant.getStockQuantity() == null ? 0 : Math.max(0, variant.getStockQuantity()))
+                        .build())
                 .toList();
     }
 

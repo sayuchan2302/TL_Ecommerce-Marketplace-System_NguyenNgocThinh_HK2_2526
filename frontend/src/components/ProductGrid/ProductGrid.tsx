@@ -23,11 +23,41 @@ interface ProductGridViewState {
 interface ProductGridProps {
   customResults?: Product[];
   viewState?: ProductGridViewState;
+  itemsPerPage?: number;
+  scrollToTopOnPageChange?: boolean;
 }
 
-const ProductGrid = ({ customResults, viewState }: ProductGridProps) => {
+type PaginationToken = number | 'dots';
+
+const buildPaginationTokens = (currentPage: number, totalPages: number): PaginationToken[] => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const tokens: PaginationToken[] = [1];
+  const left = Math.max(2, currentPage - 1);
+  const right = Math.min(totalPages - 1, currentPage + 1);
+
+  if (left > 2) {
+    tokens.push('dots');
+  }
+
+  for (let page = left; page <= right; page += 1) {
+    tokens.push(page);
+  }
+
+  if (right < totalPages - 1) {
+    tokens.push('dots');
+  }
+
+  tokens.push(totalPages);
+  return tokens;
+};
+
+const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPageChange = false }: ProductGridProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [catalog, setCatalog] = useState<Product[]>(() => customResults || productService.list());
+  const [currentPage, setCurrentPage] = useState(1);
   const internalView = useClientViewState({ validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
   const view = viewState ?? internalView;
 
@@ -94,9 +124,63 @@ const ProductGrid = ({ customResults, viewState }: ProductGridProps) => {
     return results;
   }, [view.priceRanges, view.colors, view.sortKey, customResults, catalog]);
 
-  const totalProducts = customResults
-    ? filteredProducts.length
-    : filteredProducts.length;
+  const totalProducts = filteredProducts.length;
+  const hasPagination = typeof itemsPerPage === 'number' && itemsPerPage > 0;
+  const pageSize = hasPagination ? Math.max(1, Math.floor(itemsPerPage)) : totalProducts || 1;
+  const totalPages = hasPagination ? Math.max(1, Math.ceil(totalProducts / pageSize)) : 1;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [customResults, view.priceRanges, view.colors, view.sortKey, pageSize, hasPagination]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const scrollViewportToTop = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    document.body.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    const scrollingElement = document.scrollingElement as HTMLElement | null;
+    scrollingElement?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    const appContainer = document.querySelector<HTMLElement>('.app-container');
+    appContainer?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      scrollingElement?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      appContainer?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+  };
+
+  const changePage = (nextPage: number) => {
+    const normalized = Math.min(Math.max(nextPage, 1), totalPages);
+    if (normalized === currentPage) {
+      return;
+    }
+
+    if (hasPagination && scrollToTopOnPageChange) {
+      scrollViewportToTop();
+    }
+    setCurrentPage(normalized);
+  };
+
+  const pagedProducts = useMemo(() => {
+    if (!hasPagination) {
+      return filteredProducts;
+    }
+    const start = (currentPage - 1) * pageSize;
+    return filteredProducts.slice(start, start + pageSize);
+  }, [hasPagination, filteredProducts, currentPage, pageSize]);
+
+  const rangeStart = totalProducts === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const rangeEnd = totalProducts === 0 ? 0 : Math.min(currentPage * pageSize, totalProducts);
+  const paginationTokens = useMemo(
+    () => (hasPagination ? buildPaginationTokens(currentPage, totalPages) : []),
+    [hasPagination, currentPage, totalPages],
+  );
   const dictionary = CLIENT_DICTIONARY.listing;
 
   return (
@@ -104,7 +188,10 @@ const ProductGrid = ({ customResults, viewState }: ProductGridProps) => {
       <div className="plp-toolbar">
         <div className="toolbar-left">
           <span className="results-count">
-            {dictionary.resultsLabel.replace('{start}', '1').replace('{end}', String(filteredProducts.length)).replace('{total}', String(totalProducts))}
+            {dictionary.resultsLabel
+              .replace('{start}', String(rangeStart))
+              .replace('{end}', String(rangeEnd))
+              .replace('{total}', String(totalProducts))}
           </span>
         </div>
         <div className="toolbar-right">
@@ -129,8 +216,8 @@ const ProductGrid = ({ customResults, viewState }: ProductGridProps) => {
           ? Array.from({ length: 8 }).map((_, index) => (
               <ProductCardSkeleton key={index} />
             ))
-          : filteredProducts.length > 0
-          ? filteredProducts.map((product) => (
+          : pagedProducts.length > 0
+          ? pagedProducts.map((product) => (
               <ProductCard key={product.id} {...product} />
             ))
           : (
@@ -140,17 +227,44 @@ const ProductGrid = ({ customResults, viewState }: ProductGridProps) => {
             )}
       </div>
 
-      <div className="plp-pagination">
-        <button className="pagination-btn disabled">{tListing.prevPage}</button>
-        <div className="pagination-numbers">
-          <button className="page-number active">1</button>
-          <button className="page-number">2</button>
-          <button className="page-number">3</button>
-          <span className="page-dots">...</span>
-          <button className="page-number">10</button>
+      {hasPagination && totalPages > 1 && (
+        <div className="plp-pagination">
+          <button
+            type="button"
+            className={`pagination-btn ${currentPage === 1 ? 'disabled' : ''}`}
+            disabled={currentPage === 1}
+            onClick={() => changePage(currentPage - 1)}
+          >
+            {tListing.prevPage}
+          </button>
+
+          <div className="pagination-numbers">
+            {paginationTokens.map((token, index) => (
+              token === 'dots' ? (
+                <span key={`dots-${index}`} className="page-dots">...</span>
+              ) : (
+                <button
+                  type="button"
+                  key={token}
+                  className={`page-number ${token === currentPage ? 'active' : ''}`}
+                  onClick={() => changePage(token)}
+                >
+                  {token}
+                </button>
+              )
+            ))}
+          </div>
+
+          <button
+            type="button"
+            className={`pagination-btn ${currentPage === totalPages ? 'disabled' : ''}`}
+            disabled={currentPage === totalPages}
+            onClick={() => changePage(currentPage + 1)}
+          >
+            {tListing.nextPage}
+          </button>
         </div>
-        <button className="pagination-btn">{tListing.nextPage}</button>
-      </div>
+      )}
     </div>
   );
 };

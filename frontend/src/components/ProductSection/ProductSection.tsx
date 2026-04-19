@@ -14,6 +14,11 @@ interface ProductSectionItem {
   badge?: string;
   colors?: string[];
   sizes?: string[];
+  variants?: Array<{
+    color: string;
+    size: string;
+    backendId?: string;
+  }>;
   backendId?: string;
   storeId?: string;
   storeName?: string;

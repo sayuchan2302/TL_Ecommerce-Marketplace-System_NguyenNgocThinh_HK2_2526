@@ -13,6 +13,7 @@ import {
   type MarketplaceStoreCard,
   type MarketplaceHomeCategoryTab,
 } from '../../services/marketplaceService';
+import { productService } from '../../services/productService';
 
 interface HomeSectionProduct {
   id: number | string;
@@ -41,6 +42,75 @@ interface HomeSectionProduct {
 
 const fallbackFeaturedProducts: HomeSectionProduct[] = mensFashion.map((product) => ({ ...product }));
 const fallbackTrendingProducts: HomeSectionProduct[] = womensFashion.map((product) => ({ ...product }));
+
+const hasSizeVariants = (product: HomeSectionProduct) =>
+  Array.isArray(product.variants)
+  && product.variants.some((variant) => String(variant.size || '').trim().length > 0);
+
+const buildSizeList = (variants: Array<{ size: string }>) =>
+  Array.from(new Set(variants.map((variant) => String(variant.size || '').trim()).filter(Boolean)));
+
+const enrichProductVariantsForHome = async (
+  featured: HomeSectionProduct[],
+  trending: HomeSectionProduct[],
+  topSelling: HomeSectionProduct[],
+) => {
+  const uniqueProducts = new Map<string, HomeSectionProduct>();
+  [...featured, ...trending, ...topSelling].forEach((product) => {
+    uniqueProducts.set(String(product.id), product);
+  });
+
+  const enrichedById = new Map<string, HomeSectionProduct>();
+  const rows = Array.from(uniqueProducts.values());
+  await Promise.all(rows.map(async (product) => {
+    const productId = String(product.id);
+    if (hasSizeVariants(product)) {
+      enrichedById.set(productId, product);
+      return;
+    }
+
+    const candidates = [product.backendId, product.sku, productId]
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+
+    for (const identifier of candidates) {
+      const detail = await productService.getByIdentifier(identifier);
+      if (!detail?.variants || detail.variants.length === 0) {
+        continue;
+      }
+
+      const normalizedVariants = detail.variants
+        .map((variant) => ({
+          color: String(variant.color || '').trim(),
+          size: String(variant.size || '').trim(),
+          backendId: variant.backendId,
+        }))
+        .filter((variant) => Boolean(variant.size));
+
+      if (normalizedVariants.length === 0) {
+        continue;
+      }
+
+      enrichedById.set(productId, {
+        ...product,
+        sizes: buildSizeList(normalizedVariants),
+        variants: normalizedVariants,
+      });
+      return;
+    }
+
+    enrichedById.set(productId, product);
+  }));
+
+  const pick = (rowsToMap: HomeSectionProduct[]) =>
+    rowsToMap.map((product) => enrichedById.get(String(product.id)) || product);
+
+  return {
+    featured: pick(featured),
+    trending: pick(trending),
+    topSelling: pick(topSelling),
+  };
+};
 
 const Home = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -83,17 +153,23 @@ const Home = () => {
         );
         if (!mounted) return;
 
+        const featuredRows = data.featuredProducts.length > 0 ? data.featuredProducts : fallbackFeaturedProducts;
+        const trendingRows = data.trendingProducts.length > 0 ? data.trendingProducts : fallbackTrendingProducts;
+        const topSellingRows = (
+          topSellingResponse?.items && topSellingResponse.items.length > 0
+            ? topSellingResponse.items
+            : [...data.featuredProducts, ...data.trendingProducts]
+        ).slice(0, 10);
+
+        const enriched = await enrichProductVariantsForHome(featuredRows, trendingRows, topSellingRows);
+        if (!mounted) return;
+
         setFeaturedStores(data.featuredStores);
         setAllStores(dedupedStores.length > 0 ? dedupedStores : data.featuredStores || []);
         setCategoryTabs(data.categoryTabs || []);
-        setFeaturedProducts(data.featuredProducts.length > 0 ? data.featuredProducts : fallbackFeaturedProducts);
-        setTrendingProducts(data.trendingProducts.length > 0 ? data.trendingProducts : fallbackTrendingProducts);
-        setTopSellingProducts(
-          (topSellingResponse?.items && topSellingResponse.items.length > 0
-            ? topSellingResponse.items
-            : [...data.featuredProducts, ...data.trendingProducts]
-          ).slice(0, 10),
-        );
+        setFeaturedProducts(enriched.featured);
+        setTrendingProducts(enriched.trending);
+        setTopSellingProducts(enriched.topSelling);
       } catch {
         if (!mounted) return;
         setFeaturedStores([]);

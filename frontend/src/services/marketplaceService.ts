@@ -72,6 +72,14 @@ interface MarketplaceProductCardPayload {
   storeSlug?: string;
   storeLogo?: string;
   officialStore?: boolean;
+  sizes?: string[];
+  variants?: Array<{
+    id?: string;
+    sku?: string;
+    color?: string;
+    size?: string;
+    stockQuantity?: number;
+  }>;
 }
 
 interface MarketplaceStoreCardPayload {
@@ -128,6 +136,20 @@ const mapProductCard = (row: MarketplaceProductCardPayload): Product => {
   const resolvedOriginalPrice = originalPrice > price ? originalPrice : undefined;
   const routeKey = (row.slug || row.productCode || row.id || '').trim();
   const normalizedRouteKey = routeKey || row.id;
+  const variants = (row.variants || [])
+    .filter((variant) => Boolean((variant.size || '').trim()))
+    .map((variant, index) => ({
+      id: (variant.sku || variant.id || `${normalizedRouteKey}-v${index + 1}`).trim(),
+      backendId: (variant.id || '').trim() || undefined,
+      size: (variant.size || '').trim(),
+      color: (variant.color || '').trim(),
+      sku: (variant.sku || '').trim(),
+      price,
+      stock: Math.max(0, Number(variant.stockQuantity || 0)),
+    }));
+  const sizes = row.sizes && row.sizes.length > 0
+    ? Array.from(new Set(row.sizes.map((size) => String(size || '').trim()).filter(Boolean)))
+    : Array.from(new Set(variants.map((variant) => variant.size).filter(Boolean)));
 
   return {
     id: normalizedRouteKey,
@@ -141,9 +163,11 @@ const mapProductCard = (row: MarketplaceProductCardPayload): Product => {
       || optimizeMarketplaceImage('https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=672&h=990&fit=crop', 720),
     badge: row.badge,
     colors: row.colors || [],
+    sizes: sizes.length > 0 ? sizes : undefined,
     stock: Number.isFinite(row.stock) ? Number(row.stock) : 0,
     status: 'ACTIVE',
     statusType: Number(row.stock || 0) <= 0 ? 'out' : Number(row.stock || 0) < 10 ? 'low' : 'active',
+    variants: variants.length > 0 ? variants : undefined,
     storeId: row.storeId,
     storeName: row.storeName,
     storeSlug: row.storeSlug,

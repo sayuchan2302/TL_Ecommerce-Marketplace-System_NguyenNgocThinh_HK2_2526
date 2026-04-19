@@ -343,6 +343,8 @@ const Search = () => {
                   <main className="plp-main">
                     <ProductGrid
                       customResults={filteredResults.length > 0 ? filteredResults : productResults}
+                      itemsPerPage={12}
+                      scrollToTopOnPageChange
                       viewState={{
                         priceRanges: view.priceRanges,
                         colors: view.colors,

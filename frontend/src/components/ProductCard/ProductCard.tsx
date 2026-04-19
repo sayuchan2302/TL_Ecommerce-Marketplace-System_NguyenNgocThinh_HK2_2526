@@ -1,4 +1,4 @@
-import { useRef, useState, memo } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Heart, Eye, Store, ShoppingBag } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
@@ -46,8 +46,6 @@ interface ProductCardProps {
   }) => void;
 }
 
-const DEFAULT_SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL'];
-
 const areStringArraysEqual = (left?: string[], right?: string[]) => {
   if (left === right) return true;
   if (!left || !right) return !left && !right;
@@ -57,6 +55,18 @@ const areStringArraysEqual = (left?: string[], right?: string[]) => {
   }
   return true;
 };
+
+const normalizeSizeList = (rows?: string[]) =>
+  Array.from(new Set((rows || []).map((size) => String(size || '').trim()).filter(Boolean)));
+
+const normalizeVariantList = (rows?: Array<{ color: string; size: string; backendId?: string }>) =>
+  (rows || [])
+    .map((variant) => ({
+      color: String(variant.color || '').trim(),
+      size: String(variant.size || '').trim(),
+      backendId: variant.backendId,
+    }))
+    .filter((variant) => Boolean(variant.size));
 
 const ProductCardInteractive = ({
   id,
@@ -84,26 +94,85 @@ const ProductCardInteractive = ({
   const [addedSize, setAddedSize] = useState<string | null>(null);
   const [selectedColorIdx, setSelectedColorIdx] = useState(0);
   const [isQuickViewOpen, setIsQuickViewOpen] = useState(false);
+  const [resolvedSizes, setResolvedSizes] = useState<string[]>(() => normalizeSizeList(sizes));
+  const [resolvedVariants, setResolvedVariants] = useState(() => normalizeVariantList(variants));
+  const [isHydratingVariants, setIsHydratingVariants] = useState(false);
+  const [didHydrateVariants, setDidHydrateVariants] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
 
   const productRouteKey = String(id);
   const isWished = isInWishlist(productRouteKey);
 
-  const variantSizes = Array.from(new Set((variants || []).map((variant) => variant.size).filter(Boolean)));
-  const availableSizes = variantSizes.length > 0 ? variantSizes : (sizes ?? DEFAULT_SIZES);
+  useEffect(() => {
+    setResolvedSizes(normalizeSizeList(sizes));
+    setResolvedVariants(normalizeVariantList(variants));
+    setIsHydratingVariants(false);
+    setDidHydrateVariants(false);
+  }, [id, backendId, sku, sizes, variants]);
+
+  const variantSizes = Array.from(new Set((resolvedVariants || []).map((variant) => variant.size).filter(Boolean)));
+  const availableSizes = variantSizes.length > 0 ? variantSizes : resolvedSizes;
   const selectedColorValue = colors?.[selectedColorIdx] ?? '';
   const hasStoreSlug = isCanonicalStoreSlug(storeSlug);
+
+  const hydrateVariantMetadata = async () => {
+    if (didHydrateVariants || isHydratingVariants || availableSizes.length > 0) {
+      return;
+    }
+
+    setIsHydratingVariants(true);
+    const identifiers = Array.from(new Set(
+      [backendId, sku, productRouteKey]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean),
+    ));
+
+    try {
+      for (const identifier of identifiers) {
+        const detail = await productService.getByIdentifier(identifier);
+        if (!detail) {
+          continue;
+        }
+
+        const detailVariants = normalizeVariantList(
+          (detail.variants || []).map((variant) => ({
+            color: variant.color,
+            size: variant.size,
+            backendId: variant.backendId,
+          })),
+        );
+        const detailSizes = normalizeSizeList(detail.sizes);
+        const sizesFromVariants = normalizeSizeList(detailVariants.map((variant) => variant.size));
+        const normalizedSizes = detailSizes.length > 0 ? detailSizes : sizesFromVariants;
+
+        if (detailVariants.length === 0 && normalizedSizes.length === 0) {
+          continue;
+        }
+
+        if (detailVariants.length > 0) {
+          setResolvedVariants(detailVariants);
+        }
+        setResolvedSizes(normalizedSizes);
+        break;
+      }
+    } finally {
+      setDidHydrateVariants(true);
+      setIsHydratingVariants(false);
+    }
+  };
 
   const handleSizeClick = async (e: React.MouseEvent, size: string) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const localVariantId = variants?.find((variant) => (
-      variant.color.toLowerCase() === selectedColorValue.toLowerCase()
-      && variant.size.toLowerCase() === size.toLowerCase()
-    ))?.backendId;
+    const normalizedSize = size.toLowerCase();
+    const normalizedColor = selectedColorValue.toLowerCase();
+    const localVariantId = resolvedVariants.find((variant) => (
+      variant.size.toLowerCase() === normalizedSize
+      && (!normalizedColor || variant.color.toLowerCase() === normalizedColor)
+    ))?.backendId || resolvedVariants.find((variant) => variant.size.toLowerCase() === normalizedSize)?.backendId;
     const purchaseReference = localVariantId
-      ? { backendProductId: backendId, backendVariantId: localVariantId, activeVariantCount: variants?.length || 0 }
+      ? { backendProductId: backendId, backendVariantId: localVariantId, activeVariantCount: resolvedVariants.length || 0 }
       : await productService.resolvePurchaseReference(
         String(backendId || productRouteKey),
         selectedColorValue || undefined,
@@ -184,7 +253,14 @@ const ProductCardInteractive = ({
 
   return (
     <div className="product-card">
-      <div className="product-image-container">
+      <div
+        className="product-image-container"
+        onMouseEnter={() => {
+          if (availableSizes.length === 0 && !didHydrateVariants) {
+            void hydrateVariantMetadata();
+          }
+        }}
+      >
         {/* Wishlist Icon */}
         <button 
           className={`product-wishlist-btn ${isWished ? 'wished' : ''}`}
@@ -229,16 +305,22 @@ const ProductCardInteractive = ({
               Thêm nhanh vào giỏ hàng <Plus size={14} strokeWidth={2.5} />
             </p>
             <div className="quick-add-sizes">
-              {availableSizes.map((size) => (
-                <button
-                  key={size}
-                  className={`quick-size-btn ${addedSize === size ? 'added' : ''}`}
-                  onClick={(e) => handleSizeClick(e, size)}
-                  title={`Thêm size ${size}`}
-                >
-                  {addedSize === size ? '✓' : size}
-                </button>
-              ))}
+              {availableSizes.length > 0 ? (
+                availableSizes.map((size) => (
+                  <button
+                    key={size}
+                    className={`quick-size-btn ${addedSize === size ? 'added' : ''}`}
+                    onClick={(e) => handleSizeClick(e, size)}
+                    title={`Thêm size ${size}`}
+                  >
+                    {addedSize === size ? '✓' : size}
+                  </button>
+                ))
+              ) : (
+                <span className="quick-add-status">
+                  {isHydratingVariants ? 'Đang tải kích cỡ...' : 'Không có kích cỡ'}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -302,8 +384,8 @@ const ProductCardInteractive = ({
             originalPrice,
             image,
             colors,
-            sizes,
-            variants,
+            sizes: resolvedSizes,
+            variants: resolvedVariants,
             storeId,
             storeName,
             isOfficialStore,

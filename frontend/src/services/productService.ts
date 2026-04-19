@@ -178,6 +178,7 @@ const mapBackendProduct = (product: BackendProduct): Product => {
   }));
 
   const colors = Array.from(new Set(variants.map((variant) => variant.color).filter(Boolean)));
+  const sizes = Array.from(new Set(variants.map((variant) => variant.size).filter(Boolean)));
   const sortedImages = sortImages(product.images);
   const imageUrls = sortedImages
     .map((image) => (image?.url || '').trim())
@@ -210,6 +211,7 @@ const mapBackendProduct = (product: BackendProduct): Product => {
     image: imageUrls[0] || '',
     images: imageUrls,
     colors,
+    sizes,
     stock: variants.reduce((sum, variant) => sum + (variant.stock || 0), 0),
     status: product.status || 'ACTIVE',
     statusType: variants.some((variant) => (variant.stock || 0) <= 0)
