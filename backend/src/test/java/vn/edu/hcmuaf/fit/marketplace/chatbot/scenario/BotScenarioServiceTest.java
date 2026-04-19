@@ -53,8 +53,8 @@ class BotScenarioServiceTest {
     void saveDraft_rejectsPayloadWhenMissingRequiredQuickAction() {
         BotScenarioPayload invalidPayload = basePayload();
         invalidPayload.setQuickActions(List.of(
-                BotScenarioQuickAction.builder().key(BotScenarioActionKey.ORDER_LOOKUP).label("Tra cứu đơn").build(),
-                BotScenarioQuickAction.builder().key(BotScenarioActionKey.SIZE_ADVICE).label("Tư vấn size").build()
+                BotScenarioQuickAction.builder().key(BotScenarioActionKey.ORDER_LOOKUP).label("Tra cuu don").build(),
+                BotScenarioQuickAction.builder().key(BotScenarioActionKey.SIZE_ADVICE).label("Tu van size").build()
         ));
 
         RuntimeException error = assertThrows(RuntimeException.class,
@@ -101,22 +101,22 @@ class BotScenarioServiceTest {
 
     private BotScenarioPayload basePayload() {
         return BotScenarioPayload.builder()
-                .welcomePrompt("Xin chào")
-                .unknownPrompt("Không hiểu")
-                .askOrderCodePrompt("Nhập mã đơn")
-                .askOrderPhonePrompt("Nhập 4 số cuối")
-                .orderPhoneInvalidPrompt("Sai 4 số")
-                .orderLookupContinuePrompt("Cần hỗ trợ thêm?")
-                .askHeightPrompt("Nhập chiều cao")
-                .invalidHeightPrompt("Sai chiều cao")
-                .askWeightPrompt("Nhập cân nặng")
-                .invalidWeightPrompt("Sai cân nặng")
-                .sizeAdviceContinuePrompt("Tiếp tục tác vụ?")
-                .productFaqContinuePrompt("Hỏi thêm gì?")
+                .welcomePrompt("Xin chao")
+                .unknownPrompt("Khong hieu")
+                .askOrderCodePrompt("Nhap ma don")
+                .askOrderPhonePrompt("Nhap 4 so cuoi")
+                .orderPhoneInvalidPrompt("Sai 4 so")
+                .orderLookupContinuePrompt("Can ho tro them?")
+                .askHeightPrompt("Nhap chieu cao")
+                .invalidHeightPrompt("Sai chieu cao")
+                .askWeightPrompt("Nhap can nang")
+                .invalidWeightPrompt("Sai can nang")
+                .sizeAdviceContinuePrompt("Tiep tuc tac vu?")
+                .productFaqContinuePrompt("Hoi them gi?")
                 .quickActions(List.of(
-                        BotScenarioQuickAction.builder().key(BotScenarioActionKey.ORDER_LOOKUP).label("Tra cứu đơn").build(),
-                        BotScenarioQuickAction.builder().key(BotScenarioActionKey.SIZE_ADVICE).label("Tư vấn size").build(),
-                        BotScenarioQuickAction.builder().key(BotScenarioActionKey.PRODUCT_FAQ).label("Hỏi đáp sản phẩm").build()
+                        BotScenarioQuickAction.builder().key(BotScenarioActionKey.ORDER_LOOKUP).label("Tra cuu don").build(),
+                        BotScenarioQuickAction.builder().key(BotScenarioActionKey.SIZE_ADVICE).label("Tu van size").build(),
+                        BotScenarioQuickAction.builder().key(BotScenarioActionKey.PRODUCT_FAQ).label("Hoi dap san pham").build()
                 ))
                 .build();
     }

@@ -42,7 +42,7 @@ class BotScenarioAdminControllerIntegrationTest {
         Map<String, Object> draft = (Map<String, Object>) body.get("draft");
         assertNotNull(draft);
 
-        draft.put("unknownPrompt", "Bạn hãy chọn chức năng để tiếp tục.");
+        draft.put("unknownPrompt", "Ban hay chon chuc nang de tiep tuc.");
 
         ResponseEntity<Map> saveDraftResponse = restTemplate.exchange(
                 "/api/admin/bot/scenario/draft",
@@ -62,7 +62,7 @@ class BotScenarioAdminControllerIntegrationTest {
 
         Map<String, Object> published = (Map<String, Object>) publishResponse.getBody().get("published");
         assertNotNull(published);
-        assertEquals("Bạn hãy chọn chức năng để tiếp tục.", published.get("unknownPrompt"));
+        assertEquals("Ban hay chon chuc nang de tiep tuc.", published.get("unknownPrompt"));
     }
 
     @Test
@@ -95,3 +95,4 @@ class BotScenarioAdminControllerIntegrationTest {
         return String.valueOf(token);
     }
 }
+

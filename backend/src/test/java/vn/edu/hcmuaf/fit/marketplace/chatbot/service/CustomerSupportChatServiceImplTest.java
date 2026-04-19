@@ -26,7 +26,7 @@ class CustomerSupportChatServiceImplTest {
 
         assertTrue(result.ok(), result.message());
         assertTrue(result.message().contains("DH-260412-000037"));
-        assertTrue(result.message().contains("Đơn đang giao"));
+        assertTrue(result.message().contains("Don dang giao"));
     }
 
     @Test
@@ -38,7 +38,7 @@ class CustomerSupportChatServiceImplTest {
         CustomerSupportChatService.OrderLookupResult result = service.lookupOrderStatus("DH-260412-000037", "9999");
 
         assertFalse(result.ok());
-        assertTrue(result.message().contains("Không xác minh được"));
+        assertTrue(result.message().contains("Khong xac minh duoc"));
     }
 
     @Test
@@ -50,7 +50,7 @@ class CustomerSupportChatServiceImplTest {
         CustomerSupportChatService.OrderLookupResult result = service.lookupOrderStatus("DH-NOT-FOUND", "1234");
 
         assertFalse(result.ok());
-        assertTrue(result.message().contains("Không tìm thấy đơn hàng"));
+        assertTrue(result.message().contains("Khong tim thay don hang"));
     }
 
     @Test
@@ -67,12 +67,12 @@ class CustomerSupportChatServiceImplTest {
     @Test
     void answerProductFaq_prefersConfiguredFaqKeywordMatch() {
         StubOrderService orderService = new StubOrderService();
-        FaqContentLookupService faqLookupService = rawQuestion -> Optional.of("Câu trả lời từ FAQ keyword.");
+        FaqContentLookupService faqLookupService = rawQuestion -> Optional.of("Cau tra loi tu FAQ keyword.");
         CustomerSupportChatServiceImpl service = new CustomerSupportChatServiceImpl(orderService, faqLookupService);
 
         String result = service.answerProductFaq("toi muon doi size");
 
-        assertEquals("Câu trả lời từ FAQ keyword.", result);
+        assertEquals("Cau tra loi tu FAQ keyword.", result);
     }
 
     private Order buildOrder(String code, Order.OrderStatus status, Order.PaymentStatus paymentStatus, String phone) {
@@ -103,3 +103,4 @@ class CustomerSupportChatServiceImplTest {
         }
     }
 }
+

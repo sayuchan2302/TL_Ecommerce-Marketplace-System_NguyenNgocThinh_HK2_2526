@@ -1,6 +1,6 @@
-﻿import './Admin.css';
+import './Admin.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { MessageSquare, RefreshCcw, Save, UploadCloud } from 'lucide-react';
+import { Save, RefreshCcw, UploadCloud, MessageSquare, FileText, Plus, Trash2, Pencil } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { useAdminToast } from './useAdminToast';
 import {
@@ -11,62 +11,53 @@ import {
 } from '../../services/adminBotScenarioService';
 import { contentService, type ContentPage } from '../../services/contentService';
 
+type FaqFormState = {
+  id?: string;
+  title: string;
+  body: string;
+  keywordsText: string;
+};
+
 const QUICK_ACTION_ORDER: BotScenarioActionKey[] = ['ORDER_LOOKUP', 'SIZE_ADVICE', 'PRODUCT_FAQ'];
 
 const QUICK_ACTION_LABEL: Record<BotScenarioActionKey, string> = {
-  ORDER_LOOKUP: 'Tra cứu đơn hàng',
-  SIZE_ADVICE: 'Tư vấn size',
-  PRODUCT_FAQ: 'Hỏi đáp sản phẩm',
+  ORDER_LOOKUP: 'Tra cuu don',
+  SIZE_ADVICE: 'Tu van size',
+  PRODUCT_FAQ: 'Hoi dap san pham',
 };
 
-const normalizeKeywordList = (items: string[]) =>
-  items
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .filter((item, index, arr) => arr.findIndex((value) => value.toLowerCase() === item.toLowerCase()) === index);
+const emptyFaqForm: FaqFormState = {
+  title: '',
+  body: '',
+  keywordsText: '',
+};
 
 const parseKeywords = (input: string) =>
-  normalizeKeywordList(input.split(/[,;\n\r]+/).map((item) => item.trim()));
+  input
+    .split(/[,;\n\r]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 
-const ensureQuickActions = (quickActions: BotScenarioPayload['quickActions']) => {
-  const byKey = new Map(quickActions.map((item) => [item.key, item]));
-  return QUICK_ACTION_ORDER.map((key) => byKey.get(key) || { key, label: QUICK_ACTION_LABEL[key] });
+const formatKeywords = (keywords?: string[]) => (keywords || []).join(', ');
+
+const sortQuickActions = (payload: BotScenarioPayload): BotScenarioPayload => {
+  const byKey = new Map(payload.quickActions.map((item) => [item.key, item]));
+  return {
+    ...payload,
+    quickActions: QUICK_ACTION_ORDER.map((key) => byKey.get(key)).filter(Boolean) as BotScenarioPayload['quickActions'],
+  };
 };
-
-const sortQuickActions = (payload: BotScenarioPayload): BotScenarioPayload => ({
-  ...payload,
-  quickActions: ensureQuickActions(payload.quickActions),
-});
-
-const stringifyPayload = (payload: BotScenarioPayload) => JSON.stringify(sortQuickActions(payload));
 
 const AdminBotAI = () => {
   const { pushToast } = useAdminToast();
-
   const [snapshot, setSnapshot] = useState<BotScenarioSnapshot | null>(null);
   const [draft, setDraft] = useState<BotScenarioPayload | null>(null);
-
   const [faqItems, setFaqItems] = useState<ContentPage[]>([]);
-  const [faqKeywordDrafts, setFaqKeywordDrafts] = useState<Record<string, string[]>>({});
-  const [faqKeywordInputs, setFaqKeywordInputs] = useState<Record<string, string>>({});
-
+  const [faqForm, setFaqForm] = useState<FaqFormState>(emptyFaqForm);
   const [loading, setLoading] = useState(true);
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [savingFaqId, setSavingFaqId] = useState<string | null>(null);
-
-  const initializeFaqDrafts = (items: ContentPage[]) => {
-    const keywordDraftMap: Record<string, string[]> = {};
-    const keywordInputMap: Record<string, string> = {};
-
-    items.forEach((item) => {
-      keywordDraftMap[item.id] = normalizeKeywordList(item.keywords || []);
-      keywordInputMap[item.id] = '';
-    });
-
-    setFaqKeywordDrafts(keywordDraftMap);
-    setFaqKeywordInputs(keywordInputMap);
-  };
+  const [savingFaq, setSavingFaq] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -75,13 +66,11 @@ const AdminBotAI = () => {
         adminBotScenarioService.getSnapshot(),
         contentService.list('FAQ'),
       ]);
-
       setSnapshot(scenarioSnapshot);
       setDraft(sortQuickActions(scenarioSnapshot.draft));
       setFaqItems(faqList);
-      initializeFaqDrafts(faqList);
     } catch {
-      pushToast('Không thể tải dữ liệu Bot/AI.');
+      pushToast('Khong the tai du lieu Bot/AI.');
     } finally {
       setLoading(false);
     }
@@ -93,19 +82,8 @@ const AdminBotAI = () => {
 
   const hasDraftChanged = useMemo(() => {
     if (!snapshot || !draft) return false;
-    return stringifyPayload(snapshot.draft) !== stringifyPayload(draft);
+    return JSON.stringify(sortQuickActions(snapshot.draft)) !== JSON.stringify(sortQuickActions(draft));
   }, [snapshot, draft]);
-
-  const isDraftDifferentFromPublished = useMemo(() => {
-    if (!snapshot || !draft) return false;
-    return stringifyPayload(snapshot.published) !== stringifyPayload(draft);
-  }, [snapshot, draft]);
-
-  const currentStatus = isDraftDifferentFromPublished ? 'DRAFT' : 'PUBLISHED';
-  const currentVersion =
-    currentStatus === 'DRAFT'
-      ? (snapshot?.draftMeta?.version ?? 0)
-      : (snapshot?.publishedMeta?.version ?? 0);
 
   const updateDraftField = <K extends keyof BotScenarioPayload>(field: K, value: BotScenarioPayload[K]) => {
     setDraft((current) => (current ? { ...current, [field]: value } : current));
@@ -123,15 +101,14 @@ const AdminBotAI = () => {
 
   const handleSaveDraft = async () => {
     if (!draft) return;
-
     try {
       setSavingDraft(true);
       const nextSnapshot = await adminBotScenarioService.saveDraft(sortQuickActions(draft));
       setSnapshot(nextSnapshot);
       setDraft(sortQuickActions(nextSnapshot.draft));
-      pushToast('Đã lưu nháp kịch bản chatbot.');
+      pushToast('Da luu nhap kich ban bot.');
     } catch (error) {
-      pushToast(error instanceof Error ? error.message : 'Không thể lưu nháp.');
+      pushToast(error instanceof Error ? error.message : 'Khong the luu nhap.');
     } finally {
       setSavingDraft(false);
     }
@@ -143,9 +120,9 @@ const AdminBotAI = () => {
       const nextSnapshot = await adminBotScenarioService.publishDraft();
       setSnapshot(nextSnapshot);
       setDraft(sortQuickActions(nextSnapshot.draft));
-      pushToast('Publish thành công. Kịch bản chatbot đã được áp dụng.');
+      pushToast('Da publish kich ban chatbot.');
     } catch (error) {
-      pushToast(error instanceof Error ? error.message : 'Không thể publish kịch bản.');
+      pushToast(error instanceof Error ? error.message : 'Khong the publish.');
     } finally {
       setPublishing(false);
     }
@@ -156,308 +133,255 @@ const AdminBotAI = () => {
       const nextSnapshot = await adminBotScenarioService.resetDraftFromPublished();
       setSnapshot(nextSnapshot);
       setDraft(sortQuickActions(nextSnapshot.draft));
-      pushToast('Đã khôi phục Draft từ bản Published gần nhất.');
+      pushToast('Da khoi phuc draft theo ban published.');
     } catch {
-      pushToast('Không thể khôi phục Draft.');
+      pushToast('Khong the khoi phuc draft.');
     }
   };
 
-  const addKeywordsToFaq = (faqId: string) => {
-    const rawInput = faqKeywordInputs[faqId] || '';
-    const nextKeywords = parseKeywords(rawInput);
-    if (!nextKeywords.length) {
+  const openFaqEditor = (item?: ContentPage) => {
+    if (!item) {
+      setFaqForm(emptyFaqForm);
+      return;
+    }
+    setFaqForm({
+      id: item.id,
+      title: item.title,
+      body: item.body,
+      keywordsText: formatKeywords(item.keywords),
+    });
+  };
+
+  const handleSaveFaq = async () => {
+    if (!faqForm.title.trim() || !faqForm.body.trim()) {
+      pushToast('FAQ can co title va noi dung.');
       return;
     }
 
-    setFaqKeywordDrafts((current) => {
-      const existing = current[faqId] || [];
-      return {
-        ...current,
-        [faqId]: normalizeKeywordList([...existing, ...nextKeywords]),
-      };
-    });
+    const payload = {
+      title: faqForm.title.trim(),
+      body: faqForm.body.trim(),
+      type: 'FAQ' as const,
+      displayOrder: faqForm.id ? faqItems.find((item) => item.id === faqForm.id)?.displayOrder : faqItems.length + 1,
+      keywords: parseKeywords(faqForm.keywordsText),
+    };
 
-    setFaqKeywordInputs((current) => ({
-      ...current,
-      [faqId]: '',
-    }));
-  };
-
-  const removeKeywordFromFaq = (faqId: string, keyword: string) => {
-    setFaqKeywordDrafts((current) => ({
-      ...current,
-      [faqId]: (current[faqId] || []).filter((item) => item !== keyword),
-    }));
-  };
-
-  const hasKeywordChanged = (item: ContentPage) => {
-    const original = normalizeKeywordList(item.keywords || []);
-    const edited = normalizeKeywordList(faqKeywordDrafts[item.id] || []);
-    return JSON.stringify(original) !== JSON.stringify(edited);
-  };
-
-  const handleSaveFaqKeywords = async (item: ContentPage) => {
-    const nextKeywords = normalizeKeywordList(faqKeywordDrafts[item.id] || []);
     try {
-      setSavingFaqId(item.id);
-      const updated = await contentService.update(item.id, {
-        title: item.title,
-        body: item.body,
-        type: 'FAQ',
-        displayOrder: item.displayOrder,
-        keywords: nextKeywords,
-      });
-
-      setFaqItems((current) => current.map((faq) => (faq.id === item.id ? updated : faq)));
-      setFaqKeywordDrafts((current) => ({
-        ...current,
-        [item.id]: normalizeKeywordList(updated.keywords || []),
-      }));
-      pushToast(`Đã cập nhật từ khóa cho FAQ: ${item.title}`);
+      setSavingFaq(true);
+      if (faqForm.id) {
+        const updated = await contentService.update(faqForm.id, payload);
+        setFaqItems((prev) => prev.map((item) => (item.id === faqForm.id ? updated : item)));
+        pushToast('Da cap nhat FAQ.');
+      } else {
+        const created = await contentService.create(payload);
+        setFaqItems((prev) => [...prev, created]);
+        pushToast('Da tao FAQ moi.');
+      }
+      setFaqForm(emptyFaqForm);
     } catch {
-      pushToast('Không thể lưu từ khóa cho FAQ.');
+      pushToast('Khong the luu FAQ.');
     } finally {
-      setSavingFaqId(null);
+      setSavingFaq(false);
+    }
+  };
+
+  const handleDeleteFaq = async (id: string) => {
+    if (!confirm('Ban chac chan muon xoa FAQ nay?')) return;
+    try {
+      await contentService.remove(id);
+      setFaqItems((prev) => prev.filter((item) => item.id !== id));
+      if (faqForm.id === id) {
+        setFaqForm(emptyFaqForm);
+      }
+      pushToast('Da xoa FAQ.');
+    } catch {
+      pushToast('Khong the xoa FAQ.');
     }
   };
 
   return (
-    <AdminLayout title="Bot và AI" breadcrumbs={['Bot và AI', 'Quản lý kịch bản chatbot']}>
-      <div className="bot-ai-v2-page">
-        {loading || !draft || !snapshot ? (
-          <section className="admin-panel">
-            <p className="admin-muted">Đang tải dữ liệu quản trị chatbot...</p>
-          </section>
-        ) : (
-          <>
-            <div className="bot-ai-v2-split">
-              <section className="bot-ai-v2-editor">
-                <header className="bot-ai-v2-editor-head">
-                  <div>
-                    <h2>Quản lý kịch bản chatbot</h2>
-                    <p className="admin-muted">
-                      Phiên bản hiện tại: <strong>v{currentVersion}</strong> | Draft: <strong>v{snapshot.draftMeta?.version || 0}</strong> | Published:{' '}
-                      <strong>v{snapshot.publishedMeta?.version || 0}</strong>
-                    </p>
-                  </div>
-                  <span className={`bot-ai-v2-badge ${currentStatus === 'DRAFT' ? 'draft' : 'published'}`}>
-                    {currentStatus}
-                  </span>
-                </header>
+    <AdminLayout title="Bot va AI" breadcrumbs={['Bot va AI', 'Quan ly kich ban chatbot']}>
+      <div className="admin-panels single">
+        <section className="admin-panel">
+          <div className="admin-panel-head">
+            <div>
+              <h2>Cau hinh kich ban chatbot</h2>
+              <p className="admin-muted">
+                Draft se duoc chinh sua o day. Runtime chatbot chi dung ban Published.
+              </p>
+            </div>
+            <div className="admin-topbar-actions">
+              <button className="admin-icon-btn subtle" onClick={() => void loadData()} title="Tai lai du lieu">
+                <RefreshCcw size={16} />
+              </button>
+              <button className="admin-primary-btn dark" onClick={handleResetDraft} disabled={loading || !snapshot}>
+                <RefreshCcw size={16} /> Khoi phuc draft
+              </button>
+              <button className="admin-primary-btn" onClick={handleSaveDraft} disabled={loading || !draft || savingDraft || !hasDraftChanged}>
+                <Save size={16} /> {savingDraft ? 'Dang luu...' : 'Luu nhap'}
+              </button>
+              <button className="admin-primary-btn" onClick={handlePublish} disabled={loading || publishing || !snapshot}>
+                <UploadCloud size={16} /> {publishing ? 'Dang publish...' : 'Publish'}
+              </button>
+            </div>
+          </div>
 
-                <section className="bot-ai-v2-block">
-                  <h3>Nội dung chính</h3>
+          {loading || !draft ? (
+            <p className="admin-muted">Dang tai kich ban chatbot...</p>
+          ) : (
+            <div className="bot-ai-grid">
+              <div className="bot-ai-editor">
+                <div className="bot-ai-section">
+                  <h3><MessageSquare size={16} /> Prompt chinh</h3>
                   <label>
-                    Lời chào (Welcome Message)
+                    Loi chao
                     <textarea
                       value={draft.welcomePrompt}
                       onChange={(e) => updateDraftField('welcomePrompt', e.target.value)}
-                      rows={4}
-                    />
-                  </label>
-                  <label>
-                    Fallback Message (Khi bot không hiểu)
-                    <textarea
-                      value={draft.unknownPrompt}
-                      onChange={(e) => updateDraftField('unknownPrompt', e.target.value)}
                       rows={3}
                     />
                   </label>
-                </section>
+                  <label>
+                    Loi nhan khong hieu
+                    <textarea
+                      value={draft.unknownPrompt}
+                      onChange={(e) => updateDraftField('unknownPrompt', e.target.value)}
+                      rows={2}
+                    />
+                  </label>
+                </div>
 
-                <section className="bot-ai-v2-block">
-                  <h3>Quản lý nút tác vụ nhanh</h3>
-                  <div className="bot-ai-v2-action-list">
-                    {QUICK_ACTION_ORDER.map((actionKey) => (
-                      <article key={actionKey} className="bot-ai-v2-action-item">
-                        <div className="bot-ai-v2-action-title">
-                          <strong>{QUICK_ACTION_LABEL[actionKey]}</strong>
-                          <code>{actionKey}</code>
-                        </div>
-                        <input
-                          value={draft.quickActions.find((item) => item.key === actionKey)?.label || ''}
-                          onChange={(e) => updateQuickActionLabel(actionKey, e.target.value)}
-                          placeholder="Nhập nhãn nút bấm..."
-                        />
-                      </article>
+                <div className="bot-ai-section">
+                  <h3>Quick actions</h3>
+                  {QUICK_ACTION_ORDER.map((key) => (
+                    <label key={key}>
+                      {QUICK_ACTION_LABEL[key]}
+                      <input
+                        value={draft.quickActions.find((item) => item.key === key)?.label || ''}
+                        onChange={(e) => updateQuickActionLabel(key, e.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+
+                <div className="bot-ai-section">
+                  <h3>Flow prompts</h3>
+                  <label>Yeu cau ma don<input value={draft.askOrderCodePrompt} onChange={(e) => updateDraftField('askOrderCodePrompt', e.target.value)} /></label>
+                  <label>Yeu cau 4 so cuoi SDT<input value={draft.askOrderPhonePrompt} onChange={(e) => updateDraftField('askOrderPhonePrompt', e.target.value)} /></label>
+                  <label>Sai 4 so SDT<input value={draft.orderPhoneInvalidPrompt} onChange={(e) => updateDraftField('orderPhoneInvalidPrompt', e.target.value)} /></label>
+                  <label>Hoi tiep sau tra cuu don<input value={draft.orderLookupContinuePrompt} onChange={(e) => updateDraftField('orderLookupContinuePrompt', e.target.value)} /></label>
+                  <label>Yeu cau chieu cao<input value={draft.askHeightPrompt} onChange={(e) => updateDraftField('askHeightPrompt', e.target.value)} /></label>
+                  <label>Sai chieu cao<input value={draft.invalidHeightPrompt} onChange={(e) => updateDraftField('invalidHeightPrompt', e.target.value)} /></label>
+                  <label>Yeu cau can nang<input value={draft.askWeightPrompt} onChange={(e) => updateDraftField('askWeightPrompt', e.target.value)} /></label>
+                  <label>Sai can nang<input value={draft.invalidWeightPrompt} onChange={(e) => updateDraftField('invalidWeightPrompt', e.target.value)} /></label>
+                  <label>Hoi tiep sau tu van size<input value={draft.sizeAdviceContinuePrompt} onChange={(e) => updateDraftField('sizeAdviceContinuePrompt', e.target.value)} /></label>
+                  <label>Hoi tiep sau FAQ<input value={draft.productFaqContinuePrompt} onChange={(e) => updateDraftField('productFaqContinuePrompt', e.target.value)} /></label>
+                </div>
+              </div>
+
+              <div className="bot-ai-preview">
+                <h3>Preview (Published)</h3>
+                <p className="admin-muted small">
+                  Draft version: <strong>{snapshot?.draftMeta?.version || 0}</strong> |
+                  Published version: <strong>{snapshot?.publishedMeta?.version || 0}</strong>
+                </p>
+                <div className="bot-ai-preview-card">
+                  <p className="bot-ai-preview-title">Welcome</p>
+                  <p>{snapshot?.published.welcomePrompt}</p>
+                  <p className="bot-ai-preview-title">Quick actions</p>
+                  <div className="bot-ai-keyword-wrap">
+                    {snapshot?.published.quickActions.map((action) => (
+                      <span key={action.key} className="admin-pill neutral">{action.label}</span>
                     ))}
                   </div>
-                </section>
+                  <p className="bot-ai-preview-title">Unknown</p>
+                  <p>{snapshot?.published.unknownPrompt}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
 
-                <section className="bot-ai-v2-block">
-                  <h3>FAQ và từ khóa tìm kiếm</h3>
-                  <div className="bot-ai-v2-table-wrap">
-                    <table className="bot-ai-v2-table">
-                      <thead>
-                        <tr>
-                          <th>Câu hỏi FAQ</th>
-                          <th>Từ khóa (Tags)</th>
-                          <th className="action-col">Hành động</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {faqItems.length === 0 ? (
-                          <tr>
-                            <td colSpan={3} className="bot-ai-v2-empty-row">
-                              Chưa có FAQ. Vui lòng tạo FAQ ở mục Content.
-                            </td>
-                          </tr>
-                        ) : (
-                          faqItems.map((item) => {
-                            const keywordDraft = faqKeywordDrafts[item.id] || [];
-                            const isSaving = savingFaqId === item.id;
-                            const changed = hasKeywordChanged(item);
+        <section className="admin-panel">
+          <div className="admin-panel-head">
+            <div>
+              <h2>FAQ cho chatbot</h2>
+              <p className="admin-muted">FAQ su dung module ContentPage. Match theo keywords da normalize.</p>
+            </div>
+            <button className="admin-primary-btn" onClick={() => openFaqEditor()}>
+              <Plus size={16} /> Tao FAQ
+            </button>
+          </div>
 
-                            return (
-                              <tr key={item.id}>
-                                <td>
-                                  <p className="faq-title">{item.title}</p>
-                                  <p className="faq-body-preview">{item.body}</p>
-                                </td>
-                                <td>
-                                  <div className="bot-ai-v2-tag-editor">
-                                    <div className="bot-ai-v2-tags">
-                                      {keywordDraft.map((keyword) => (
-                                        <span key={`${item.id}-${keyword}`} className="bot-ai-v2-tag">
-                                          {keyword}
-                                          <button
-                                            type="button"
-                                            onClick={() => removeKeywordFromFaq(item.id, keyword)}
-                                            aria-label={`Xóa từ khóa ${keyword}`}
-                                          >
-                                            ×
-                                          </button>
-                                        </span>
-                                      ))}
-                                    </div>
-                                    <div className="bot-ai-v2-tag-input-row">
-                                      <input
-                                        value={faqKeywordInputs[item.id] || ''}
-                                        onChange={(e) =>
-                                          setFaqKeywordInputs((current) => ({
-                                            ...current,
-                                            [item.id]: e.target.value,
-                                          }))
-                                        }
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            addKeywordsToFaq(item.id);
-                                          }
-                                        }}
-                                        placeholder="Nhập từ khóa, Enter để thêm"
-                                      />
-                                      <button type="button" className="admin-ghost-btn" onClick={() => addKeywordsToFaq(item.id)}>
-                                        Thêm
-                                      </button>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="action-col">
-                                  <button
-                                    type="button"
-                                    className="admin-primary-btn"
-                                    onClick={() => void handleSaveFaqKeywords(item)}
-                                    disabled={!changed || isSaving}
-                                  >
-                                    {isSaving ? 'Đang lưu...' : 'Lưu từ khóa'}
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              </section>
-
-              <aside className="bot-ai-v2-preview">
-                <header className="bot-ai-v2-preview-head">
-                  <h3>Xem trước trực tiếp</h3>
-                  <p className="admin-muted">Cập nhật tức thì theo nội dung bạn đang soạn.</p>
-                </header>
-
-                <div className="bot-ai-v2-chat-widget">
-                  <div className="bot-ai-v2-chat-header">
-                    <div className="bot-ai-v2-chat-brand">
-                      <strong>FashMarket Support Bot</strong>
-                      <span>Đang trực tuyến</span>
-                    </div>
-                  </div>
-
-                  <div className="bot-ai-v2-chat-body">
-                    <div className="bot-ai-v2-msg bot">
-                      <div className="avatar">FM</div>
-                      <div className="bubble">{draft.welcomePrompt}</div>
-                    </div>
-
-                    <div className="bot-ai-v2-suggested-actions">
-                      {ensureQuickActions(draft.quickActions).map((action) => (
-                        <button type="button" key={action.key}>
-                          {action.label}
+          <div className="bot-ai-faq-layout">
+            <div className="bot-ai-faq-list">
+              {faqItems.length === 0 ? (
+                <p className="admin-muted">Chua co FAQ.</p>
+              ) : (
+                faqItems.map((item) => (
+                  <div key={item.id} className="bot-ai-faq-card">
+                    <div className="bot-ai-faq-card-head">
+                      <h4><FileText size={14} /> {item.title}</h4>
+                      <div className="admin-actions">
+                        <button className="admin-icon-btn subtle" onClick={() => openFaqEditor(item)} title="Sua FAQ">
+                          <Pencil size={14} />
                         </button>
+                        <button className="admin-icon-btn subtle danger-icon" onClick={() => void handleDeleteFaq(item.id)} title="Xoa FAQ">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="admin-muted">{item.body}</p>
+                    <div className="bot-ai-keyword-wrap">
+                      {(item.keywords || []).map((keyword) => (
+                        <span key={`${item.id}-${keyword}`} className="admin-pill neutral">{keyword}</span>
                       ))}
                     </div>
-
-                    <div className="bot-ai-v2-msg user">
-                      <div className="bubble">Cho mình hỏi thêm thông tin nhé?</div>
-                    </div>
-
-                    <div className="bot-ai-v2-msg bot">
-                      <div className="avatar">FM</div>
-                      <div className="bubble">{draft.unknownPrompt}</div>
-                    </div>
                   </div>
-
-                  <div className="bot-ai-v2-chat-input">
-                    <MessageSquare size={14} />
-                    <span>Nhập tin nhắn để xem mô phỏng...</span>
-                  </div>
-                </div>
-              </aside>
+                ))
+              )}
             </div>
 
-            <div className="bot-ai-v2-sticky-bar">
-              <div className="bot-ai-v2-sticky-info">
-                {hasDraftChanged ? 'Bạn có thay đổi chưa lưu trong bản Draft.' : 'Không có thay đổi mới.'}
-              </div>
-              <div className="bot-ai-v2-sticky-actions">
-                <button
-                  type="button"
-                  className="bot-ai-v2-btn bot-ai-v2-btn-ghost"
-                  onClick={() => void handleSaveDraft()}
-                  disabled={!hasDraftChanged || savingDraft}
-                >
-                  <Save size={16} />
-                  {savingDraft ? 'Đang lưu...' : 'Lưu nháp'}
+            <div className="bot-ai-faq-editor">
+              <h3>{faqForm.id ? 'Chinh sua FAQ' : 'FAQ moi'}</h3>
+              <label>
+                Tieu de
+                <input
+                  value={faqForm.title}
+                  onChange={(e) => setFaqForm((prev) => ({ ...prev, title: e.target.value }))}
+                />
+              </label>
+              <label>
+                Noi dung tra loi
+                <textarea
+                  value={faqForm.body}
+                  onChange={(e) => setFaqForm((prev) => ({ ...prev, body: e.target.value }))}
+                  rows={6}
+                />
+              </label>
+              <label>
+                Keywords (tach boi dau phay hoac xuong dong)
+                <textarea
+                  value={faqForm.keywordsText}
+                  onChange={(e) => setFaqForm((prev) => ({ ...prev, keywordsText: e.target.value }))}
+                  rows={4}
+                />
+              </label>
+              <div className="admin-topbar-actions">
+                <button className="admin-primary-btn dark" onClick={() => setFaqForm(emptyFaqForm)}>
+                  Lam moi form
                 </button>
-                <button
-                  type="button"
-                  className="bot-ai-v2-btn bot-ai-v2-btn-danger"
-                  onClick={() => void handleResetDraft()}
-                  disabled={publishing || savingDraft}
-                >
-                  <RefreshCcw size={16} />
-                  Khôi phục
-                </button>
-                <button
-                  type="button"
-                  className="bot-ai-v2-btn bot-ai-v2-btn-primary"
-                  onClick={() => void handlePublish()}
-                  disabled={publishing || savingDraft}
-                >
-                  <UploadCloud size={16} />
-                  {publishing ? 'Đang xuất bản...' : 'XUẤT BẢN'}
+                <button className="admin-primary-btn" onClick={() => void handleSaveFaq()} disabled={savingFaq}>
+                  <Save size={16} /> {savingFaq ? 'Dang luu...' : 'Luu FAQ'}
                 </button>
               </div>
             </div>
-          </>
-        )}
+          </div>
+        </section>
       </div>
     </AdminLayout>
   );
 };
 
 export default AdminBotAI;
+

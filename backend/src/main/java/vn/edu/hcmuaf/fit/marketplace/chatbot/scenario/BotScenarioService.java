@@ -15,7 +15,6 @@ import vn.edu.hcmuaf.fit.marketplace.repository.BotScenarioRevisionRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.UserRepository;
 import vn.edu.hcmuaf.fit.marketplace.service.AdminAuditLogService;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumMap;
@@ -31,22 +30,6 @@ public class BotScenarioService {
             BotScenarioActionKey.ORDER_LOOKUP,
             BotScenarioActionKey.SIZE_ADVICE,
             BotScenarioActionKey.PRODUCT_FAQ
-    );
-    private static final Map<String, String> LEGACY_TEXT_FIXES = Map.ofEntries(
-            Map.entry("Tra cuu don hang", "Tra cứu đơn hàng"),
-            Map.entry("Tu van size", "Tư vấn size"),
-            Map.entry("Hoi dap san pham", "Hỏi đáp sản phẩm"),
-            Map.entry("Ban hay chon chuc nang de tiep tuc.", "Bạn hãy chọn chức năng để tiếp tục."),
-            Map.entry("Ban gui giup minh ma don hang (vi du: DH-260412-000037).", "Bạn gửi giúp mình mã đơn hàng (ví dụ: DH-260412-000037)."),
-            Map.entry("Vui long nhap 4 so cuoi SDT nhan hang de xac minh.", "Vui lòng nhập 4 số cuối SĐT nhận hàng để xác minh."),
-            Map.entry("Dinh dang chua dung. Vui long nhap dung 4 chu so.", "Định dạng chưa đúng. Vui lòng nhập đúng 4 chữ số."),
-            Map.entry("Ban can ho tro them gi nua khong?", "Bạn cần hỗ trợ thêm gì nữa không?"),
-            Map.entry("Ban cho minh chieu cao (cm) truoc nhe.", "Bạn cho mình chiều cao (cm) trước nhé."),
-            Map.entry("Chieu cao chua hop le. Nhap lai giup minh (cm), vi du: 168.", "Chiều cao chưa hợp lệ. Nhập lại giúp mình (cm), ví dụ: 168."),
-            Map.entry("Cam on ban. Gio nhap can nang (kg), vi du: 58.", "Cảm ơn bạn. Giờ nhập cân nặng (kg), ví dụ: 58."),
-            Map.entry("Can nang chua hop le. Nhap lai giup minh (kg), vi du: 58.", "Cân nặng chưa hợp lệ. Nhập lại giúp mình (kg), ví dụ: 58."),
-            Map.entry("Ban muon tiep tuc voi tac vu nao?", "Bạn muốn tiếp tục với tác vụ nào?"),
-            Map.entry("Ban muon hoi them gi?", "Bạn muốn hỏi thêm gì?")
     );
 
     private final BotScenarioRevisionRepository revisionRepository;
@@ -281,58 +264,32 @@ public class BotScenarioService {
         if (!StringUtils.hasText(value)) {
             throw badRequest(fieldName + " is required");
         }
-        String repaired = repairBrokenUtf8(value).trim();
-        return normalizeLegacyText(repaired);
+        return value.trim();
     }
 
     private ResponseStatusException badRequest(String message) {
         return new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
     }
 
-    private String repairBrokenUtf8(String value) {
-        if (value == null) {
-            return null;
-        }
-
-        String trimmed = value.trim();
-        if (trimmed.isEmpty()) {
-            return trimmed;
-        }
-
-        if (!(trimmed.contains("Ã") || trimmed.contains("Â") || trimmed.contains("Ä") || trimmed.contains("Æ") || trimmed.contains("á»"))) {
-            return trimmed;
-        }
-
-        String repaired = new String(trimmed.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
-        return repaired.isBlank() ? trimmed : repaired;
-    }
-
-    private String normalizeLegacyText(String value) {
-        if (!StringUtils.hasText(value)) {
-            return value;
-        }
-        return LEGACY_TEXT_FIXES.getOrDefault(value, value);
-    }
-
     private BotScenarioPayload defaultPayload() {
         List<BotScenarioQuickAction> quickActions = new ArrayList<>();
-        quickActions.add(BotScenarioQuickAction.builder().key(BotScenarioActionKey.ORDER_LOOKUP).label("Tra cứu đơn hàng").build());
-        quickActions.add(BotScenarioQuickAction.builder().key(BotScenarioActionKey.SIZE_ADVICE).label("Tư vấn size").build());
-        quickActions.add(BotScenarioQuickAction.builder().key(BotScenarioActionKey.PRODUCT_FAQ).label("Hỏi đáp sản phẩm").build());
+        quickActions.add(BotScenarioQuickAction.builder().key(BotScenarioActionKey.ORDER_LOOKUP).label("Tra cuu don hang").build());
+        quickActions.add(BotScenarioQuickAction.builder().key(BotScenarioActionKey.SIZE_ADVICE).label("Tu van size").build());
+        quickActions.add(BotScenarioQuickAction.builder().key(BotScenarioActionKey.PRODUCT_FAQ).label("Hoi dap san pham").build());
 
         return BotScenarioPayload.builder()
-                .welcomePrompt("Xin chào! Mình là trợ lý CSKH của FashMarket. Bạn cần hỗ trợ gì?")
-                .unknownPrompt("Mình chưa hiểu yêu cầu. Bạn chọn một chức năng bên dưới nhé.")
-                .askOrderCodePrompt("Bạn gửi giúp mình mã đơn hàng (ví dụ: DH-260412-000037).")
-                .askOrderPhonePrompt("Vui lòng nhập 4 số cuối SĐT nhận hàng để xác minh.")
-                .orderPhoneInvalidPrompt("Định dạng chưa đúng. Vui lòng nhập đúng 4 chữ số.")
-                .orderLookupContinuePrompt("Bạn cần hỗ trợ thêm gì nữa không?")
-                .askHeightPrompt("Bạn cho mình chiều cao (cm) trước nhé.")
-                .invalidHeightPrompt("Chiều cao chưa hợp lệ. Nhập lại giúp mình (cm), ví dụ: 168.")
-                .askWeightPrompt("Cảm ơn bạn. Giờ nhập cân nặng (kg), ví dụ: 58.")
-                .invalidWeightPrompt("Cân nặng chưa hợp lệ. Nhập lại giúp mình (kg), ví dụ: 58.")
-                .sizeAdviceContinuePrompt("Bạn muốn tiếp tục với tác vụ nào?")
-                .productFaqContinuePrompt("Bạn muốn hỏi thêm gì?")
+                .welcomePrompt("Xin chao! Minh la tro ly CSKH cua FashMarket. Ban can ho tro gi?")
+                .unknownPrompt("Minh chua hieu yeu cau. Ban chon mot chuc nang ben duoi nhe.")
+                .askOrderCodePrompt("Ban gui giup minh ma don hang (vi du: DH-260412-000037).")
+                .askOrderPhonePrompt("Vui long nhap 4 so cuoi SDT nhan hang de xac minh.")
+                .orderPhoneInvalidPrompt("Dinh dang chua dung. Vui long nhap dung 4 chu so.")
+                .orderLookupContinuePrompt("Ban can ho tro them gi nua khong?")
+                .askHeightPrompt("Ban cho minh chieu cao (cm) truoc nhe.")
+                .invalidHeightPrompt("Chieu cao chua hop le. Nhap lai giup minh (cm), vi du: 168.")
+                .askWeightPrompt("Cam on ban. Gio nhap can nang (kg), vi du: 58.")
+                .invalidWeightPrompt("Can nang chua hop le. Nhap lai giup minh (kg), vi du: 58.")
+                .sizeAdviceContinuePrompt("Ban muon tiep tuc voi tac vu nao?")
+                .productFaqContinuePrompt("Ban muon hoi them gi?")
                 .quickActions(quickActions)
                 .build();
     }
