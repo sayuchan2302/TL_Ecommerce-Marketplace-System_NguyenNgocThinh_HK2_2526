@@ -1,5 +1,6 @@
 package vn.edu.hcmuaf.fit.marketplace.service;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.CartItemRequest;
@@ -24,6 +25,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -53,7 +55,7 @@ public class CartService {
     @Transactional
     public Cart getCartByUserId(UUID userId) {
         return cartRepository.findByUserIdWithItems(userId)
-                .orElseGet(() -> createCartForUser(userId));
+                .orElseGet(() -> createCartForUserOrLoadExisting(userId));
     }
 
     @Transactional
@@ -86,6 +88,36 @@ public class CartService {
                 .build();
 
         return cartRepository.save(cart);
+    }
+
+    private Cart createCartForUserOrLoadExisting(UUID userId) {
+        try {
+            return createCartForUser(userId);
+        } catch (DataIntegrityViolationException ex) {
+            if (!isDuplicateCartForUserViolation(ex)) {
+                throw ex;
+            }
+            return cartRepository.findByUserIdWithItems(userId).orElseThrow(() -> ex);
+        }
+    }
+
+    private boolean isDuplicateCartForUserViolation(DataIntegrityViolationException ex) {
+        Throwable current = ex;
+        while (current != null) {
+            String message = current.getMessage();
+            if (message != null) {
+                String normalized = message.toLowerCase(Locale.ROOT);
+                boolean duplicateUserId = normalized.contains("duplicate key value")
+                        && normalized.contains("user_id");
+                boolean knownConstraint = normalized.contains("uk_64t7ox312pqal3p7fg9o503c2")
+                        || normalized.contains("carts_user_id_key");
+                if (duplicateUserId || knownConstraint) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     @Transactional

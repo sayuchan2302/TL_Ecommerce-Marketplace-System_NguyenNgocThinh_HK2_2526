@@ -72,15 +72,19 @@ const AdminCategories = () => {
       const data = await adminCategoryService.getAll();
       setCategories(data);
       setExpandedIds(new Set());
-      if (data.length > 0 && !selectedId && draftMode === 'view') {
-        setSelectedId(data[0].id);
-      }
+      const defaultRootId =
+        data.find((item) => !item.parentId && item.slug === 'men')?.id
+        || data.find((item) => !item.parentId)?.id
+        || data[0]?.id
+        || '';
+
+      setSelectedId(defaultRootId);
     } catch {
       pushToast('Lỗi tải danh sách danh mục');
     } finally {
       setIsLoading(false);
     }
-  }, [draftMode, pushToast, selectedId]);
+  }, [pushToast]);
 
   useEffect(() => {
     void loadCategories();
@@ -501,14 +505,6 @@ const AdminCategories = () => {
             <div>
               <h2>Cây danh mục</h2>
             </div>
-          </div>
-          <div className="admin-search category-search">
-            <input
-              placeholder="Tìm theo tên, slug hoặc đường dẫn"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              aria-label="Tìm theo tên, slug hoặc đường dẫn"
-            />
           </div>
           {isLoading ? (
             <AdminStateBlock type="empty" title="Đang tải dữ liệu" description="Hệ thống đang tải cây danh mục..." />

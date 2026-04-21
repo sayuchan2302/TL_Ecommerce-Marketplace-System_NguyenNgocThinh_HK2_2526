@@ -29,14 +29,14 @@ node crawl/gap/crawl-gap-products.mjs --target-count 1000 --headless true
 ## 3) Output
 
 Mac dinh output:
-- `data/gap/styles.csv`
-- `data/gap/images.csv`
-- `data/gap/products.raw.json`
+- `backend/src/main/resources/seeder/gap/styles.csv`
+- `backend/src/main/resources/seeder/gap/images.csv`
+- `backend/src/main/resources/seeder/gap/products.raw.json`
 
 Ban co the doi output:
 
 ```bash
-node crawl/gap/crawl-gap-products.mjs --output-dir data
+node crawl/gap/crawl-gap-products.mjs --output-dir backend/src/main/resources/seeder/gap
 ```
 
 ## 4) Tuy chon
@@ -74,5 +74,5 @@ Cap nhat `application.yml`:
 - `app.seed.gap.images-path`
 
 Vi du:
-- `app.seed.gap.styles-path: data/gap/styles.csv`
-- `app.seed.gap.images-path: data/gap/images.csv`
+- `app.seed.gap.styles-path: backend/src/main/resources/seeder/gap/styles.csv`
+- `app.seed.gap.images-path: backend/src/main/resources/seeder/gap/images.csv`

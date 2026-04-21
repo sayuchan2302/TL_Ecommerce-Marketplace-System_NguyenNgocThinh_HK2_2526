@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class GapSeedProperties {
     private boolean enabled = false;
     private int targetCount = 1000;
-    private String stylesPath = "data/gap-raw1800/styles.csv";
-    private String imagesPath = "data/gap-raw1800/images.csv";
+    private String stylesPath = "backend/src/main/resources/seeder/gap/styles.csv";
+    private String imagesPath = "backend/src/main/resources/seeder/gap/images.csv";
     private boolean cleanBeforeImport = true;
 }

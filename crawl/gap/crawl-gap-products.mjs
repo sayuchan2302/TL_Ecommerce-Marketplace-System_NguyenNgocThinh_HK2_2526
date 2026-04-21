@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 const DEFAULTS = {
   categoriesPath: path.join(__dirname, 'default-categories.json'),
-  outputDir: path.join(process.cwd(), 'data', 'gap'),
+  outputDir: path.resolve(__dirname, '..', '..', 'backend', 'src', 'main', 'resources', 'seeder', 'gap'),
   targetCount: 1000,
   maxPerCategory: 120,
   delayMs: 1200,
@@ -31,7 +31,7 @@ Options:
   --delay-ms <n>           Delay between requests in ms (default: 1200)
   --timeout-ms <n>         Navigation timeout in ms (default: 45000)
   --categories <path>      Path to category config JSON
-  --output-dir <path>      Directory for output files (default: data/gap)
+  --output-dir <path>      Directory for output files (default: backend/src/main/resources/seeder/gap)
   --headless <true|false>  Run browser headless (default: true)
   --help                   Show this help
 
