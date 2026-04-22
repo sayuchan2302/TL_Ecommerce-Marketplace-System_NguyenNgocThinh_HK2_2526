@@ -1,4 +1,4 @@
-import type { Address } from '../types';
+﻿import type { Address } from '../types';
 import { apiRequest } from './apiClient';
 
 const KEY = 'coolmate_addresses_v1';
@@ -76,22 +76,6 @@ export const addressService = {
 
   getAll(): Address[] {
     const data = load();
-    if (data.length === 0) {
-      const seed: Address[] = [
-        {
-          id: 'addr-1',
-          fullName: 'Anh Thịnh',
-          phone: '0382253049',
-          detail: 'JJJV+Q7F, Quốc lộ 37',
-          ward: 'Thị trấn Hùng Sơn',
-          district: 'Huyện Đại Từ',
-          province: 'Thái Nguyên',
-          isDefault: true,
-        },
-      ];
-      save(seed);
-      return seed;
-    }
     return data.map(addr => ({ ...addr, isDefault: Boolean(addr.isDefault) }));
   },
 
@@ -143,3 +127,4 @@ export const addressService = {
     save(data);
   },
 };
+

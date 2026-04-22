@@ -2,9 +2,7 @@ import { useLayoutEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, ChevronRight, Check, ShieldCheck, Truck, ShoppingCart, Store, BadgeCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import ProductSection from '../../components/ProductSection/ProductSection';
 import EmptyState from '../../components/EmptyState/EmptyState';
-import { mensFashion } from '../../mocks/products';
 import { useCart, type StoreGroup } from '../../contexts/CartContext';
 import { useToast } from '../../contexts/ToastContext';
 import { hasBackendJwt } from '../../services/apiClient';
@@ -386,11 +384,6 @@ const Cart = () => {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Cross-sell */}
-        <div className="cart-cross-sell">
-          <ProductSection title={t.crossSell} products={mensFashion} />
         </div>
       </div>
     </motion.div>

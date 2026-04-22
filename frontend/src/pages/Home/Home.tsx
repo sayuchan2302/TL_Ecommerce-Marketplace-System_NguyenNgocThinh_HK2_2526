@@ -6,7 +6,6 @@ import HeroSlider from '../../components/HeroSlider/HeroSlider';
 import Categories from '../../components/Categories/Categories';
 import ProductSection from '../../components/ProductSection/ProductSection';
 import FlashSaleSection, { type FlashSaleItem } from '../../components/FlashSaleSection/FlashSaleSection';
-import { mensFashion, womensFashion } from '../../mocks/products';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import {
   marketplaceService,
@@ -39,9 +38,6 @@ interface HomeSectionProduct {
   soldCount?: number;
   totalStock?: number;
 }
-
-const fallbackFeaturedProducts: HomeSectionProduct[] = mensFashion.map((product) => ({ ...product }));
-const fallbackTrendingProducts: HomeSectionProduct[] = womensFashion.map((product) => ({ ...product }));
 
 const hasSizeVariants = (product: HomeSectionProduct) =>
   Array.isArray(product.variants)
@@ -117,8 +113,8 @@ const Home = () => {
   const [featuredStores, setFeaturedStores] = useState<MarketplaceStoreCard[]>([]);
   const [allStores, setAllStores] = useState<MarketplaceStoreCard[]>([]);
   const [categoryTabs, setCategoryTabs] = useState<MarketplaceHomeCategoryTab[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<HomeSectionProduct[]>(fallbackFeaturedProducts);
-  const [trendingProducts, setTrendingProducts] = useState<HomeSectionProduct[]>(fallbackTrendingProducts);
+  const [featuredProducts, setFeaturedProducts] = useState<HomeSectionProduct[]>([]);
+  const [trendingProducts, setTrendingProducts] = useState<HomeSectionProduct[]>([]);
   const [topSellingProducts, setTopSellingProducts] = useState<HomeSectionProduct[]>([]);
 
   useEffect(() => {
@@ -153,8 +149,8 @@ const Home = () => {
         );
         if (!mounted) return;
 
-        const featuredRows = data.featuredProducts.length > 0 ? data.featuredProducts : fallbackFeaturedProducts;
-        const trendingRows = data.trendingProducts.length > 0 ? data.trendingProducts : fallbackTrendingProducts;
+        const featuredRows = data.featuredProducts;
+        const trendingRows = data.trendingProducts;
         const topSellingRows = (
           topSellingResponse?.items && topSellingResponse.items.length > 0
             ? topSellingResponse.items
@@ -175,8 +171,8 @@ const Home = () => {
         setFeaturedStores([]);
         setAllStores([]);
         setCategoryTabs([]);
-        setFeaturedProducts(fallbackFeaturedProducts);
-        setTrendingProducts(fallbackTrendingProducts);
+        setFeaturedProducts([]);
+        setTrendingProducts([]);
         setTopSellingProducts([]);
       } finally {
         if (mounted) {
@@ -201,11 +197,7 @@ const Home = () => {
       (product) => typeof product.originalPrice === 'number' && product.originalPrice > product.price,
     );
 
-    if (discountedProducts.length > 0) {
-      return discountedProducts.slice(0, 12);
-    }
-
-    return featuredProducts.slice(0, 12);
+    return discountedProducts.slice(0, 12);
   }, [featuredProducts, trendingProducts]);
 
   const flashSaleItems = useMemo<FlashSaleItem[]>(

@@ -1,5 +1,5 @@
-/**
- * promotionStore.ts — Shared source of truth for promotions/vouchers.
+﻿/**
+ * promotionStore.ts â€” Shared source of truth for promotions/vouchers.
  *
  * Both AdminPromotions (admin management) and couponService (client checkout)
  * read/write from this store, ensuring they are always in sync.
@@ -25,110 +25,13 @@ export interface Promotion {
   status: PromotionStatus;
 }
 
-// ── Initial seed data (unified, previously split between couponService and AdminPromotions) ─
-const INITIAL_PROMOTIONS: Promotion[] = [
-  {
-    id: 'pr-001',
-    name: 'Summer Flash Sale',
-    code: 'SUMMER20',
-    description: 'Chiến dịch hè giảm sâu cho nhóm sản phẩm bán chạy.',
-    discountType: 'percent',
-    discountValue: 20,
-    maxDiscount: 200000,
-    minOrderValue: 300000,
-    userLimit: 2,
-    totalIssued: 3000,
-    usedCount: 1820,
-    startDate: '2026-03-01',
-    endDate: '2026-08-31',
-    status: 'running',
-  },
-  {
-    id: 'pr-002',
-    name: 'Chào mừng khách mới',
-    code: 'HELLO100K',
-    description: 'Voucher chào mừng khách hàng mới, giảm 100K cho đơn từ 699K.',
-    discountType: 'fixed',
-    discountValue: 100000,
-    maxDiscount: 100000,
-    minOrderValue: 699000,
-    userLimit: 1,
-    totalIssued: 5000,
-    usedCount: 4960,
-    startDate: '2026-01-01',
-    endDate: '2026-12-31',
-    status: 'running',
-  },
-  {
-    id: 'pr-003',
-    name: 'Weekend Promo',
-    code: 'WKND50',
-    description: 'Ưu đãi cuối tuần cho toàn bộ danh mục. Giảm 50K cho đơn từ 399K.',
-    discountType: 'fixed',
-    discountValue: 50000,
-    maxDiscount: 50000,
-    minOrderValue: 399000,
-    userLimit: 3,
-    totalIssued: 4500,
-    usedCount: 820,
-    startDate: '2026-06-01',
-    endDate: '2026-07-30',
-    status: 'paused',
-  },
-  {
-    id: 'pr-004',
-    name: 'Free Ship',
-    code: 'FREESHIP',
-    description: 'Miễn phí vận chuyển cho mọi đơn hàng.',
-    discountType: 'fixed',
-    discountValue: 30000,
-    maxDiscount: 30000,
-    minOrderValue: 0,
-    userLimit: 1,
-    totalIssued: 9999,
-    usedCount: 1200,
-    startDate: '2026-01-01',
-    endDate: '2026-12-31',
-    status: 'running',
-  },
-  {
-    id: 'pr-005',
-    name: 'Coolmate 100K',
-    code: 'COOLMATE100',
-    description: 'Giảm 100K cho đơn từ 500K.',
-    discountType: 'fixed',
-    discountValue: 100000,
-    maxDiscount: 100000,
-    minOrderValue: 500000,
-    userLimit: 1,
-    totalIssued: 50,
-    usedCount: 12,
-    startDate: '2026-01-01',
-    endDate: '2026-06-30',
-    status: 'running',
-  },
-  {
-    id: 'pr-006',
-    name: 'Giảm 15%',
-    code: 'NHNS153',
-    description: 'Giảm 15% tối đa 200K cho mọi đơn hàng.',
-    discountType: 'percent',
-    discountValue: 15,
-    maxDiscount: 200000,
-    minOrderValue: 0,
-    userLimit: 2,
-    totalIssued: 500,
-    usedCount: 21,
-    startDate: '2026-01-01',
-    endDate: '2026-05-01',
-    status: 'running',
-  },
-];
+// â”€â”€ Initial seed data (unified, previously split between couponService and AdminPromotions) â”€
+const INITIAL_PROMOTIONS: Promotion[] = [];
 
-// ── In-memory store ────────────────────────────────────────────────────────
+// â”€â”€ In-memory store â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let _rows: Promotion[] = [...INITIAL_PROMOTIONS];
 
-// ── Derived status logic ───────────────────────────────────────────────────
+// â”€â”€ Derived status logic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const derivePromotionStatus = (p: Promotion): PromotionStatus => {
   if (p.status === 'paused') return 'paused';
   const today = new Date();
@@ -146,7 +49,7 @@ export const derivePromotionStatus = (p: Promotion): PromotionStatus => {
   return 'running';
 };
 
-// ── Store API ──────────────────────────────────────────────────────────────
+// â”€â”€ Store API â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export const promotionStore = {
   /** Returns all promotions with derived status applied */
   getAll(): Promotion[] {
@@ -198,3 +101,4 @@ export const promotionStore = {
     );
   },
 };
+

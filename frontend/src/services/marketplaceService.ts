@@ -189,31 +189,6 @@ const mapStoreCard = (row: MarketplaceStoreCardPayload): MarketplaceStoreCard =>
   liveProductCount: Math.max(0, Math.round(toNumber(row.liveProductCount, 0))),
 });
 
-const CATEGORY_IMAGE_BY_SLUG: Record<string, string> = {
-  'men-ao': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400&auto=format&fit=crop',
-  'men-quan': 'https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?q=80&w=400&auto=format&fit=crop',
-  'men-do-the-thao': 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=400&auto=format&fit=crop',
-  'men-do-mac-nha': 'https://images.unsplash.com/photo-1618354691438-25af0475c28f?q=80&w=400&auto=format&fit=crop',
-  'men-phu-kien': 'https://images.unsplash.com/photo-1523206489230-c012c64b2b48?q=80&w=400&auto=format&fit=crop',
-  'women-ao': 'https://images.unsplash.com/photo-1551163943-3f6a855d1153?q=80&w=400&auto=format&fit=crop',
-  'women-vay-dam': 'https://images.unsplash.com/photo-1595777457583-95e059d581b8?q=80&w=400&auto=format&fit=crop',
-  'women-quan': 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?q=80&w=400&auto=format&fit=crop',
-  'women-do-mac-nha': 'https://images.unsplash.com/photo-1583496920310-91890e2b96e5?q=80&w=400&auto=format&fit=crop',
-  'women-do-the-thao': 'https://images.unsplash.com/photo-1580436427382-706f9d45cc4e?q=80&w=400&auto=format&fit=crop',
-  'women-phu-kien': 'https://images.unsplash.com/photo-1509319117193-57bab727e09d?q=80&w=400&auto=format&fit=crop',
-  'accessories-tui-va-vi': 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?q=80&w=400&auto=format&fit=crop',
-  'accessories-phu-kien-thoi-trang': 'https://images.unsplash.com/photo-1523206489230-c012c64b2b48?q=80&w=400&auto=format&fit=crop',
-  'accessories-phu-kien-khac': 'https://images.unsplash.com/photo-1508296695146-257a814070b4?q=80&w=400&auto=format&fit=crop',
-};
-
-const CATEGORY_FALLBACK_IMAGES = [
-  'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1542272454315-4c01d7abdf4a?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1618354691438-25af0475c28f?q=80&w=400&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1523206489230-c012c64b2b48?q=80&w=400&auto=format&fit=crop',
-];
-
 const normalizeText = (value: string) =>
   value
     .normalize('NFD')
@@ -282,12 +257,12 @@ const mapHomeCategoryTab = (
   label: string,
 ): MarketplaceHomeCategoryTab => {
   const children = root.children || [];
-  const items = children.map((item, index) => {
+  const items = children.map((item) => {
     const slug = (item.slug || '').trim();
     const image =
       optimizeMarketplaceImage(item.image, 400) ||
-      CATEGORY_IMAGE_BY_SLUG[slug] ||
-      CATEGORY_FALLBACK_IMAGES[index % CATEGORY_FALLBACK_IMAGES.length];
+      optimizeMarketplaceImage(root.image, 400) ||
+      '';
 
     return {
       id: item.id,
