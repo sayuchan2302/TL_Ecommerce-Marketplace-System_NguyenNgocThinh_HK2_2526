@@ -67,6 +67,7 @@ public class SecurityConfig {
                         // ─── Public endpoints (no auth required) ───────────────────────────
                         .requestMatchers(HttpMethod.GET, "/").permitAll()
                         .requestMatchers(HttpMethod.GET, "/favicon.ico").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()

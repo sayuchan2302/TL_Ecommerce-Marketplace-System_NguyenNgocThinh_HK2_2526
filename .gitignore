@@ -18,6 +18,8 @@ backend/.m2/
 frontend/dist/
 frontend/dist-ssr/
 backend/target/
+backend/upload/*
+!backend/upload/.gitkeep
 
 # Env files
 .env
@@ -42,5 +44,5 @@ backend/boot-run.log
 .DS_Store
 Thumbs.db
 skills-lock.json
-vibe.md
+AGENTS.md
 .m2

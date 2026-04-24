@@ -6,6 +6,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.ChangePasswordRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.UpdateUserProfileRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.FollowedStoreResponse;
@@ -30,17 +31,20 @@ public class UserProfileService {
     private final StoreFollowRepository storeFollowRepository;
     private final AuthContext authContext;
     private final PasswordEncoder passwordEncoder;
+    private final AvatarStorageService avatarStorageService;
 
     public UserProfileService(
             UserRepository userRepository,
             StoreFollowRepository storeFollowRepository,
             AuthContext authContext,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            AvatarStorageService avatarStorageService
     ) {
         this.userRepository = userRepository;
         this.storeFollowRepository = storeFollowRepository;
         this.authContext = authContext;
         this.passwordEncoder = passwordEncoder;
+        this.avatarStorageService = avatarStorageService;
     }
 
     @Transactional(readOnly = true)
@@ -74,6 +78,15 @@ public class UserProfileService {
             user.setWeight(request.getWeight());
         }
 
+        User saved = userRepository.save(user);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public UserProfileResponse uploadMyAvatar(String authHeader, MultipartFile file) {
+        User user = getCurrentUser(authHeader);
+        String avatarUrl = avatarStorageService.storeAvatar(file, user.getAvatar());
+        user.setAvatar(avatarUrl);
         User saved = userRepository.save(user);
         return toResponse(saved);
     }

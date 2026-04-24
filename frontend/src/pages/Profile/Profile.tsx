@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
   User,
@@ -20,7 +20,8 @@ import {
   Info,
   Trash,
   Pencil,
-  Store
+  Store,
+  Camera
 } from 'lucide-react';
 import AddressModal from './AddressModal';
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
@@ -91,6 +92,8 @@ const Profile = () => {
   const { logout, user: authUser } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
   const [isLoading, setIsLoading] = useState(true);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -465,6 +468,38 @@ const Profile = () => {
     }
     return () => document.body.classList.remove('modal-open');
   }, [isAccountModalOpen, isPasswordModalOpen, isAddressModalOpen, isReviewModalOpen, isFollowingModalOpen]);
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || isUploadingAvatar) return;
+
+    const maxSize = 3 * 1024 * 1024;
+    if (file.size > maxSize) {
+      addToast('Ảnh đại diện không được vượt quá 3MB', 'error');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      addToast('Vui lòng chọn file ảnh (JPG, PNG, WEBP, GIF)', 'error');
+      return;
+    }
+
+    try {
+      setIsUploadingAvatar(true);
+      const nextProfile = await profileService.uploadMyAvatar(file);
+      setProfile(nextProfile);
+      syncAuthSession(nextProfile);
+      addToast('Đã cập nhật ảnh đại diện', 'success');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Không thể tải lên ảnh đại diện.';
+      addToast(message, 'error');
+    } finally {
+      setIsUploadingAvatar(false);
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+    }
+  };
 
   const handleLogout = () => {
     logout();
@@ -1083,12 +1118,35 @@ const Profile = () => {
         <div className="loyalty-panel">
           <div className="loyalty-top">
             <div className="loyalty-left">
-              <div className="loyalty-avatar">
+              <div
+                className={`loyalty-avatar loyalty-avatar-upload${isUploadingAvatar ? ' uploading' : ''}`}
+                onClick={() => avatarInputRef.current?.click()}
+                role="button"
+                tabIndex={0}
+                aria-label="Thay đổi ảnh đại diện"
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') avatarInputRef.current?.click(); }}
+              >
                 {user.avatar && /^https?:\/\//.test(user.avatar) ? (
                   <img src={user.avatar} alt={user.name} />
                 ) : (
                   <span>{(user.name.charAt(0) || 'U').toUpperCase()}</span>
                 )}
+                <div className="loyalty-avatar-overlay">
+                  {isUploadingAvatar ? (
+                    <div className="avatar-upload-spinner" />
+                  ) : (
+                    <Camera size={20} />
+                  )}
+                </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleAvatarChange}
+                  className="loyalty-avatar-input"
+                  aria-hidden="true"
+                  tabIndex={-1}
+                />
               </div>
               <div className="loyalty-welcome">
                 <span className="welcome-text">Xin chào</span>

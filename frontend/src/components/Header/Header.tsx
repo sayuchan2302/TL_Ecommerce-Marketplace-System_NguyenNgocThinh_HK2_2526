@@ -16,6 +16,7 @@ import {
 } from '../../services/marketplaceService';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_TOAST_MESSAGES } from '../../utils/clientMessages';
+import { resolveAvatarSrc } from '../../utils/avatar';
 import './Header.css';
 
 type SearchScope = 'products' | 'stores';
@@ -141,6 +142,7 @@ const Header = () => {
   const [expandedMobileMenu, setExpandedMobileMenu] = useState<string | null>(null);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const { isAuthenticated, user, logout } = useAuth();
+  const avatarImageSrc = resolveAvatarSrc(user?.avatar);
   const { addToast } = useToast();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -311,9 +313,13 @@ const Header = () => {
                   className="account-toggle"
                   onClick={() => navigate('/profile')}
                 >
-                  <div className="account-avatar">
-                    {user?.avatar || user?.name?.charAt(0).toUpperCase() || 'U'}
-                  </div>
+	                  <div className="account-avatar">
+	                    {avatarImageSrc ? (
+	                      <img src={avatarImageSrc} alt={user?.name || 'Avatar'} />
+	                    ) : (
+	                      user?.name?.charAt(0).toUpperCase() || 'U'
+	                    )}
+	                  </div>
                   <span className="account-name">{user?.name || 'Tài khoản'}</span>
                 </button>
                 <div className={`account-dropdown ${isAccountMenuOpen ? 'show' : ''}`}>
@@ -485,9 +491,13 @@ const Header = () => {
           ) : (
             <>
               <div className="mobile-user-info">
-                <div className="mobile-user-avatar">
-                  {user?.avatar || user?.name?.charAt(0).toUpperCase() || 'U'}
-                </div>
+	                <div className="mobile-user-avatar">
+	                  {avatarImageSrc ? (
+	                    <img src={avatarImageSrc} alt={user?.name || 'Avatar'} />
+	                  ) : (
+	                    user?.name?.charAt(0).toUpperCase() || 'U'
+	                  )}
+	                </div>
                 <div className="mobile-user-details">
                   <span className="mobile-user-name">{user?.name}</span>
                   <span className="mobile-user-email">{user?.email}</span>

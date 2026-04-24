@@ -1,4 +1,5 @@
 import { apiRequest } from './apiClient';
+import { resolveAvatarSrc } from '../utils/avatar';
 
 type UserRole = 'CUSTOMER' | 'VENDOR' | 'SUPER_ADMIN';
 type UserGender = 'MALE' | 'FEMALE' | 'OTHER';
@@ -54,7 +55,7 @@ const mapProfile = (payload: BackendProfileResponse): UserProfileRecord => ({
   name: payload.name?.trim() || '',
   email: payload.email?.trim() || '',
   phone: payload.phone?.trim() || '',
-  avatar: payload.avatar?.trim() || undefined,
+  avatar: resolveAvatarSrc(payload.avatar),
   gender: payload.gender || 'OTHER',
   dateOfBirth: payload.dateOfBirth || null,
   height: typeof payload.height === 'number' ? payload.height : null,
@@ -84,5 +85,16 @@ export const profileService = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }, { auth: true });
+  },
+
+  async uploadMyAvatar(file: File): Promise<UserProfileRecord> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await apiRequest<BackendProfileResponse>('/api/users/me/avatar', {
+      method: 'POST',
+      body: formData,
+    }, { auth: true });
+    return mapProfile(response);
   },
 };

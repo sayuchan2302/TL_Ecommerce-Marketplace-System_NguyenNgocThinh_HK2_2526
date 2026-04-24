@@ -4,11 +4,10 @@ import './ChatWidget.css';
 import { chatbotService } from '../../services/chatbotService';
 import { ApiError } from '../../services/apiClient';
 import { useAuth } from '../../contexts/AuthContext';
+import { resolveAvatarSrc } from '../../utils/avatar';
 
 const VISITOR_ID_KEY = 'fashmarket-chat-visitor-id-v2';
 const DIRECT_LINE_USER_ID_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
-const ABSOLUTE_IMAGE_URL_PATTERN = /^https?:\/\//i;
-const DATA_IMAGE_PATTERN = /^data:image\//i;
 const WEBCHAT_JOIN_EVENT = 'webchat/join';
 const WEBCHAT_RUNTIME_SCRIPT_ID = 'fashmarket-webchat-runtime';
 const WEBCHAT_RUNTIME_URL = 'https://cdn.botframework.com/botframework-webchat/latest/webchat.js';
@@ -160,14 +159,11 @@ const ChatWidget = () => {
 
   const visitorId = useMemo(buildVisitorId, []);
   const userAvatar = useMemo(() => {
-    const rawAvatar = user?.avatar?.trim() || '';
-    const hasImageAvatar = ABSOLUTE_IMAGE_URL_PATTERN.test(rawAvatar) || DATA_IMAGE_PATTERN.test(rawAvatar);
+    const imageAvatar = resolveAvatarSrc(user?.avatar);
 
     return {
-      image: hasImageAvatar ? rawAvatar : undefined,
-      initials: hasImageAvatar
-        ? getInitials(user?.name || 'User')
-        : (rawAvatar || getInitials(user?.name || 'User')),
+      image: imageAvatar,
+      initials: getInitials(user?.name || 'User'),
     };
   }, [user?.avatar, user?.name]);
 

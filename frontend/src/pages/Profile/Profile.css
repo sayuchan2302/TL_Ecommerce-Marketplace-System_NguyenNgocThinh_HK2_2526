@@ -88,6 +88,64 @@
   font-weight: 700;
 }
 
+/* Avatar Upload Overlay */
+.loyalty-avatar-upload {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.loyalty-avatar-upload:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.loyalty-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.loyalty-avatar-upload:hover .loyalty-avatar-overlay,
+.loyalty-avatar-upload:focus-visible .loyalty-avatar-overlay {
+  opacity: 1;
+}
+
+.loyalty-avatar-upload.uploading .loyalty-avatar-overlay {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.loyalty-avatar-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.avatar-upload-spinner {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: avatarSpin 0.7s linear infinite;
+}
+
+@keyframes avatarSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .loyalty-welcome {
   display: flex;
   flex-direction: column;

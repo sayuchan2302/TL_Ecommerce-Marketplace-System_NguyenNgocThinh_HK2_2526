@@ -102,7 +102,8 @@ export const apiRequest = async <T>(
   attemptedRefresh = false,
 ): Promise<T> => {
   const headers = new Headers(init.headers || {});
-  const needsJson = init.body !== undefined && !headers.has('Content-Type');
+  const isFormDataBody = typeof FormData !== 'undefined' && init.body instanceof FormData;
+  const needsJson = init.body !== undefined && !isFormDataBody && !headers.has('Content-Type');
 
   if (needsJson) {
     headers.set('Content-Type', 'application/json');
