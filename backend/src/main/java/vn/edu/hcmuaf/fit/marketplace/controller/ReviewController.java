@@ -43,13 +43,13 @@ public class ReviewController {
     }
 
     @GetMapping("/product/{productId}")
-    public ResponseEntity<List<ReviewResponse>> getApprovedProductReviews(@PathVariable UUID productId) {
-        return ResponseEntity.ok(reviewService.getApprovedProductReviews(productId));
+    public ResponseEntity<List<ReviewResponse>> getVisibleProductReviews(@PathVariable UUID productId) {
+        return ResponseEntity.ok(reviewService.getVisibleProductReviews(productId));
     }
 
     @GetMapping("/store/{storeId}")
-    public ResponseEntity<List<ReviewResponse>> getApprovedStoreReviews(@PathVariable UUID storeId) {
-        return ResponseEntity.ok(reviewService.getApprovedStoreReviews(storeId));
+    public ResponseEntity<List<ReviewResponse>> getVisibleStoreReviews(@PathVariable UUID storeId) {
+        return ResponseEntity.ok(reviewService.getVisibleStoreReviews(storeId));
     }
 
     @GetMapping("/my")

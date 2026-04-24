@@ -20,6 +20,8 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
     Optional<Review> findByIdAndStoreId(UUID id, UUID storeId);
     List<Review> findByProductIdAndStatusOrderByCreatedAtDesc(UUID productId, Review.ReviewStatus status);
     List<Review> findByStoreIdAndStatusOrderByCreatedAtDesc(UUID storeId, Review.ReviewStatus status);
+    List<Review> findByProductIdAndStatusNotOrderByCreatedAtDesc(UUID productId, Review.ReviewStatus status);
+    List<Review> findByStoreIdAndStatusNotOrderByCreatedAtDesc(UUID storeId, Review.ReviewStatus status);
     List<Review> findByUserIdOrderByCreatedAtDesc(UUID userId);
     boolean existsByUserIdAndProductIdAndOrderId(UUID userId, UUID productId, UUID orderId);
 
@@ -51,7 +53,7 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
             SELECT COALESCE(AVG(r.rating), 0)
             FROM Review r
             WHERE r.storeId = :storeId
-              AND r.status IN ('PENDING', 'APPROVED')
+              AND r.status <> 'HIDDEN'
             """)
     Double calculateAverageRatingByStoreId(@Param("storeId") UUID storeId);
 

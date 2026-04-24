@@ -395,9 +395,9 @@ const Profile = () => {
   const tabs = [
     { id: 'account', label: t.tabs.account, icon: User },
     { id: 'orders', label: t.tabs.orders, icon: ShoppingBag },
+    { id: 'reviews', label: t.tabs.reviews, icon: MessageSquare },
     { id: 'vouchers', label: t.tabs.vouchers, icon: Ticket },
     { id: 'addresses', label: t.tabs.addresses, icon: MapPin },
-    { id: 'reviews', label: t.tabs.reviews, icon: MessageSquare },
     { id: 'notifications', label: 'Thông báo', icon: Bell, badge: unreadCount > 0 ? unreadCount : undefined },
   ];
 
@@ -1614,5 +1614,3 @@ const Profile = () => {
 };
 
 export default Profile;
-
-

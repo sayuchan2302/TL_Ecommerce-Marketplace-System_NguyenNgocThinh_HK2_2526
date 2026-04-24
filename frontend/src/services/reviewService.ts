@@ -7,6 +7,7 @@ export interface Review {
   id: string;
   storeId: string;
   productId: string;
+  productSlug?: string;
   productName: string;
   productImage: string;
   orderId: string;
@@ -30,6 +31,7 @@ export interface EligibleReviewItem {
   orderId: string;
   orderCode?: string;
   productId: string;
+  productSlug?: string;
   productName: string;
   productImage: string;
   variantName?: string;
@@ -53,6 +55,7 @@ interface BackendReviewResponse {
   id: string;
   storeId?: string;
   productId?: string;
+  productSlug?: string;
   productName?: string;
   productImage?: string;
   rating?: number;
@@ -71,6 +74,7 @@ interface BackendEligibleReviewItem {
   orderId?: string;
   orderCode?: string;
   productId?: string;
+  productSlug?: string;
   productName?: string;
   productImage?: string;
   variantName?: string;
@@ -121,6 +125,7 @@ const mapBackendReview = (row: BackendReviewResponse): Review => {
     id: String(row.id),
     storeId: row.storeId || '',
     productId: row.productId || '',
+    productSlug: row.productSlug || undefined,
     productName: row.productName || 'Sản phẩm',
     productImage: row.productImage || '',
     orderId: row.orderId || '',
@@ -147,6 +152,7 @@ const mapBackendEligibleReview = (row: BackendEligibleReviewItem): EligibleRevie
   orderId: String(row.orderId || ''),
   orderCode: row.orderCode || undefined,
   productId: String(row.productId || ''),
+  productSlug: row.productSlug || undefined,
   productName: row.productName || 'Sản phẩm',
   productImage: row.productImage || '',
   variantName: row.variantName || '',

@@ -12,6 +12,7 @@ public class ReviewResponse {
     private UUID id;
     private UUID storeId;
     private UUID productId;
+    private String productSlug;
     private String productName;
     private String productImage;
     private String customerName;

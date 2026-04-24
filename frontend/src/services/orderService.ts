@@ -95,6 +95,7 @@ interface BackendOrderTreeSubOrder {
   trackingNumber?: string;
   warehouseNote?: string;
   createdAt?: string;
+  updatedAt?: string;
   items?: BackendOrderTreeItem[];
 }
 
@@ -298,7 +299,7 @@ const mapBackendOrderTreeToShared = (order: BackendOrderTreeResponse): SharedOrd
         tone: 'success',
       },
       ...subOrders.map((subOrder) => ({
-        time: new Date(subOrder.createdAt || order.createdAt || Date.now()).toLocaleString('vi-VN'),
+        time: new Date(subOrder.updatedAt || subOrder.createdAt || order.createdAt || Date.now()).toLocaleString('vi-VN'),
         text: `${subOrder.vendorName || 'Vendor'} - ${subOrder.status || 'PENDING'}`,
         tone: 'neutral' as const,
       })),

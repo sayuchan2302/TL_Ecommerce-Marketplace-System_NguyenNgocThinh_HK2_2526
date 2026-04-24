@@ -1,11 +1,25 @@
-import { useParams, Link, useNavigate } from 'react-router-dom';
+﻿import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
-  ChevronRight, Package, Truck, CheckCircle2, XCircle, Clock,
-  MapPin, Phone, CreditCard, ArrowLeft, RotateCcw, Copy, X, AlertTriangle
+  ChevronRight,
+  Package,
+  Truck,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  MapPin,
+  Phone,
+  CreditCard,
+  ArrowLeft,
+  RotateCcw,
+  Copy,
+  X,
+  AlertTriangle,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { orderService } from '../../services/orderService';
+import { reviewService, type EligibleReviewItem } from '../../services/reviewService';
+import ReviewModal from '../../components/ReviewModal/ReviewModal';
 import { formatPrice } from '../../utils/formatters';
 import { CLIENT_TEXT } from '../../utils/texts';
 import type { Order } from '../../types';
@@ -32,6 +46,31 @@ const statusColorMap: Record<string, string> = {
   refunded: 'status-refunded',
 };
 
+interface ReviewProduct {
+  productId: string;
+  productName: string;
+  productImage: string;
+  orderId: string;
+  variant?: string;
+}
+
+const mapEligibleToReviewProduct = (item: EligibleReviewItem): ReviewProduct => {
+  const variant = [
+    item.variantName?.trim() || null,
+    item.quantity > 0 ? `Số lượng: ${item.quantity}` : null,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+
+  return {
+    productId: item.productId,
+    productName: item.productName,
+    productImage: item.productImage,
+    orderId: item.orderId,
+    variant: variant || 'Đơn hàng đã giao',
+  };
+};
+
 const OrderDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -41,13 +80,20 @@ const OrderDetail = () => {
   const [otherReason, setOtherReason] = useState('');
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isResolvingReview, setIsResolvingReview] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewProduct, setReviewProduct] = useState<ReviewProduct | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
-    const loadOrder = async () => {
+    const loadOrder = async (options?: { silent?: boolean; withLoading?: boolean }) => {
+      const silent = options?.silent ?? false;
+      const withLoading = options?.withLoading ?? false;
       try {
-        setIsLoading(true);
+        if (withLoading) {
+          setIsLoading(true);
+        }
         if (!id) {
           if (mounted) setOrder(null);
           return;
@@ -57,17 +103,40 @@ const OrderDetail = () => {
         setOrder(data);
       } catch (error: unknown) {
         if (!mounted) return;
-        setOrder(null);
-        const message = error instanceof Error ? error.message : 'Không thể tải chi tiết đơn hàng.';
-        addToast(message, 'error');
+        if (!silent) {
+          setOrder(null);
+          const message = error instanceof Error ? error.message : 'Không thể tải chi tiết đơn hàng.';
+          addToast(message, 'error');
+        }
       } finally {
-        if (mounted) setIsLoading(false);
+        if (withLoading && mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    void loadOrder();
+    void loadOrder({ withLoading: true });
+
+    const refreshInterval = window.setInterval(() => {
+      if (!mounted || !id || document.visibilityState !== 'visible') {
+        return;
+      }
+      void loadOrder({ silent: true });
+    }, 15000);
+
+    const handleWindowFocus = () => {
+      if (!mounted || !id) {
+        return;
+      }
+      void loadOrder({ silent: true });
+    };
+
+    window.addEventListener('focus', handleWindowFocus);
+
     return () => {
       mounted = false;
+      window.removeEventListener('focus', handleWindowFocus);
+      window.clearInterval(refreshInterval);
     };
   }, [addToast, id]);
 
@@ -98,6 +167,34 @@ const OrderDetail = () => {
       navigator.clipboard.writeText(order.tracking);
       addToast('Đã sao chép mã vận đơn!', 'success');
     }
+  };
+
+  const handleReviewOrder = async () => {
+    if (!order || order.status !== 'delivered' || isResolvingReview) return;
+
+    try {
+      setIsResolvingReview(true);
+      const eligibleItems = await reviewService.getEligibleReviews();
+      const orderEligibleItems = eligibleItems.filter((item) => item.orderId === order.id);
+
+      if (orderEligibleItems.length === 0) {
+        addToast('Đơn hàng này đã đánh giá hết hoặc chưa đủ điều kiện đánh giá.', 'info');
+        return;
+      }
+
+      setReviewProduct(mapEligibleToReviewProduct(orderEligibleItems[0]));
+      setIsReviewModalOpen(true);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Không thể tải dữ liệu đánh giá.';
+      addToast(message, 'error');
+    } finally {
+      setIsResolvingReview(false);
+    }
+  };
+
+  const handleCloseReviewModal = () => {
+    setIsReviewModalOpen(false);
+    setReviewProduct(null);
   };
 
   if (isLoading) {
@@ -161,13 +258,13 @@ const OrderDetail = () => {
               <h3 className="od-card-title">Trạng thái đơn hàng</h3>
               <div className="od-timeline">
                 {order.statusSteps.map((step, idx) => (
-                  <div key={idx} className={`od-tl-step done`}>
+                  <div key={idx} className="od-tl-step done">
                     <div className="od-tl-dot">
-                      {step.label.includes('Đặt') ? <Clock size={16} /> :
-                       step.label.includes('Xác nhận') ? <CheckCircle2 size={16} /> :
-                       step.label.includes('giao') ? <Truck size={16} /> :
-                       step.label.includes('hủy') ? <XCircle size={16} /> :
-                       <Package size={16} />}
+                      {step.label.includes('Đặt') ? <Clock size={16} />
+                        : step.label.includes('Xác nhận') ? <CheckCircle2 size={16} />
+                          : step.label.includes('giao') ? <Truck size={16} />
+                            : step.label.includes('hủy') ? <XCircle size={16} />
+                              : <Package size={16} />}
                     </div>
                     <div className="od-tl-content">
                       <span className="od-tl-label">{step.label}</span>
@@ -284,7 +381,13 @@ const OrderDetail = () => {
             <div className="od-card od-actions-card">
               {order.status === 'delivered' && (
                 <>
-                  <button className="od-action-btn od-btn-primary">Đánh giá sản phẩm</button>
+                  <button
+                    className="od-action-btn od-btn-primary"
+                    onClick={() => void handleReviewOrder()}
+                    disabled={isResolvingReview}
+                  >
+                    {isResolvingReview ? 'Đang tải...' : 'Đánh giá sản phẩm'}
+                  </button>
                   <button className="od-action-btn od-btn-outline"><RotateCcw size={16} /> Đổi / trả hàng</button>
                 </>
               )}
@@ -293,7 +396,7 @@ const OrderDetail = () => {
               )}
               {(order.status === 'pending' || order.status === 'processing') && (
                 <>
-                  <button 
+                  <button
                     className="od-action-btn od-btn-danger"
                     onClick={() => setIsCancelModalOpen(true)}
                   >
@@ -320,12 +423,12 @@ const OrderDetail = () => {
             </div>
             <h3 className="od-modal-title">Xác nhận hủy đơn hàng</h3>
             <p className="od-modal-desc">
-              Bạn có chắc chắn muốn hủy đơn hàng <strong>#{order.code || order.id}</strong>? 
+              Bạn có chắc chắn muốn hủy đơn hàng <strong>#{order.code || order.id}</strong>?
               Hành động này không thể hoàn tác.
             </p>
-            
+
             <div className="od-cancel-reasons">
-              <p className="od-reason-label">Lý do hủy đơ:</p>
+              <p className="od-reason-label">Lý do hủy đơn:</p>
               {CANCEL_REASONS.map((reason) => (
                 <label key={reason} className="od-reason-option">
                   <input
@@ -351,13 +454,13 @@ const OrderDetail = () => {
             )}
 
             <div className="od-modal-actions">
-              <button 
+              <button
                 className="od-btn-cancel-action"
                 onClick={() => setIsCancelModalOpen(false)}
               >
                 Không, giữ đơn
               </button>
-              <button 
+              <button
                 className="od-btn-confirm-cancel"
                 onClick={handleCancelOrder}
               >
@@ -367,6 +470,14 @@ const OrderDetail = () => {
           </div>
         </div>
       )}
+
+      {reviewProduct ? (
+        <ReviewModal
+          isOpen={isReviewModalOpen}
+          onClose={handleCloseReviewModal}
+          product={reviewProduct}
+        />
+      ) : null}
     </div>
   );
 };

@@ -181,7 +181,7 @@ const ProductDetail = () => {
 
     setSubmitting(true);
     try {
-      await reviewService.submitReview({
+      const submittedReview = await reviewService.submitReview({
         storeId: product.storeId,
         productId: product.backendId,
         productName: product.name,
@@ -191,12 +191,23 @@ const ProductDetail = () => {
         images: reviewImages.length > 0 ? reviewImages : undefined,
       });
 
+      setReviews((prev) => [
+        {
+          id: submittedReview.id,
+          rating: submittedReview.rating,
+          content: submittedReview.content,
+          reply: submittedReview.shopReply?.content,
+          createdAt: submittedReview.createdAt,
+          status: submittedReview.status,
+        },
+        ...prev,
+      ]);
       setSubmitted(true);
       setReviewRating(0);
       setReviewContent('');
       setReviewImages([]);
       setCanReview(false);
-      addToast('Đánh giá đã được gửi, chờ phê duyệt.', 'success');
+      addToast('Đánh giá đã được gửi và hiển thị ngay.', 'success');
     } catch (error: unknown) {
       const message =
         error instanceof Error && error.message.trim()
@@ -419,7 +430,7 @@ const ProductDetail = () => {
                     <p className="pdp-review-submitted-title">Đánh giá đã được gửi!</p>
                     <p className="pdp-review-submitted-sub">
                       <Clock size={14} />
-                      Đánh giá đang chờ phê duyệt, sẽ hiển thị sau khi được xác nhận.
+                      Cảm ơn bạn đã chia sẻ trải nghiệm mua sắm.
                     </p>
                     <button className="pdp-review-submit-another" onClick={() => setSubmitted(false)}>
                       Viết thêm đánh giá

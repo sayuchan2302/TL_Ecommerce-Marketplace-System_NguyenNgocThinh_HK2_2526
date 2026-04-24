@@ -76,6 +76,7 @@ public class ReviewService {
                 .id(review.getId())
                 .storeId(review.getStoreId())
                 .productId(review.getProduct() != null ? review.getProduct().getId() : null)
+                .productSlug(review.getProduct() != null ? review.getProduct().getSlug() : null)
                 .productName(review.getProduct() != null ? review.getProduct().getName() : "Unknown Product")
                 .productImage(review.getProduct() != null && review.getProduct().getImages() != null && !review.getProduct().getImages().isEmpty() ? review.getProduct().getImages().get(0).getUrl() : null)
                 .customerName(review.getUser() != null ? review.getUser().getName() : "Unknown Customer")
@@ -152,16 +153,16 @@ public class ReviewService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getApprovedProductReviews(UUID productId) {
-        return reviewRepository.findByProductIdAndStatusOrderByCreatedAtDesc(productId, Review.ReviewStatus.APPROVED)
+    public List<ReviewResponse> getVisibleProductReviews(UUID productId) {
+        return reviewRepository.findByProductIdAndStatusNotOrderByCreatedAtDesc(productId, Review.ReviewStatus.HIDDEN)
                 .stream()
                 .map(this::toReviewResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewResponse> getApprovedStoreReviews(UUID storeId) {
-        return reviewRepository.findByStoreIdAndStatusOrderByCreatedAtDesc(storeId, Review.ReviewStatus.APPROVED)
+    public List<ReviewResponse> getVisibleStoreReviews(UUID storeId) {
+        return reviewRepository.findByStoreIdAndStatusNotOrderByCreatedAtDesc(storeId, Review.ReviewStatus.HIDDEN)
                 .stream()
                 .map(this::toReviewResponse)
                 .toList();
@@ -183,6 +184,7 @@ public class ReviewService {
                 .map(item -> ReviewEligibleItemResponse.builder()
                         .orderId(item.getOrderId())
                         .productId(item.getProductId())
+                        .productSlug(item.getProductSlug() == null ? "" : item.getProductSlug())
                         .productName(item.getProductName() == null || item.getProductName().isBlank() ? "Sản phẩm" : item.getProductName())
                         .productImage(item.getProductImage() == null ? "" : item.getProductImage())
                         .variantName(item.getVariantName() == null ? "" : item.getVariantName())
@@ -219,7 +221,7 @@ public class ReviewService {
                 .content(request.getContent().trim())
                 .images(normalizeImages(request.getImages()))
                 .helpful(0)
-                .status(Review.ReviewStatus.PENDING)
+                .status(Review.ReviewStatus.APPROVED)
                 .version(1)
                 .build();
 
@@ -230,6 +232,9 @@ public class ReviewService {
 
     @Transactional
     public ReviewResponse updateStatus(UUID id, Review.ReviewStatus status) {
+        if (status != Review.ReviewStatus.HIDDEN) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only HIDDEN status is supported");
+        }
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Review not found"));
         review.setStatus(status);
@@ -246,10 +251,6 @@ public class ReviewService {
         String normalizedReply = normalizeRequiredText(reply, "Reply content cannot be empty");
         review.setShopReply(normalizedReply);
         review.setShopReplyAt(LocalDateTime.now());
-        // Auto-approve if pending
-        if (review.getStatus() == Review.ReviewStatus.PENDING) {
-            review.setStatus(Review.ReviewStatus.APPROVED);
-        }
         Review saved = reviewRepository.save(review);
         notifyCustomerReviewReply(saved, previousReply, normalizedReply, true);
         return toReviewResponse(saved);
@@ -263,9 +264,6 @@ public class ReviewService {
         String normalizedReply = normalizeRequiredText(reply, "Reply content cannot be empty");
         review.setShopReply(normalizedReply);
         review.setShopReplyAt(LocalDateTime.now());
-        if (review.getStatus() == Review.ReviewStatus.PENDING) {
-            review.setStatus(Review.ReviewStatus.APPROVED);
-        }
         Review saved = reviewRepository.save(review);
         notifyCustomerReviewReply(saved, previousReply, normalizedReply, false);
         return toReviewResponse(saved);

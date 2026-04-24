@@ -35,6 +35,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     interface EligibleReviewItemProjection {
         UUID getOrderId();
         UUID getProductId();
+        String getProductSlug();
         String getProductName();
         String getProductImage();
         String getVariantName();
@@ -332,6 +333,7 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     @Query("""
             SELECT o.id AS orderId,
                    oi.product.id AS productId,
+                   COALESCE(oi.product.slug, '') AS productSlug,
                    COALESCE(oi.productName, oi.product.name) AS productName,
                    COALESCE(oi.productImage, '') AS productImage,
                    COALESCE(oi.variantName, '') AS variantName,

@@ -1,6 +1,6 @@
 import { apiRequest } from '../../services/apiClient';
 
-export type ReviewStatus = 'pending' | 'approved' | 'hidden';
+export type ReviewStatus = 'visible' | 'hidden';
 
 export interface Review {
   id: string;
@@ -36,9 +36,8 @@ interface BackendReview extends Omit<Review, 'status'> {
 
 const normalizeReviewStatus = (status?: string | null): ReviewStatus => {
   const normalized = status?.toLowerCase();
-  if (normalized === 'approved') return 'approved';
   if (normalized === 'hidden') return 'hidden';
-  return 'pending';
+  return 'visible';
 };
 
 const mapBackendReview = (review: BackendReview): Review => ({
@@ -47,11 +46,11 @@ const mapBackendReview = (review: BackendReview): Review => ({
 });
 
 export const adminReviewService = {
-  getAll: async (params: { page?: number; size?: number; status?: string } = {}): Promise<PaginatedResponse<Review>> => {
+  getAll: async (params: { page?: number; size?: number; status?: 'all' | ReviewStatus } = {}): Promise<PaginatedResponse<Review>> => {
     const query = new URLSearchParams();
     if (params.page !== undefined) query.set('page', String(params.page));
     if (params.size !== undefined) query.set('size', String(params.size));
-    if (params.status && params.status !== 'all') query.set('status', params.status.toUpperCase());
+    if (params.status === 'hidden') query.set('status', 'HIDDEN');
 
     const qs = query.toString();
     const response = await apiRequest<PaginatedResponse<BackendReview>>(
@@ -66,12 +65,12 @@ export const adminReviewService = {
     };
   },
 
-  updateStatus: async (id: string, status: ReviewStatus): Promise<Review> => {
+  hide: async (id: string): Promise<Review> => {
     const response = await apiRequest<BackendReview>(
       `/api/reviews/admin/${id}/status`,
       {
         method: 'PATCH',
-        body: JSON.stringify({ status: status.toUpperCase() }),
+        body: JSON.stringify({ status: 'HIDDEN' }),
       },
       { auth: true },
     );

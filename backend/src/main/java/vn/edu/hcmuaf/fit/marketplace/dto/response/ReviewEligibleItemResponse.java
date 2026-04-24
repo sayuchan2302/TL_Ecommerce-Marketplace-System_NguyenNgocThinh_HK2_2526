@@ -11,6 +11,7 @@ import java.util.UUID;
 public class ReviewEligibleItemResponse {
     private UUID orderId;
     private UUID productId;
+    private String productSlug;
     private String productName;
     private String productImage;
     private String variantName;
