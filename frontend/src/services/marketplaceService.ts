@@ -1,6 +1,7 @@
 import { apiRequest } from './apiClient';
 import type { Product } from '../types';
 import { getOptimizedImageUrl } from '../utils/getOptimizedImageUrl';
+import { resolveColorSwatch } from '../utils/colorSwatch';
 
 export interface MarketplaceStoreCard {
   id: string;
@@ -59,12 +60,17 @@ interface MarketplaceProductCardPayload {
   slug?: string;
   productCode: string;
   name: string;
+  category?: string;
+  categorySlug?: string;
   image?: string;
   price?: number;
   priceAmount?: string;
   originalPrice?: number;
   originalPriceAmount?: string;
   badge?: string;
+  material?: string;
+  fit?: string;
+  gender?: string;
   colors?: string[];
   stock?: number;
   storeId?: string;
@@ -132,6 +138,47 @@ const toNumber = (value: unknown, fallback = 0): number => {
 const optimizeMarketplaceImage = (rawUrl: string | null | undefined, width: number) =>
   getOptimizedImageUrl(rawUrl, { width, format: 'webp', quality: 74 });
 
+const normalizeColorKey = (value: string) => String(value || '').trim().toLowerCase();
+
+const dedupeColorsBySwatch = (
+  colors: string[] | undefined,
+  variants: MarketplaceProductCardPayload['variants'],
+): string[] => {
+  const variantRows = variants || [];
+  const colorHexByName = new Map<string, string>();
+  for (const variant of variantRows) {
+    const colorName = normalizeColorKey(variant.color || '');
+    const colorHex = String(variant.colorHex || '').trim().toLowerCase();
+    if (!colorName || !colorHex || colorHexByName.has(colorName)) {
+      continue;
+    }
+    colorHexByName.set(colorName, colorHex);
+  }
+
+  const sourceColors = (colors && colors.length > 0)
+    ? colors
+    : variantRows.map((variant) => variant.color || '');
+
+  const seenSwatches = new Set<string>();
+  const result: string[] = [];
+  for (const rawColor of sourceColors) {
+    const normalizedName = String(rawColor || '').trim();
+    if (!normalizedName) {
+      continue;
+    }
+    const swatchKey = resolveColorSwatch(
+      colorHexByName.get(normalizeColorKey(normalizedName)) || normalizedName,
+    ).toLowerCase();
+    if (seenSwatches.has(swatchKey)) {
+      continue;
+    }
+    seenSwatches.add(swatchKey);
+    result.push(normalizedName);
+  }
+
+  return result;
+};
+
 const mapProductCard = (row: MarketplaceProductCardPayload): Product => {
   const price = toNumber(row.priceAmount ?? row.price, 0);
   const originalPrice = toNumber(row.originalPriceAmount ?? row.originalPrice, 0);
@@ -158,14 +205,17 @@ const mapProductCard = (row: MarketplaceProductCardPayload): Product => {
     id: normalizedRouteKey,
     sku: row.productCode || row.id,
     name: row.name || 'Sản phẩm',
-    category: 'Marketplace',
+    category: row.category || 'Marketplace',
+    material: row.material,
+    fit: row.fit,
+    gender: row.gender,
     price,
     originalPrice: resolvedOriginalPrice,
     image:
       optimizeMarketplaceImage(row.image, 720)
       || optimizeMarketplaceImage('https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=672&h=990&fit=crop', 720),
     badge: row.badge,
-    colors: row.colors || [],
+    colors: dedupeColorsBySwatch(row.colors, row.variants),
     sizes: sizes.length > 0 ? sizes : undefined,
     stock: Number.isFinite(row.stock) ? Number(row.stock) : 0,
     status: 'ACTIVE',

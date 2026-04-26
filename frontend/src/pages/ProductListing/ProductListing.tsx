@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import FilterSidebar from '../../components/FilterSidebar/FilterSidebar';
@@ -10,12 +10,11 @@ import './ProductListing.css';
 import { useClientViewState } from '../../hooks/useClientViewState';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_DICTIONARY } from '../../utils/clientDictionary';
-
-const PRICE_LABEL: Record<string, string> = {
-  'under-200k': 'Dưới 200k',
-  'from-200k-500k': '200k – 500k',
-  'over-500k': 'Trên 500k',
-};
+import {
+  collectFilterFacets,
+  formatGenderLabel,
+  getPriceRangeLabel,
+} from '../../utils/productFilters';
 
 const ProductListing = () => {
   const { id } = useParams<{ id: string }>();
@@ -27,7 +26,6 @@ const ProductListing = () => {
     defaultCategory: id || 'all',
   });
 
-  // Mapper for category names in breadcrumbs/titles
   const categoryNames: Record<string, string> = {
     sale: CLIENT_TEXT.productListing.title,
     new: CLIENT_TEXT.productListing.title,
@@ -78,38 +76,68 @@ const ProductListing = () => {
     };
   }, [id]);
 
-  // Sync filters <-> URL query params for deep linking
   useEffect(() => {
     setFiltersState({
       priceRanges: view.priceRanges,
       sizes: view.sizes,
       colors: view.colors,
+      genders: view.genders,
+      fits: view.fits,
+      materials: view.materials,
       sortBy: view.sortKey,
     });
-  }, [view.priceRanges, view.sizes, view.colors, view.sortKey, setFiltersState]);
+  }, [
+    view.priceRanges,
+    view.sizes,
+    view.colors,
+    view.genders,
+    view.fits,
+    view.materials,
+    view.sortKey,
+    setFiltersState,
+  ]);
 
-  // Build active chips list
+  const facets = useMemo(() => collectFilterFacets(categoryProducts), [categoryProducts]);
+  const colorLabelByValue = useMemo(
+    () => new Map(facets.colors.map((color) => [color.value, color.label])),
+    [facets.colors],
+  );
+
   const activeChips = [
-    ...view.priceRanges.map((r) => ({
-      key: `price-${r}`,
-      label: PRICE_LABEL[r] || r,
-      onRemove: () => view.togglePrice(r),
+    ...view.priceRanges.map((range) => ({
+      key: `price-${range}`,
+      label: getPriceRangeLabel(range),
+      onRemove: () => view.togglePrice(range),
     })),
-    ...view.sizes.map((s) => ({
-      key: `size-${s}`,
-      label: dictionary.chips.size.replace('{value}', s),
-      onRemove: () => view.toggleSize(s),
+    ...view.sizes.map((size) => ({
+      key: `size-${size}`,
+      label: dictionary.chips.size.replace('{value}', size),
+      onRemove: () => view.toggleSize(size),
     })),
-    ...view.colors.map((c) => ({
-      key: `color-${c}`,
-      label: c,
-      onRemove: () => view.toggleColor(c),
+    ...view.colors.map((color) => ({
+      key: `color-${color}`,
+      label: colorLabelByValue.get(color) || color,
+      onRemove: () => view.toggleColor(color),
+    })),
+    ...view.genders.map((gender) => ({
+      key: `gender-${gender}`,
+      label: `Giới tính: ${formatGenderLabel(gender)}`,
+      onRemove: () => view.toggleGender(gender),
+    })),
+    ...view.fits.map((fit) => ({
+      key: `fit-${fit}`,
+      label: `Dáng: ${fit}`,
+      onRemove: () => view.toggleFit(fit),
+    })),
+    ...view.materials.map((material) => ({
+      key: `material-${material}`,
+      label: `Chất liệu: ${material}`,
+      onRemove: () => view.toggleMaterial(material),
     })),
   ];
 
   return (
     <div className="plp-page">
-      {/* Breadcrumbs */}
       <div className="breadcrumb-wrapper">
         <div className="container">
           <nav className="breadcrumbs">
@@ -120,20 +148,17 @@ const ProductListing = () => {
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="container plp-container">
-        {/* Page Title & Count */}
-         <div className="plp-header">
-           <h1 className="plp-title">{currentCategoryName || dictionary.header.title}</h1>
-           <span className="plp-count">{dictionary.header.countSuffix}</span>
-          </div>
+        <div className="plp-header">
+          <h1 className="plp-title">{currentCategoryName || dictionary.header.title}</h1>
+          <span className="plp-count">{dictionary.header.countSuffix}</span>
+        </div>
 
-        {/* Active Filter Chips */}
         {activeChips.length > 0 && (
           <div className="active-filters-bar">
-             <span className="active-filters-label">{dictionary.activeFilters}</span>
+            <span className="active-filters-label">{dictionary.activeFilters}</span>
             <div className="active-chips">
-              {activeChips.map(chip => (
+              {activeChips.map((chip) => (
                 <button key={chip.key} className="filter-chip" onClick={chip.onRemove}>
                   {chip.label}
                   <X size={13} />
@@ -141,13 +166,12 @@ const ProductListing = () => {
               ))}
             </div>
             <button className="clear-all-filters" onClick={() => view.reset()}>
-               {dictionary.filters.clearAll}
-              </button>
-           </div>
-          )}
+              {dictionary.filters.clearAll}
+            </button>
+          </div>
+        )}
 
         <div className="plp-layout">
-          {/* Mobile Filter Toggle Button */}
           <button
             className="mobile-filter-btn"
             onClick={() => setIsMobileFilterOpen(true)}
@@ -159,7 +183,6 @@ const ProductListing = () => {
             )}
           </button>
 
-          {/* Left Column: Filter Sidebar */}
           <aside className={`plp-sidebar ${isMobileFilterOpen ? 'is-open' : ''}`}>
             <div className="mobile-filter-header">
               <h3>{dictionary.filters.label}</h3>
@@ -175,23 +198,31 @@ const ProductListing = () => {
                 selectedPriceRanges={view.priceRanges}
                 selectedSizes={view.sizes}
                 selectedColors={view.colors}
-                onTogglePrice={(id) => view.togglePrice(id)}
+                selectedGenders={view.genders}
+                selectedFits={view.fits}
+                selectedMaterials={view.materials}
+                sizeOptions={facets.sizes}
+                colorOptions={facets.colors}
+                genderOptions={facets.genders}
+                fitOptions={facets.fits}
+                materialOptions={facets.materials}
+                onTogglePrice={(range) => view.togglePrice(range)}
                 onToggleSize={(size) => view.toggleSize(size)}
                 onToggleColor={(color) => view.toggleColor(color)}
-                onReset={() => view.reset()}
+                onToggleGender={(gender) => view.toggleGender(gender)}
+                onToggleFit={(fit) => view.toggleFit(fit)}
+                onToggleMaterial={(material) => view.toggleMaterial(material)}
               />
             </div>
           </aside>
 
-          {/* Overlay when sidebar is open on mobile */}
           {isMobileFilterOpen && (
             <div
               className="filter-overlay"
               onClick={() => setIsMobileFilterOpen(false)}
-            ></div>
+            />
           )}
 
-          {/* Right Column: Main Content */}
           <main className="plp-main">
             <ProductGrid
               customResults={categoryProducts}
@@ -199,7 +230,11 @@ const ProductListing = () => {
               scrollToTopOnPageChange
               viewState={{
                 priceRanges: view.priceRanges,
+                sizes: view.sizes,
                 colors: view.colors,
+                genders: view.genders,
+                fits: view.fits,
+                materials: view.materials,
                 sortKey: view.sortKey,
                 setSort: (value) => view.setSort(value),
               }}

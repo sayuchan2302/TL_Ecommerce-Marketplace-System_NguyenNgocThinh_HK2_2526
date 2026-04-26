@@ -1,5 +1,6 @@
 import { apiRequest } from './apiClient';
 import { PLACEHOLDER_PRODUCT_IMAGE } from '../constants/placeholders';
+import { resolveColorSwatch } from '../utils/colorSwatch';
 
 export interface StoreProfile {
   id: string;
@@ -203,6 +204,46 @@ interface BackendProduct {
   variants?: Array<{ id?: string; sku?: string; color?: string; colorHex?: string; size?: string; stockQuantity?: number }>;
 }
 
+const normalizeColorKey = (value: string) => String(value || '').trim().toLowerCase();
+
+const dedupeColorsBySwatch = (
+  colors: string[] | undefined,
+  variants: Array<{ color: string; colorHex?: string; size: string; backendId?: string }>,
+): string[] => {
+  const colorHexByName = new Map<string, string>();
+  for (const variant of variants) {
+    const colorName = normalizeColorKey(variant.color);
+    const colorHex = String(variant.colorHex || '').trim().toLowerCase();
+    if (!colorName || !colorHex || colorHexByName.has(colorName)) {
+      continue;
+    }
+    colorHexByName.set(colorName, colorHex);
+  }
+
+  const sourceColors = (colors && colors.length > 0)
+    ? colors
+    : variants.map((variant) => variant.color);
+
+  const seenSwatches = new Set<string>();
+  const result: string[] = [];
+  for (const rawColor of sourceColors) {
+    const normalizedName = String(rawColor || '').trim();
+    if (!normalizedName) {
+      continue;
+    }
+    const swatchKey = resolveColorSwatch(
+      colorHexByName.get(normalizeColorKey(normalizedName)) || normalizedName,
+    ).toLowerCase();
+    if (seenSwatches.has(swatchKey)) {
+      continue;
+    }
+    seenSwatches.add(swatchKey);
+    result.push(normalizedName);
+  }
+
+  return result;
+};
+
 const buildRegistrationDescription = (payload: StoreRegistrationRequest) =>
   [
     payload.brandName ? `Brand: ${payload.brandName}` : null,
@@ -278,7 +319,10 @@ const mapBackendProduct = (product: BackendProduct, store?: StoreProfile): Store
     price,
     originalPrice,
     image: product.images?.[0]?.url || PLACEHOLDER_PRODUCT_IMAGE,
-    colors: Array.from(new Set(variantOptions.map((variant) => variant.color).filter(Boolean))),
+    colors: dedupeColorsBySwatch(
+      Array.from(new Set(variantOptions.map((variant) => variant.color).filter(Boolean))),
+      variantOptions,
+    ),
     sizes: Array.from(new Set(variantOptions.map((variant) => variant.size).filter(Boolean))),
     variants: variantOptions
       .filter((variant) => Boolean(variant.color && variant.size))

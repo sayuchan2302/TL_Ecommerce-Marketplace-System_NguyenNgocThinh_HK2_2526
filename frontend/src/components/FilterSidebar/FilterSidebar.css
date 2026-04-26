@@ -107,7 +107,7 @@
   font-weight: 600;
   color: var(--co-gray-700);
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.18s ease;
 }
 
 .size-btn:hover {
@@ -115,17 +115,61 @@
   color: var(--co-black);
 }
 
+.size-btn:focus-visible {
+  outline: 2px solid var(--co-blue);
+  outline-offset: 2px;
+}
+
+.size-btn.selected,
 .size-btn.active {
-  background-color: var(--co-black);
-  color: var(--co-white);
-  border-color: var(--co-black);
+  background-color: rgba(47, 90, 207, 0.1);
+  color: var(--co-blue);
+  border-color: var(--co-blue);
+  box-shadow: 0 0 0 2px rgba(47, 90, 207, 0.18);
+}
+
+.size-btn.selected:hover,
+.size-btn.active:hover {
+  border-color: var(--co-blue);
+  color: var(--co-blue);
+  transform: translateY(-1px);
 }
 
 /* Color Grid */
 .color-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(5, 32px);
   gap: 12px;
+}
+
+.filter-more-btn {
+  margin-top: 12px;
+  display: flex;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--co-blue);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filter-more-btn:hover {
+  text-decoration: underline;
+}
+
+.filter-more-btn--swap {
+  margin-top: 14px;
+  text-decoration: none;
+}
+
+.filter-more-btn--swap:hover {
+  text-decoration: none;
 }
 
 .color-btn {
@@ -143,6 +187,42 @@
   box-shadow: 0 0 0 2px var(--co-white), 0 0 0 4px var(--co-gray-300);
 }
 
+.color-btn:focus-visible {
+  outline: 2px solid var(--co-blue);
+  outline-offset: 3px;
+}
+
+.color-btn.selected,
 .color-btn.active {
-  box-shadow: 0 0 0 2px var(--co-white), 0 0 0 4px var(--co-black);
+  transform: scale(1.08);
+  box-shadow: 0 0 0 2px var(--co-white), 0 0 0 5px var(--co-blue);
+}
+
+.facet-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.facet-tag-btn {
+  background-color: var(--co-white);
+  border: 1px solid var(--co-gray-300);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--co-gray-700);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.facet-tag-btn:hover {
+  border-color: var(--co-black);
+  color: var(--co-black);
+}
+
+.facet-tag-btn.selected {
+  background-color: rgba(47, 90, 207, 0.1);
+  border-color: var(--co-blue);
+  color: var(--co-blue);
 }

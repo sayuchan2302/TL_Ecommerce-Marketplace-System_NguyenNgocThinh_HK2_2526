@@ -19,7 +19,6 @@ import { storeFollowService } from '../../services/storeFollowService';
 import { hasBackendJwt } from '../../services/apiClient';
 import { useCart } from '../../contexts/CartContext';
 import ProductCard from '../../components/ProductCard/ProductCard';
-import '../../components/ProductSection/ProductSection.css';
 import './StoreProfile.css';
 
 type StoreTab = 'browse' | 'products' | 'categories' | 'reviews';
@@ -190,7 +189,7 @@ const StorefrontProductGrid = memo(({
   }
 
   return (
-    <div className="product-grid storefront-grid">
+    <div className="storefront-grid">
       {rows.map((product) => (
         <StoreProductCard
           key={`${product.id}-${product.sku}`}
@@ -615,8 +614,8 @@ const StoreProfilePage = () => {
     if (loading || typeof ResizeObserver === 'undefined') return;
 
     const updateHeight = (tab: StoreTab, nextHeight: number) => {
-      if (nextHeight <= 0) return;
-      setPanelHeights((prev) => (prev[tab] === nextHeight ? prev : { ...prev, [tab]: nextHeight }));
+      const normalizedHeight = Math.max(0, nextHeight);
+      setPanelHeights((prev) => (prev[tab] === normalizedHeight ? prev : { ...prev, [tab]: normalizedHeight }));
     };
 
     for (const tab of TAB_ITEMS.map((item) => item.id)) {
@@ -646,10 +645,7 @@ const StoreProfilePage = () => {
   }, [loading, store?.id]);
 
   useLayoutEffect(() => {
-    const nextHeight = panelHeights[activeTab];
-    if (nextHeight > 0) {
-      setStageMinHeight(nextHeight);
-    }
+    setStageMinHeight(Math.max(0, panelHeights[activeTab] || 0));
   }, [activeTab, panelHeights]);
 
   const handleToggleFollow = async () => {

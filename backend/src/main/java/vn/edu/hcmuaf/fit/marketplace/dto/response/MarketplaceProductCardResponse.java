@@ -19,12 +19,17 @@ public class MarketplaceProductCardResponse {
     private String slug;
     private String productCode;
     private String name;
+    private String category;
+    private String categorySlug;
     private String image;
     private BigDecimal price;
     private String priceAmount;
     private BigDecimal originalPrice;
     private String originalPriceAmount;
     private String badge;
+    private String material;
+    private String fit;
+    private String gender;
     private List<String> colors;
     private Integer stock;
     private UUID storeId;

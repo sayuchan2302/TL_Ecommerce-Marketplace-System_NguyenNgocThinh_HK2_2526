@@ -10,10 +10,14 @@ import { CLIENT_TEXT } from '../../utils/texts';
 import { useClientViewState } from '../../hooks/useClientViewState';
 import { marketplaceService, type MarketplaceStoreCard } from '../../services/marketplaceService';
 import type { Product } from '../../types';
+import {
+  collectFilterFacets,
+  filterProducts,
+  type ProductFilterState,
+} from '../../utils/productFilters';
 import './Search.css';
 
 const t = CLIENT_TEXT.search;
-
 type SearchScope = 'products' | 'stores';
 
 const Search = () => {
@@ -25,7 +29,6 @@ const Search = () => {
   const [productResults, setProductResults] = useState<Product[]>([]);
   const [storeResults, setStoreResults] = useState<MarketplaceStoreCard[]>([]);
   const view = useClientViewState({ validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
-
   const history = searchService.getRecentSearches();
 
   useEffect(() => {
@@ -72,54 +75,37 @@ const Search = () => {
   }, [query, scope]);
 
   const filteredResults = useMemo(() => {
-    if (!query) return [];
-    let results = [...productResults];
+    if (!query || scope !== 'products') return [];
+    const filterState: ProductFilterState = {
+      priceRanges: view.priceRanges,
+      sizes: view.sizes,
+      colors: view.colors,
+      genders: view.genders,
+      fits: view.fits,
+      materials: view.materials,
+    };
+    return filterProducts(productResults, filterState);
+  }, [
+    query,
+    scope,
+    productResults,
+    view.priceRanges,
+    view.sizes,
+    view.colors,
+    view.genders,
+    view.fits,
+    view.materials,
+  ]);
 
-    if (view.priceRanges.length > 0) {
-      results = results.filter((product) => view.priceRanges.some((range) => {
-        if (range === 'under-200k') return product.price < 200000;
-        if (range === 'from-200k-500k') return product.price >= 200000 && product.price <= 500000;
-        if (range === 'over-500k') return product.price > 500000;
-        return false;
-      }));
-    }
-
-    if (view.colors.length > 0) {
-      const colorMap: Record<string, string> = {
-        'Đen': '#000000',
-        'Trắng': '#ffffff',
-        'Xám': '#9ca3af',
-        'Xanh Navy': '#1e3a8a',
-        'Đỏ': '#ef4444',
-        Be: '#f5f5dc',
-      };
-
-      results = results.filter((product) => product.colors && product.colors.some((colorHex) =>
-        view.colors.some((selectedColor) =>
-          (colorMap[selectedColor] || '').toLowerCase() === colorHex.toLowerCase(),
-        )));
-    }
-
-    switch (view.sortKey) {
-      case 'price-asc':
-        results = [...results].sort((a, b) => a.price - b.price);
-        break;
-      case 'price-desc':
-        results = [...results].sort((a, b) => b.price - a.price);
-        break;
-      case 'discount':
-        results = [...results].sort((a, b) => {
-          const discountA = a.originalPrice ? ((a.originalPrice - a.price) / a.originalPrice) * 100 : 0;
-          const discountB = b.originalPrice ? ((b.originalPrice - b.price) / b.originalPrice) * 100 : 0;
-          return discountB - discountA;
-        });
-        break;
-      default:
-        break;
-    }
-
-    return results;
-  }, [query, productResults, view.priceRanges, view.colors, view.sortKey]);
+  const facets = useMemo(() => collectFilterFacets(productResults), [productResults]);
+  const activeFilterCount = (
+    view.priceRanges.length
+    + view.sizes.length
+    + view.colors.length
+    + view.genders.length
+    + view.fits.length
+    + view.materials.length
+  );
 
   const clearHistory = () => {
     searchService.clearHistory();
@@ -142,15 +128,13 @@ const Search = () => {
   const handleScopeChange = (nextScope: SearchScope) => {
     const params = new URLSearchParams(searchParams);
     params.set('scope', nextScope);
-    if (query.trim()) {
-      params.set('q', query.trim());
-    }
+    if (query.trim()) params.set('q', query.trim());
     setSearchParams(params);
   };
 
   const hasNoResults = scope === 'stores'
     ? storeResults.length === 0
-    : filteredResults.length === 0 && productResults.length === 0;
+    : filteredResults.length === 0;
 
   return (
     <div className="search-page">
@@ -197,8 +181,8 @@ const Search = () => {
                         <span className="search-history-text">{item}</span>
                         <button
                           className="search-history-del"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={(event) => {
+                            event.stopPropagation();
                             removeHistoryItem(item);
                           }}
                           aria-label={`Xóa "${item}" khỏi lịch sử`}
@@ -216,18 +200,18 @@ const Search = () => {
                   <SearchIcon size={16} /> {t.dropdown.popularKeywords}
                 </h3>
                 <div className="search-keywords">
-                  {searchService.getPopularKeywords().map((kw, i) => (
+                  {searchService.getPopularKeywords().map((keyword, index) => (
                     <motion.button
-                      key={kw}
+                      key={keyword}
                       className="search-keyword-chip"
-                      onClick={() => handleKeywordClick(kw)}
+                      onClick={() => handleKeywordClick(keyword)}
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: i * 0.05, duration: 0.2 }}
+                      transition={{ delay: index * 0.05, duration: 0.2 }}
                       whileHover={{ scale: 1.05, y: -2 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      {kw}
+                      {keyword}
                     </motion.button>
                   ))}
                 </div>
@@ -243,13 +227,11 @@ const Search = () => {
               transition={{ duration: 0.3 }}
             >
               <div className="plp-header">
-                <h1 className="plp-title">
-                  {t.page.resultsFor(query)}
-                </h1>
+                <h1 className="plp-title">{t.page.resultsFor(query)}</h1>
                 <span className="plp-count">
                   {scope === 'stores'
                     ? `(${storeResults.length} cửa hàng)`
-                    : `(${t.page.productCount(filteredResults.length || productResults.length)})`}
+                    : `(${t.page.productCount(filteredResults.length)})`}
                 </span>
               </div>
 
@@ -273,11 +255,7 @@ const Search = () => {
               ) : hasNoResults ? (
                 scope === 'products'
                   ? <EmptySearchState query={query} />
-                  : (
-                    <div className="store-empty-state">
-                      <p>Không tìm thấy cửa hàng phù hợp cho "{query}".</p>
-                    </div>
-                  )
+                  : <div className="store-empty-state"><p>Không tìm thấy cửa hàng phù hợp cho "{query}".</p></div>
               ) : scope === 'stores' ? (
                 <div className="store-results-grid">
                   {storeResults.map((store) => (
@@ -304,6 +282,9 @@ const Search = () => {
                   >
                     <SlidersHorizontal size={18} aria-hidden="true" />
                     {CLIENT_TEXT.filter.title}
+                    {activeFilterCount > 0 && (
+                      <span className="mobile-filter-badge">{activeFilterCount}</span>
+                    )}
                   </motion.button>
 
                   <aside className={`plp-sidebar ${isMobileFilterOpen ? 'is-open' : ''}`}>
@@ -322,10 +303,20 @@ const Search = () => {
                         selectedPriceRanges={view.priceRanges}
                         selectedSizes={view.sizes}
                         selectedColors={view.colors}
-                        onTogglePrice={(id) => view.togglePrice(id)}
+                        selectedGenders={view.genders}
+                        selectedFits={view.fits}
+                        selectedMaterials={view.materials}
+                        sizeOptions={facets.sizes}
+                        colorOptions={facets.colors}
+                        genderOptions={facets.genders}
+                        fitOptions={facets.fits}
+                        materialOptions={facets.materials}
+                        onTogglePrice={(range) => view.togglePrice(range)}
                         onToggleSize={(size) => view.toggleSize(size)}
                         onToggleColor={(color) => view.toggleColor(color)}
-                        onReset={() => view.reset()}
+                        onToggleGender={(gender) => view.toggleGender(gender)}
+                        onToggleFit={(fit) => view.toggleFit(fit)}
+                        onToggleMaterial={(material) => view.toggleMaterial(material)}
                       />
                     </div>
                   </aside>
@@ -342,12 +333,16 @@ const Search = () => {
 
                   <main className="plp-main">
                     <ProductGrid
-                      customResults={filteredResults.length > 0 ? filteredResults : productResults}
+                      customResults={productResults}
                       itemsPerPage={12}
                       scrollToTopOnPageChange
                       viewState={{
                         priceRanges: view.priceRanges,
+                        sizes: view.sizes,
                         colors: view.colors,
+                        genders: view.genders,
+                        fits: view.fits,
+                        materials: view.materials,
                         sortKey: view.sortKey,
                         setSort: (value) => view.setSort(value),
                       }}

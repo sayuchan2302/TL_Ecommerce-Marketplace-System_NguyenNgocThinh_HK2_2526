@@ -6,6 +6,9 @@ export interface FilterState {
   priceRanges: string[];
   sizes: string[];
   colors: string[];
+  genders: string[];
+  fits: string[];
+  materials: string[];
   sortBy: string;
 }
 
@@ -14,6 +17,9 @@ interface FilterContextType {
   updatePriceRange: (range: string, checked: boolean) => void;
   updateSize: (size: string, checked: boolean) => void;
   updateColor: (color: string, checked: boolean) => void;
+  updateGender: (gender: string, checked: boolean) => void;
+  updateFit: (fit: string, checked: boolean) => void;
+  updateMaterial: (material: string, checked: boolean) => void;
   updateSortBy: (sort: string) => void;
   resetFilters: () => void;
   setFiltersState: (next: FilterState) => void;
@@ -26,6 +32,9 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
     priceRanges: [],
     sizes: [],
     colors: [],
+    genders: [],
+    fits: [],
+    materials: [],
     sortBy: 'newest',
   });
 
@@ -35,7 +44,18 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
     const samePrices = a.priceRanges.length === b.priceRanges.length && a.priceRanges.every((v, idx) => v === b.priceRanges[idx]);
     const sameSizes = a.sizes.length === b.sizes.length && a.sizes.every((v, idx) => v === b.sizes[idx]);
     const sameColors = a.colors.length === b.colors.length && a.colors.every((v, idx) => v === b.colors[idx]);
-    return samePrices && sameSizes && sameColors && a.sortBy === b.sortBy;
+    const sameGenders = a.genders.length === b.genders.length && a.genders.every((v, idx) => v === b.genders[idx]);
+    const sameFits = a.fits.length === b.fits.length && a.fits.every((v, idx) => v === b.fits[idx]);
+    const sameMaterials = a.materials.length === b.materials.length && a.materials.every((v, idx) => v === b.materials[idx]);
+    return (
+      samePrices
+      && sameSizes
+      && sameColors
+      && sameGenders
+      && sameFits
+      && sameMaterials
+      && a.sortBy === b.sortBy
+    );
   };
 
   const setFiltersState = useCallback((next: FilterState) => {
@@ -44,6 +64,9 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
         priceRanges: normalizeList(next.priceRanges),
         sizes: normalizeList(next.sizes),
         colors: normalizeList(next.colors),
+        genders: normalizeList(next.genders),
+        fits: normalizeList(next.fits),
+        materials: normalizeList(next.materials),
         sortBy: next.sortBy || 'newest',
       };
 
@@ -79,6 +102,33 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
     }));
   };
 
+  const updateGender = (gender: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      genders: checked
+        ? [...prev.genders, gender]
+        : prev.genders.filter(g => g !== gender),
+    }));
+  };
+
+  const updateFit = (fit: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      fits: checked
+        ? [...prev.fits, fit]
+        : prev.fits.filter(item => item !== fit),
+    }));
+  };
+
+  const updateMaterial = (material: string, checked: boolean) => {
+    setFilters(prev => ({
+      ...prev,
+      materials: checked
+        ? [...prev.materials, material]
+        : prev.materials.filter(item => item !== material),
+    }));
+  };
+
   const updateSortBy = (sort: string) => {
     setFilters(prev => ({
       ...prev,
@@ -91,6 +141,9 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
       priceRanges: [],
       sizes: [],
       colors: [],
+      genders: [],
+      fits: [],
+      materials: [],
       sortBy: 'newest',
     });
   };
@@ -102,6 +155,9 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
         updatePriceRange,
         updateSize,
         updateColor,
+        updateGender,
+        updateFit,
+        updateMaterial,
         updateSortBy,
         resetFilters,
         setFiltersState,

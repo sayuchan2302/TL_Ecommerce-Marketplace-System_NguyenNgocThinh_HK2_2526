@@ -7,17 +7,25 @@ import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_DICTIONARY } from '../../utils/clientDictionary';
 import type { Product } from '../../types';
 import { useClientViewState } from '../../hooks/useClientViewState';
+import {
+  filterProducts,
+  sortProducts,
+  type ProductFilterState,
+  type ProductSortKey,
+} from '../../utils/productFilters';
 
 const t = CLIENT_TEXT.filter;
 const tListing = CLIENT_TEXT.productListing;
 
-type SortKey = 'newest' | 'bestseller' | 'price-asc' | 'price-desc' | 'discount';
-
 interface ProductGridViewState {
   priceRanges: string[];
+  sizes: string[];
   colors: string[];
-  sortKey: SortKey;
-  setSort: (value: SortKey) => void;
+  genders: string[];
+  fits: string[];
+  materials: string[];
+  sortKey: ProductSortKey;
+  setSort: (value: ProductSortKey) => void;
 }
 
 interface ProductGridProps {
@@ -82,47 +90,17 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
   }, [customResults]);
 
   const filteredProducts = useMemo(() => {
-    let results = customResults || catalog;
-
-    if (view.priceRanges.length > 0) {
-      results = results.filter((product) => {
-        return view.priceRanges.some((range) => {
-          if (range === 'under-200k') return product.price < 200000;
-          if (range === 'from-200k-500k') return product.price >= 200000 && product.price <= 500000;
-          if (range === 'over-500k') return product.price > 500000;
-          return false;
-        });
-      });
-    }
-
-    if (view.colors.length > 0) {
-      results = results.filter((product) => {
-        return product.colors && product.colors.some((colorHex) => view.colors.some((selectedColor) => selectedColor.toLowerCase() === colorHex.toLowerCase()));
-      });
-    }
-
-    switch (view.sortKey) {
-      case 'price-asc':
-        results = [...results].sort((a, b) => a.price - b.price);
-        break;
-      case 'price-desc':
-        results = [...results].sort((a, b) => b.price - a.price);
-        break;
-      case 'discount':
-        results = [...results].sort((a, b) => {
-          const discountA = a.originalPrice ? ((a.originalPrice - a.price) / a.originalPrice) * 100 : 0;
-          const discountB = b.originalPrice ? ((b.originalPrice - b.price) / b.originalPrice) * 100 : 0;
-          return discountB - discountA;
-        });
-        break;
-      case 'newest':
-      case 'bestseller':
-      default:
-        break;
-    }
-
-    return results;
-  }, [view.priceRanges, view.colors, view.sortKey, customResults, catalog]);
+    const source = customResults || catalog;
+    const filterState: ProductFilterState = {
+      priceRanges: view.priceRanges,
+      sizes: view.sizes,
+      colors: view.colors,
+      genders: view.genders,
+      fits: view.fits,
+      materials: view.materials,
+    };
+    return sortProducts(filterProducts(source, filterState), view.sortKey);
+  }, [view.priceRanges, view.sizes, view.colors, view.genders, view.fits, view.materials, view.sortKey, customResults, catalog]);
 
   const totalProducts = filteredProducts.length;
   const hasPagination = typeof itemsPerPage === 'number' && itemsPerPage > 0;
@@ -133,9 +111,13 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
     pageSize,
     sortKey: view.sortKey,
     priceRanges: [...view.priceRanges].sort(),
+    sizes: [...view.sizes].sort(),
     colors: [...view.colors].sort(),
+    genders: [...view.genders].sort(),
+    fits: [...view.fits].sort(),
+    materials: [...view.materials].sort(),
     customResultsKey: customResults ? customResults.map((product) => String(product.id)).join('|') : 'catalog',
-  }), [hasPagination, pageSize, view.sortKey, view.priceRanges, view.colors, customResults]);
+  }), [hasPagination, pageSize, view.sortKey, view.priceRanges, view.sizes, view.colors, view.genders, view.fits, view.materials, customResults]);
   const rawCurrentPage = pageByScope[paginationScope] ?? 1;
   const currentPage = hasPagination ? Math.min(Math.max(rawCurrentPage, 1), totalPages) : 1;
 
@@ -203,7 +185,7 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
             id="sort-select"
             className="sort-select"
             value={view.sortKey}
-            onChange={(e) => view.setSort(e.target.value as SortKey)}
+            onChange={(e) => view.setSort(e.target.value as ProductSortKey)}
           >
             <option value="newest">{t.sort.newest}</option>
             <option value="bestseller">{t.sort.bestseller}</option>
