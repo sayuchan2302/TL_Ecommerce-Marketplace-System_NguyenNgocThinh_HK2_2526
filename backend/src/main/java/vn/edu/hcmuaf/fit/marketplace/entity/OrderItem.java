@@ -51,4 +51,10 @@ public class OrderItem extends BaseEntity {
 
     @Column(name = "store_id")
     private UUID storeId;
+
+    @Column(name = "flash_sale_item_id")
+    private UUID flashSaleItemId;
+
+    @Column(name = "flash_sale_unit_price")
+    private BigDecimal flashSaleUnitPrice;
 }

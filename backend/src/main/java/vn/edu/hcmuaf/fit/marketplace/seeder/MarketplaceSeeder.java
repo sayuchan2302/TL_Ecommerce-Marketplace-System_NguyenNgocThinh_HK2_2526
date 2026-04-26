@@ -323,6 +323,8 @@ public class MarketplaceSeeder implements ApplicationRunner {
                     orders,
                     cart_items,
                     carts,
+                    flash_sale_items,
+                    flash_sale_campaigns,
                     vouchers,
                     product_variants,
                     product_images,

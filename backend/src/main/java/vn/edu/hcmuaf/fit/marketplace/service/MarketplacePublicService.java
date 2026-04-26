@@ -7,15 +7,21 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceFlashSaleItemResponse;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceFlashSaleResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceHomeResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceProductCardResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceStoreCardResponse;
 import vn.edu.hcmuaf.fit.marketplace.entity.Category;
+import vn.edu.hcmuaf.fit.marketplace.entity.FlashSaleCampaign;
+import vn.edu.hcmuaf.fit.marketplace.entity.FlashSaleItem;
 import vn.edu.hcmuaf.fit.marketplace.entity.Product;
 import vn.edu.hcmuaf.fit.marketplace.entity.ProductImage;
 import vn.edu.hcmuaf.fit.marketplace.entity.ProductVariant;
 import vn.edu.hcmuaf.fit.marketplace.entity.Store;
 import vn.edu.hcmuaf.fit.marketplace.repository.CategoryRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.FlashSaleCampaignRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.FlashSaleItemRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ProductRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
 
@@ -47,15 +53,21 @@ public class MarketplacePublicService {
     private final ProductRepository productRepository;
     private final StoreRepository storeRepository;
     private final CategoryRepository categoryRepository;
+    private final FlashSaleCampaignRepository flashSaleCampaignRepository;
+    private final FlashSaleItemRepository flashSaleItemRepository;
 
     public MarketplacePublicService(
             ProductRepository productRepository,
             StoreRepository storeRepository,
-            CategoryRepository categoryRepository
+            CategoryRepository categoryRepository,
+            FlashSaleCampaignRepository flashSaleCampaignRepository,
+            FlashSaleItemRepository flashSaleItemRepository
     ) {
         this.productRepository = productRepository;
         this.storeRepository = storeRepository;
         this.categoryRepository = categoryRepository;
+        this.flashSaleCampaignRepository = flashSaleCampaignRepository;
+        this.flashSaleItemRepository = flashSaleItemRepository;
     }
 
     @Transactional(readOnly = true)
@@ -146,6 +158,62 @@ public class MarketplacePublicService {
                 .toList();
 
         return new PageImpl<>(rows, resolved, storePage.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    public MarketplaceFlashSaleResponse getActiveFlashSale() {
+        LocalDateTime now = LocalDateTime.now();
+        FlashSaleCampaign campaign = flashSaleCampaignRepository.findFirstActiveAt(now).orElse(null);
+        if (campaign == null || campaign.getId() == null) {
+            return MarketplaceFlashSaleResponse.builder()
+                    .serverTime(now)
+                    .items(List.of())
+                    .build();
+        }
+
+        List<FlashSaleItem> rawItems = flashSaleItemRepository.findPublicActiveByCampaignId(
+                campaign.getId(),
+                FlashSaleCampaign.CampaignStatus.RUNNING,
+                FlashSaleItem.ItemStatus.ACTIVE,
+                now
+        );
+
+        if (rawItems.isEmpty()) {
+            return MarketplaceFlashSaleResponse.builder()
+                    .campaignId(campaign.getId())
+                    .campaignName(campaign.getName())
+                    .startAt(campaign.getStartAt())
+                    .endAt(campaign.getEndAt())
+                    .serverTime(now)
+                    .items(List.of())
+                    .build();
+        }
+
+        Set<UUID> storeIds = rawItems.stream()
+                .map(FlashSaleItem::getProduct)
+                .filter(Objects::nonNull)
+                .map(Product::getStoreId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, Store> storesById = storeIds.isEmpty()
+                ? Map.of()
+                : storeRepository.findAllById(storeIds).stream()
+                .collect(Collectors.toMap(Store::getId, store -> store, (left, right) -> right, HashMap::new));
+
+        List<MarketplaceFlashSaleItemResponse> items = rawItems.stream()
+                .map(item -> toFlashSaleItemResponse(item, storesById.get(item.getProduct() != null ? item.getProduct().getStoreId() : null)))
+                .filter(Objects::nonNull)
+                .toList();
+
+        return MarketplaceFlashSaleResponse.builder()
+                .campaignId(campaign.getId())
+                .campaignName(campaign.getName())
+                .startAt(campaign.getStartAt())
+                .endAt(campaign.getEndAt())
+                .serverTime(now)
+                .items(items)
+                .build();
     }
 
     private Pageable resolveProductSearchPageable(Pageable pageable) {
@@ -429,6 +497,56 @@ public class MarketplacePublicService {
                 .toList();
     }
 
+    private MarketplaceFlashSaleItemResponse toFlashSaleItemResponse(FlashSaleItem item, Store store) {
+        if (item == null || item.getProduct() == null || item.getProduct().getId() == null) {
+            return null;
+        }
+        Product product = item.getProduct();
+        ProductVariant variant = item.getVariant();
+
+        if (!hasPublicAvailability(product, variant)) {
+            return null;
+        }
+        if (store == null || !isPublicStore(store)) {
+            return null;
+        }
+
+        int quota = Math.max(0, defaultInteger(item.getQuota()));
+        int soldCount = Math.max(0, defaultInteger(item.getSoldCount()));
+        if (quota <= 0 || soldCount >= quota) {
+            return null;
+        }
+
+        BigDecimal originalPrice = resolveUnitPriceForFlash(product, variant);
+        BigDecimal flashPrice = item.getFlashPrice() == null ? BigDecimal.ZERO : item.getFlashPrice();
+        if (flashPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+
+        return MarketplaceFlashSaleItemResponse.builder()
+                .flashSaleItemId(item.getId())
+                .productId(product.getId())
+                .productSlug(product.getSlug())
+                .productCode(resolveProductCode(product))
+                .variantId(variant != null ? variant.getId() : null)
+                .name(product.getName())
+                .image(resolvePrimaryImage(product))
+                .flashPrice(flashPrice)
+                .flashPriceAmount(formatMoneyAmount(flashPrice))
+                .originalPrice(originalPrice)
+                .originalPriceAmount(formatMoneyAmount(originalPrice))
+                .soldCount(soldCount)
+                .quota(quota)
+                .storeId(store != null ? store.getId() : product.getStoreId())
+                .storeName(store != null ? store.getName() : null)
+                .storeSlug(store != null ? store.getSlug() : null)
+                .officialStore(store != null && isOfficialStore(store))
+                .colors(resolveColors(product))
+                .sizes(resolveSizes(product))
+                .variants(resolveVariants(product))
+                .build();
+    }
+
     private String resolvePrimaryImage(Product product) {
         List<ProductImage> images = product.getImages();
         if (images == null || images.isEmpty()) {
@@ -455,6 +573,11 @@ public class MarketplacePublicService {
             return product.getBasePrice();
         }
         return BigDecimal.ZERO;
+    }
+
+    private BigDecimal resolveUnitPriceForFlash(Product product, ProductVariant variant) {
+        BigDecimal unitPrice = variant != null ? variant.getPrice() : resolveEffectivePrice(product);
+        return unitPrice == null ? BigDecimal.ZERO : unitPrice;
     }
 
     private BigDecimal resolveOriginalPrice(Product product) {
@@ -487,6 +610,31 @@ public class MarketplacePublicService {
 
     private boolean isOfficialStore(Store store) {
         return store.getCommissionRate() != null && store.getCommissionRate().compareTo(new BigDecimal("3.0")) <= 0;
+    }
+
+    private boolean hasPublicAvailability(Product product, ProductVariant variant) {
+        if (product.getStoreId() == null) {
+            return false;
+        }
+        if (product.getStatus() != Product.ProductStatus.ACTIVE) {
+            return false;
+        }
+        if (product.getApprovalStatus() != null && product.getApprovalStatus() != Product.ApprovalStatus.APPROVED) {
+            return false;
+        }
+
+        if (variant != null) {
+            return !Boolean.FALSE.equals(variant.getIsActive()) && defaultInteger(variant.getStockQuantity()) > 0;
+        }
+        return resolveTotalStock(product) > 0;
+    }
+
+    private boolean isPublicStore(Store store) {
+        if (store == null) {
+            return false;
+        }
+        return store.getApprovalStatus() == Store.ApprovalStatus.APPROVED
+                && store.getStatus() == Store.StoreStatus.ACTIVE;
     }
 
     private int defaultInteger(Integer value) {

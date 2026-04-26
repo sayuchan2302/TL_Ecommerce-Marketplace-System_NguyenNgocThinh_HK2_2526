@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceFlashSaleResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceHomeResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceProductCardResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceStoreCardResponse;
@@ -26,6 +27,11 @@ public class MarketplacePublicController {
     @GetMapping("/home")
     public ResponseEntity<MarketplaceHomeResponse> getMarketplaceHome() {
         return ResponseEntity.ok(marketplacePublicService.getMarketplaceHome());
+    }
+
+    @GetMapping("/flash-sale/active")
+    public ResponseEntity<MarketplaceFlashSaleResponse> getActiveFlashSale() {
+        return ResponseEntity.ok(marketplacePublicService.getActiveFlashSale());
     }
 
     @GetMapping("/search/products")

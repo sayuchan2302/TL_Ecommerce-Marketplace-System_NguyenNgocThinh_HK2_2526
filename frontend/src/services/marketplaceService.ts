@@ -55,6 +55,40 @@ export interface MarketplaceHomeData {
   categoryTabs: MarketplaceHomeCategoryTab[];
 }
 
+export interface MarketplaceFlashSaleData {
+  campaignId?: string;
+  campaignName?: string;
+  startAt?: string;
+  endAt?: string;
+  serverTime?: string;
+  items: MarketplaceFlashSaleItem[];
+}
+
+export interface MarketplaceFlashSaleItem {
+  id: string;
+  backendProductId?: string;
+  backendVariantId?: string;
+  name: string;
+  image: string;
+  price: number;
+  originalPrice?: number;
+  badge?: string;
+  colors?: string[];
+  sizes?: string[];
+  variants?: Array<{
+    color: string;
+    colorHex?: string;
+    size: string;
+    backendId?: string;
+  }>;
+  storeName: string;
+  storeId?: string;
+  storeSlug?: string;
+  isOfficialStore?: boolean;
+  soldCount: number;
+  totalStock: number;
+}
+
 interface MarketplaceProductCardPayload {
   id: string;
   slug?: string;
@@ -104,6 +138,45 @@ interface MarketplaceHomePayload {
   featuredStores?: MarketplaceStoreCardPayload[];
   featuredProducts?: MarketplaceProductCardPayload[];
   trendingProducts?: MarketplaceProductCardPayload[];
+}
+
+interface MarketplaceFlashSaleItemPayload {
+  flashSaleItemId?: string;
+  productId?: string;
+  productSlug?: string;
+  productCode?: string;
+  variantId?: string;
+  name?: string;
+  image?: string;
+  flashPrice?: number;
+  flashPriceAmount?: string;
+  originalPrice?: number;
+  originalPriceAmount?: string;
+  soldCount?: number;
+  quota?: number;
+  storeId?: string;
+  storeName?: string;
+  storeSlug?: string;
+  officialStore?: boolean;
+  colors?: string[];
+  sizes?: string[];
+  variants?: Array<{
+    id?: string;
+    sku?: string;
+    color?: string;
+    colorHex?: string;
+    size?: string;
+    stockQuantity?: number;
+  }>;
+}
+
+interface MarketplaceFlashSalePayload {
+  campaignId?: string;
+  campaignName?: string;
+  startAt?: string;
+  endAt?: string;
+  serverTime?: string;
+  items?: MarketplaceFlashSaleItemPayload[];
 }
 
 interface BackendCategoryTreeNode {
@@ -240,6 +313,56 @@ const mapStoreCard = (row: MarketplaceStoreCardPayload): MarketplaceStoreCard =>
   totalOrders: Math.max(0, Math.round(toNumber(row.totalOrders, 0))),
   liveProductCount: Math.max(0, Math.round(toNumber(row.liveProductCount, 0))),
 });
+
+const mapFlashSaleItem = (row: MarketplaceFlashSaleItemPayload): MarketplaceFlashSaleItem | null => {
+  const routeKey = (row.productSlug || row.productCode || row.productId || '').trim();
+  if (!routeKey) {
+    return null;
+  }
+
+  const flashPrice = toNumber(row.flashPriceAmount ?? row.flashPrice, 0);
+  if (!Number.isFinite(flashPrice) || flashPrice <= 0) {
+    return null;
+  }
+  const originalPrice = toNumber(row.originalPriceAmount ?? row.originalPrice, 0);
+  const quota = Math.max(1, Math.round(toNumber(row.quota, 1)));
+  const soldCount = Math.min(quota, Math.max(0, Math.round(toNumber(row.soldCount, 0))));
+
+  const variants = (row.variants || [])
+    .filter((variant) => Boolean((variant.size || '').trim()))
+    .map((variant, index) => ({
+      color: String(variant.color || '').trim(),
+      colorHex: String(variant.colorHex || '').trim() || undefined,
+      size: String(variant.size || '').trim(),
+      backendId: String(variant.id || '').trim() || String(variant.sku || '').trim() || `${routeKey}-v${index + 1}`,
+    }));
+
+  const sizes = row.sizes && row.sizes.length > 0
+    ? Array.from(new Set(row.sizes.map((size) => String(size || '').trim()).filter(Boolean)))
+    : Array.from(new Set(variants.map((variant) => variant.size).filter(Boolean)));
+
+  return {
+    id: routeKey,
+    backendProductId: (row.productId || '').trim() || undefined,
+    backendVariantId: (row.variantId || '').trim() || undefined,
+    name: row.name || 'Sản phẩm',
+    image:
+      optimizeMarketplaceImage(row.image, 720)
+      || optimizeMarketplaceImage('https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=672&h=990&fit=crop', 720),
+    price: flashPrice,
+    originalPrice: originalPrice > flashPrice ? originalPrice : undefined,
+    badge: 'FLASH SALE',
+    colors: dedupeColorsBySwatch(row.colors, row.variants),
+    sizes: sizes.length > 0 ? sizes : undefined,
+    variants: variants.length > 0 ? variants : undefined,
+    storeName: (row.storeName || '').trim() || 'Nhà bán',
+    storeId: (row.storeId || '').trim() || undefined,
+    storeSlug: (row.storeSlug || '').trim() || undefined,
+    isOfficialStore: Boolean(row.officialStore),
+    soldCount,
+    totalStock: quota,
+  };
+};
 
 const normalizeText = (value: string) =>
   value
@@ -381,6 +504,22 @@ export const marketplaceService = {
     } catch {
       return [];
     }
+  },
+
+  async getActiveFlashSale(): Promise<MarketplaceFlashSaleData> {
+    const payload = await apiRequest<MarketplaceFlashSalePayload>('/api/public/marketplace/flash-sale/active');
+    const items = (payload.items || [])
+      .map(mapFlashSaleItem)
+      .filter((row): row is MarketplaceFlashSaleItem => Boolean(row));
+
+    return {
+      campaignId: (payload.campaignId || '').trim() || undefined,
+      campaignName: (payload.campaignName || '').trim() || undefined,
+      startAt: (payload.startAt || '').trim() || undefined,
+      endAt: (payload.endAt || '').trim() || undefined,
+      serverTime: (payload.serverTime || '').trim() || undefined,
+      items,
+    };
   },
 
   async searchProducts(query: string, page = 0, size = 20, categorySlug?: string) {

@@ -12,7 +12,10 @@ import vn.edu.hcmuaf.fit.marketplace.entity.Category;
 import vn.edu.hcmuaf.fit.marketplace.entity.Product;
 import vn.edu.hcmuaf.fit.marketplace.entity.Store;
 import vn.edu.hcmuaf.fit.marketplace.repository.CategoryRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.FlashSaleCampaignRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.FlashSaleItemRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ProductRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.ProductVariantRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
 import vn.edu.hcmuaf.fit.marketplace.service.ProductService;
 
@@ -47,6 +50,15 @@ class GapProductImportRunnerTest {
     @Mock
     private CategoryRepository categoryRepository;
 
+    @Mock
+    private ProductVariantRepository productVariantRepository;
+
+    @Mock
+    private FlashSaleCampaignRepository flashSaleCampaignRepository;
+
+    @Mock
+    private FlashSaleItemRepository flashSaleItemRepository;
+
     private FakeProductService productService;
     private GapSeedProperties properties;
     private GapProductImportRunner runner;
@@ -62,9 +74,13 @@ class GapProductImportRunnerTest {
                 properties,
                 productService,
                 productRepository,
+                productVariantRepository,
                 storeRepository,
-                categoryRepository
+                categoryRepository,
+                flashSaleCampaignRepository,
+                flashSaleItemRepository
         );
+        when(flashSaleCampaignRepository.count()).thenReturn(1L);
     }
 
     @Test

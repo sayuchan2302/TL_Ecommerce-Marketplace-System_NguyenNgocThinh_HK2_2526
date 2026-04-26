@@ -9,17 +9,24 @@ import org.springframework.stereotype.Component;
 import vn.edu.hcmuaf.fit.marketplace.config.GapSeedProperties;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.ProductRequest;
 import vn.edu.hcmuaf.fit.marketplace.entity.Category;
+import vn.edu.hcmuaf.fit.marketplace.entity.FlashSaleCampaign;
+import vn.edu.hcmuaf.fit.marketplace.entity.FlashSaleItem;
 import vn.edu.hcmuaf.fit.marketplace.entity.Product;
 import vn.edu.hcmuaf.fit.marketplace.entity.ProductImage;
+import vn.edu.hcmuaf.fit.marketplace.entity.ProductVariant;
 import vn.edu.hcmuaf.fit.marketplace.entity.Store;
 import vn.edu.hcmuaf.fit.marketplace.repository.CategoryRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.FlashSaleCampaignRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.FlashSaleItemRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ProductRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.ProductVariantRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
 import vn.edu.hcmuaf.fit.marketplace.service.ProductService;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,6 +40,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -57,21 +65,30 @@ public class GapProductImportRunner {
     private final GapSeedProperties properties;
     private final ProductService productService;
     private final ProductRepository productRepository;
+    private final ProductVariantRepository productVariantRepository;
     private final StoreRepository storeRepository;
     private final CategoryRepository categoryRepository;
+    private final FlashSaleCampaignRepository flashSaleCampaignRepository;
+    private final FlashSaleItemRepository flashSaleItemRepository;
 
     public GapProductImportRunner(
             GapSeedProperties properties,
             ProductService productService,
             ProductRepository productRepository,
+            ProductVariantRepository productVariantRepository,
             StoreRepository storeRepository,
-            CategoryRepository categoryRepository
+            CategoryRepository categoryRepository,
+            FlashSaleCampaignRepository flashSaleCampaignRepository,
+            FlashSaleItemRepository flashSaleItemRepository
     ) {
         this.properties = properties;
         this.productService = productService;
         this.productRepository = productRepository;
+        this.productVariantRepository = productVariantRepository;
         this.storeRepository = storeRepository;
         this.categoryRepository = categoryRepository;
+        this.flashSaleCampaignRepository = flashSaleCampaignRepository;
+        this.flashSaleItemRepository = flashSaleItemRepository;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -175,12 +192,14 @@ public class GapProductImportRunner {
 
         if (candidates.isEmpty()) {
             log.warn("GAP import skipped because no eligible candidates were found.");
+            ensureDefaultFlashSaleCampaign();
             return;
         }
 
         List<AssignedCandidate> selected = allocateCandidates(candidates, leafCategories, targetCount);
         if (selected.isEmpty()) {
             log.warn("GAP import skipped because allocation returned no candidates.");
+            ensureDefaultFlashSaleCampaign();
             return;
         }
 
@@ -221,6 +240,97 @@ public class GapProductImportRunner {
                 leafCategories.size()
         );
         log.info("GAP import category coverage: {} leaf categories received products.", countsByCategory.size());
+        ensureDefaultFlashSaleCampaign();
+    }
+
+    private void ensureDefaultFlashSaleCampaign() {
+        long campaignCount = flashSaleCampaignRepository.count();
+        long itemCount = flashSaleItemRepository.count();
+        if (campaignCount > 0 && itemCount > 0) {
+            return;
+        }
+
+        if (campaignCount > 0 && itemCount == 0) {
+            flashSaleCampaignRepository.deleteAll();
+        }
+
+        List<Product> publicProducts = productRepository.findAllPublicProducts();
+        if (publicProducts.isEmpty()) {
+            log.warn("Skip Flash Sale seed because no public products are available.");
+            return;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        FlashSaleCampaign campaign = FlashSaleCampaign.builder()
+                .name("Flash Sale gio vang")
+                .description("Campaign mac dinh cho moi truong local seed.")
+                .scope(FlashSaleCampaign.CampaignScope.PLATFORM)
+                .status(FlashSaleCampaign.CampaignStatus.RUNNING)
+                .startAt(now.minusHours(1))
+                .endAt(now.plusDays(3))
+                .updatedBy("gap-seed")
+                .build();
+        campaign = flashSaleCampaignRepository.save(campaign);
+
+        int createdItems = 0;
+        int sortOrder = 0;
+        for (Product product : publicProducts) {
+            if (createdItems >= 24) {
+                break;
+            }
+            if (product == null || product.getId() == null) {
+                continue;
+            }
+
+            ProductVariant variant = productVariantRepository.findByProductIdAndIsActiveTrue(product.getId()).stream()
+                    .filter(v -> v.getStockQuantity() != null && v.getStockQuantity() > 0)
+                    .findFirst()
+                    .orElse(null);
+
+            int stock = variant != null
+                    ? Math.max(variant.getStockQuantity() != null ? variant.getStockQuantity() : 0, 0)
+                    : Math.max(product.getStockQuantity() != null ? product.getStockQuantity() : 0, 0);
+            if (stock <= 0) {
+                continue;
+            }
+
+            BigDecimal basePrice = product.getEffectivePrice();
+            if (basePrice == null || basePrice.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            if (variant != null && variant.getPriceAdjustment() != null) {
+                basePrice = basePrice.add(variant.getPriceAdjustment());
+            }
+            if (basePrice.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            BigDecimal flashPrice = basePrice.multiply(new BigDecimal("0.80")).setScale(0, RoundingMode.HALF_UP);
+            if (flashPrice.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            FlashSaleItem item = FlashSaleItem.builder()
+                    .campaign(campaign)
+                    .product(product)
+                    .variant(variant)
+                    .flashPrice(flashPrice)
+                    .quota(Math.max(20, Math.min(120, stock)))
+                    .soldCount(0)
+                    .status(FlashSaleItem.ItemStatus.ACTIVE)
+                    .sortOrder(sortOrder++)
+                    .build();
+            flashSaleItemRepository.save(item);
+            createdItems++;
+        }
+
+        if (createdItems == 0) {
+            flashSaleCampaignRepository.delete(campaign);
+            log.warn("Rollback Flash Sale seed because no eligible items were created.");
+            return;
+        }
+
+        log.info("Seeded default Flash Sale campaign with {} items for local environment.", createdItems);
     }
 
     private List<LeafCategory> loadLeafCategories() {

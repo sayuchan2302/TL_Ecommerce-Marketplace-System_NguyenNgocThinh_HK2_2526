@@ -51,6 +51,7 @@ public class OrderService {
     private final AddressRepository addressRepository;
     private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final FlashSaleItemRepository flashSaleItemRepository;
     private final WalletService walletService;
     private final StoreRepository storeRepository;
     private final CouponRepository couponRepository;
@@ -65,7 +66,8 @@ public class OrderService {
     @Autowired
     public OrderService(OrderRepository orderRepository, UserRepository userRepository,
                         AddressRepository addressRepository, ProductRepository productRepository,
-                        ProductVariantRepository productVariantRepository, WalletService walletService,
+                        ProductVariantRepository productVariantRepository, FlashSaleItemRepository flashSaleItemRepository,
+                        WalletService walletService,
                         StoreRepository storeRepository, CouponRepository couponRepository,
                         VoucherRepository voucherRepository, CustomerVoucherRepository customerVoucherRepository,
                         PublicCodeService publicCodeService,
@@ -78,6 +80,7 @@ public class OrderService {
         this.addressRepository = addressRepository;
         this.productRepository = productRepository;
         this.productVariantRepository = productVariantRepository;
+        this.flashSaleItemRepository = flashSaleItemRepository;
         this.walletService = walletService;
         this.storeRepository = storeRepository;
         this.couponRepository = couponRepository;
@@ -105,6 +108,7 @@ public class OrderService {
                 addressRepository,
                 productRepository,
                 productVariantRepository,
+                null,
                 walletService,
                 storeRepository,
                 couponRepository,
@@ -130,13 +134,17 @@ public class OrderService {
                 addressRepository,
                 productRepository,
                 productVariantRepository,
+                null,
                 walletService,
                 storeRepository,
                 couponRepository,
                 voucherRepository,
                 null,
                 publicCodeService,
-                applicationEventPublisher
+                applicationEventPublisher,
+                null,
+                null,
+                null
         );
     }
 
@@ -153,6 +161,7 @@ public class OrderService {
                 addressRepository,
                 productRepository,
                 productVariantRepository,
+                null,
                 walletService,
                 storeRepository,
                 couponRepository,
@@ -204,8 +213,23 @@ public class OrderService {
             UUID storeId,
             String productName,
             String variantName,
-            String productImage
+            String productImage,
+            UUID flashSaleItemId,
+            BigDecimal flashSaleUnitPrice
     ) {}
+
+    private record FlashSaleAllocation(
+            UUID flashSaleItemId,
+            BigDecimal flashUnitPrice
+    ) {
+        static FlashSaleAllocation none() {
+            return new FlashSaleAllocation(null, null);
+        }
+
+        boolean applied() {
+            return flashSaleItemId != null && flashUnitPrice != null && flashUnitPrice.compareTo(BigDecimal.ZERO) > 0;
+        }
+    }
 
     private record StoreOrderGroup(
             UUID storeId,
@@ -1462,6 +1486,7 @@ public class OrderService {
         if (quantity <= 0) {
             return;
         }
+        restoreFlashSaleQuotaForOrderItem(item, quantity);
 
         ProductVariant itemVariant = item.getVariant();
         if (itemVariant != null && itemVariant.getId() != null) {
@@ -1490,6 +1515,19 @@ public class OrderService {
             return;
         }
         lockedProduct.setStockQuantity(safeInt(lockedProduct.getStockQuantity()) + quantity);
+    }
+
+    private void restoreFlashSaleQuotaForOrderItem(OrderItem item, int quantity) {
+        if (flashSaleItemRepository == null || item == null || item.getFlashSaleItemId() == null || quantity <= 0) {
+            return;
+        }
+        FlashSaleItem lockedFlashItem = flashSaleItemRepository.findByIdForUpdate(item.getFlashSaleItemId()).orElse(null);
+        if (lockedFlashItem == null) {
+            return;
+        }
+        int soldCount = safeInt(lockedFlashItem.getSoldCount());
+        lockedFlashItem.setSoldCount(Math.max(0, soldCount - quantity));
+        flashSaleItemRepository.save(lockedFlashItem);
     }
 
     private void validateStatusTransition(Order.OrderStatus current, Order.OrderStatus next, boolean enforceVendorRules) {
@@ -1719,7 +1757,9 @@ public class OrderService {
             reserveStock(product, variant, itemReq.getQuantity());
 
             // Always resolve price server-side to prevent client-side price tampering.
-            BigDecimal unitPrice = resolveUnitPrice(product, variant);
+            BigDecimal fallbackUnitPrice = resolveUnitPrice(product, variant);
+            FlashSaleAllocation flashSaleAllocation = tryApplyFlashSaleAllocation(product, variant, itemReq.getQuantity());
+            BigDecimal unitPrice = flashSaleAllocation.applied() ? flashSaleAllocation.flashUnitPrice() : fallbackUnitPrice;
             BigDecimal totalPrice = unitPrice.multiply(BigDecimal.valueOf(itemReq.getQuantity()));
 
             preparedItems.add(new PreparedOrderItem(
@@ -1731,7 +1771,9 @@ public class OrderService {
                     product.getStoreId(),
                     product.getName(),
                     buildVariantName(variant),
-                    resolvePrimaryImage(product)
+                    resolvePrimaryImage(product),
+                    flashSaleAllocation.flashSaleItemId(),
+                    flashSaleAllocation.applied() ? flashSaleAllocation.flashUnitPrice() : null
             ));
         }
 
@@ -1780,6 +1822,53 @@ public class OrderService {
         }
 
         product.setStockQuantity(available - quantity);
+    }
+
+    private FlashSaleAllocation tryApplyFlashSaleAllocation(Product product, ProductVariant variant, int quantity) {
+        if (flashSaleItemRepository == null || product == null || product.getId() == null || quantity <= 0) {
+            return FlashSaleAllocation.none();
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        FlashSaleItem candidate = null;
+        if (variant != null && variant.getId() != null) {
+            candidate = firstOrNull(flashSaleItemRepository.findActiveVariantItemForUpdate(
+                    product.getId(),
+                    variant.getId(),
+                    FlashSaleItem.ItemStatus.ACTIVE,
+                    FlashSaleCampaign.CampaignStatus.RUNNING,
+                    now
+            ));
+        }
+        if (candidate == null) {
+            candidate = firstOrNull(flashSaleItemRepository.findActiveProductItemForUpdate(
+                    product.getId(),
+                    FlashSaleItem.ItemStatus.ACTIVE,
+                    FlashSaleCampaign.CampaignStatus.RUNNING,
+                    now
+            ));
+        }
+        if (candidate == null) {
+            return FlashSaleAllocation.none();
+        }
+
+        int quota = safeInt(candidate.getQuota());
+        int soldCount = safeInt(candidate.getSoldCount());
+        if (quota <= 0 || soldCount >= quota) {
+            return FlashSaleAllocation.none();
+        }
+        if (soldCount + quantity > quota) {
+            return FlashSaleAllocation.none();
+        }
+
+        BigDecimal flashPrice = safeAmount(candidate.getFlashPrice());
+        if (flashPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            return FlashSaleAllocation.none();
+        }
+
+        candidate.setSoldCount(soldCount + quantity);
+        flashSaleItemRepository.save(candidate);
+        return new FlashSaleAllocation(candidate.getId(), flashPrice);
     }
 
     private Map<UUID, StoreOrderGroup> groupItemsByStore(List<PreparedOrderItem> preparedItems) {
@@ -2178,6 +2267,13 @@ public class OrderService {
         return normalized.isEmpty() ? null : normalized;
     }
 
+    private <T> T firstOrNull(List<T> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return null;
+        }
+        return rows.get(0);
+    }
+
     private int safeInt(Integer value) {
         return value == null ? 0 : value;
     }
@@ -2301,6 +2397,8 @@ public class OrderService {
                 .unitPrice(item.unitPrice())
                 .totalPrice(item.totalPrice())
                 .storeId(item.storeId())
+                .flashSaleItemId(item.flashSaleItemId())
+                .flashSaleUnitPrice(item.flashSaleUnitPrice())
                 .build();
     }
 

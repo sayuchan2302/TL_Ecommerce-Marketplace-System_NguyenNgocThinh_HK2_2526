@@ -31,6 +31,8 @@ interface FlashSaleSectionProps {
   items?: FlashSaleItem[];
   viewAllLink?: string;
   className?: string;
+  endAt?: string;
+  serverTime?: string;
 }
 
 const getRemainingSecondsToEndOfDay = () => {
@@ -55,13 +57,39 @@ const FlashSaleSection = ({
   items = [],
   viewAllLink = '/search?scope=products&sort=discount',
   className = '',
+  endAt,
+  serverTime,
 }: FlashSaleSectionProps) => {
-  const [remainingSeconds, setRemainingSeconds] = useState(getRemainingSecondsToEndOfDay());
+  const [clientNowMs, setClientNowMs] = useState(() => Date.now());
+  const [mountEpochMs] = useState(() => Date.now());
   const sliderRef = useRef<HTMLDivElement>(null);
+
+  const serverOffsetMs = useMemo(() => {
+    if (!serverTime) {
+      return 0;
+    }
+    const parsed = new Date(serverTime).getTime();
+    if (!Number.isFinite(parsed)) {
+      return 0;
+    }
+    return parsed - mountEpochMs;
+  }, [serverTime, mountEpochMs]);
+
+  const remainingSeconds = useMemo(() => {
+    if (!endAt) {
+      return getRemainingSecondsToEndOfDay();
+    }
+    const targetMs = new Date(endAt).getTime();
+    if (!Number.isFinite(targetMs)) {
+      return getRemainingSecondsToEndOfDay();
+    }
+    const nowMs = clientNowMs + serverOffsetMs;
+    return Math.max(0, Math.floor((targetMs - nowMs) / 1000));
+  }, [endAt, serverOffsetMs, clientNowMs]);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setRemainingSeconds(getRemainingSecondsToEndOfDay());
+      setClientNowMs(Date.now());
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -81,6 +109,7 @@ const FlashSaleSection = ({
   };
 
   if (!items || items.length === 0) return null;
+  if (endAt && remainingSeconds <= 0) return null;
 
   return (
     <section className={`flash-sale-section container ${className}`.trim()}>

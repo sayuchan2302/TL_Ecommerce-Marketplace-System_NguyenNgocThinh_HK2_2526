@@ -5,10 +5,11 @@ import './Home.css';
 import HeroSlider from '../../components/HeroSlider/HeroSlider';
 import Categories from '../../components/Categories/Categories';
 import ProductSection from '../../components/ProductSection/ProductSection';
-import FlashSaleSection, { type FlashSaleItem } from '../../components/FlashSaleSection/FlashSaleSection';
+import FlashSaleSection from '../../components/FlashSaleSection/FlashSaleSection';
 import Skeleton from '../../components/Skeleton/Skeleton';
 import {
   marketplaceService,
+  type MarketplaceFlashSaleData,
   type MarketplaceStoreCard,
   type MarketplaceHomeCategoryTab,
 } from '../../services/marketplaceService';
@@ -113,19 +114,20 @@ const Home = () => {
   const [featuredStores, setFeaturedStores] = useState<MarketplaceStoreCard[]>([]);
   const [allStores, setAllStores] = useState<MarketplaceStoreCard[]>([]);
   const [categoryTabs, setCategoryTabs] = useState<MarketplaceHomeCategoryTab[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<HomeSectionProduct[]>([]);
-  const [trendingProducts, setTrendingProducts] = useState<HomeSectionProduct[]>([]);
   const [topSellingProducts, setTopSellingProducts] = useState<HomeSectionProduct[]>([]);
+  const [flashSaleData, setFlashSaleData] = useState<MarketplaceFlashSaleData>({ items: [] });
 
   useEffect(() => {
     let mounted = true;
 
     const loadHomeData = async () => {
       try {
-        const [data, storesResponse, topSellingResponse] = await Promise.all([
+        const emptyFlashSaleData: MarketplaceFlashSaleData = { items: [] };
+        const [data, storesResponse, topSellingResponse, flashSaleResponse] = await Promise.all([
           marketplaceService.getHomeData(),
           marketplaceService.searchStores('', 0, 100).catch(() => null),
           marketplaceService.searchProducts('', 0, 10).catch(() => null),
+          marketplaceService.getActiveFlashSale().catch(() => emptyFlashSaleData),
         ]);
         if (!mounted) return;
 
@@ -163,17 +165,22 @@ const Home = () => {
         setFeaturedStores(data.featuredStores);
         setAllStores(dedupedStores.length > 0 ? dedupedStores : data.featuredStores || []);
         setCategoryTabs(data.categoryTabs || []);
-        setFeaturedProducts(enriched.featured);
-        setTrendingProducts(enriched.trending);
         setTopSellingProducts(enriched.topSelling);
+        setFlashSaleData({
+          campaignId: flashSaleResponse.campaignId,
+          campaignName: flashSaleResponse.campaignName,
+          startAt: flashSaleResponse.startAt,
+          endAt: flashSaleResponse.endAt,
+          serverTime: flashSaleResponse.serverTime,
+          items: flashSaleResponse.items || [],
+        });
       } catch {
         if (!mounted) return;
         setFeaturedStores([]);
         setAllStores([]);
         setCategoryTabs([]);
-        setFeaturedProducts([]);
-        setTrendingProducts([]);
         setTopSellingProducts([]);
+        setFlashSaleData({ items: [] });
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -186,51 +193,6 @@ const Home = () => {
       mounted = false;
     };
   }, []);
-
-  const flashSaleProducts = useMemo(() => {
-    const uniqueById = new Map<string, HomeSectionProduct>();
-    [...featuredProducts, ...trendingProducts].forEach((product) => {
-      uniqueById.set(String(product.id), product);
-    });
-
-    const discountedProducts = [...uniqueById.values()].filter(
-      (product) => typeof product.originalPrice === 'number' && product.originalPrice > product.price,
-    );
-
-    return discountedProducts.slice(0, 12);
-  }, [featuredProducts, trendingProducts]);
-
-  const flashSaleItems = useMemo<FlashSaleItem[]>(
-    () =>
-      flashSaleProducts.map((product) => {
-        const availableStock = Math.max(0, Number(product.stock || 0));
-        const soldCountFromApi = typeof product.soldCount === 'number' ? Math.max(0, Math.round(product.soldCount)) : 0;
-        const totalStockFromApi = typeof product.totalStock === 'number' ? Math.max(1, Math.round(product.totalStock)) : 0;
-
-        const totalStock = totalStockFromApi > 0 ? totalStockFromApi : Math.max(1, soldCountFromApi + availableStock);
-        const soldCount = Math.min(totalStock, soldCountFromApi);
-
-        return {
-          id: product.id,
-          backendProductId: product.backendId,
-          name: product.name,
-          image: product.image,
-          price: product.price,
-          originalPrice: product.originalPrice,
-          badge: product.badge,
-          colors: product.colors,
-          sizes: product.sizes,
-          variants: product.variants,
-          storeName: product.storeName || 'Nh\u00e0 b\u00e1n',
-          storeId: product.storeId,
-          storeSlug: product.storeSlug,
-          isOfficialStore: product.isOfficialStore,
-          soldCount,
-          totalStock,
-        };
-      }),
-    [flashSaleProducts],
-  );
 
   const topVendors = useMemo(() => {
     const source = allStores.length > 0 ? allStores : featuredStores;
@@ -297,7 +259,9 @@ const Home = () => {
 
             <FlashSaleSection
               className="home-section-gap"
-              items={flashSaleItems}
+              items={flashSaleData.items}
+              endAt={flashSaleData.endAt}
+              serverTime={flashSaleData.serverTime}
             />
 
             <section className="top-vendor-section container home-section-gap">
