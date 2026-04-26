@@ -39,7 +39,7 @@
 /* Base override for grid if not used as slider */
 .product-grid:not(.slider-view) {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: var(--space-4);
 }
 
@@ -108,17 +108,15 @@
 }
 
 @media (max-width: 1200px) {
-  .product-grid:not(.slider-view) { grid-template-columns: repeat(4, 1fr); }
   .slider-item { flex: 0 0 calc(25% - (var(--space-4) * 3 / 4)); }
 }
 
 @media (max-width: 900px) {
-  .product-grid:not(.slider-view) { grid-template-columns: repeat(3, 1fr); }
   .slider-item { flex: 0 0 calc(33.333% - (var(--space-4) * 2 / 3)); }
 }
 
 @media (max-width: 600px) {
-  .product-grid:not(.slider-view) { grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+  .product-grid:not(.slider-view) { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--space-2); }
   .slider-item { flex: 0 0 calc(50% - (var(--space-4) / 2)); min-width: 160px;}
   .product-section-compact .slider-item { min-width: 155px; flex-basis: 155px; }
   .section-title { font-size: 1.5rem; }

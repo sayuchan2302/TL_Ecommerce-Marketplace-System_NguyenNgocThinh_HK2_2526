@@ -65,8 +65,8 @@
 /* Grid Layout */
 .plp-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-4);
   margin-bottom: 40px;
   content-visibility: auto;
   contain-intrinsic-size: 800px;
@@ -147,27 +147,18 @@
 }
 
 /* Responsiveness */
-@media (max-width: 1200px) {
-  .plp-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 900px) {
-  .plp-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
 @media (max-width: 768px) {
   .plp-toolbar {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
   }
-  
+}
+
+@media (max-width: 600px) {
   .plp-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: var(--space-2);
   }
 }
 
