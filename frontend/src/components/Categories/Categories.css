@@ -3,6 +3,19 @@
   margin-bottom: var(--space-8);
 }
 
+.categories-title-wrap {
+  display: grid;
+  gap: 6px;
+  margin-bottom: var(--space-4);
+}
+
+.categories-heading {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--co-black);
+}
+
 .tab-buttons {
   display: flex;
   gap: var(--space-4);

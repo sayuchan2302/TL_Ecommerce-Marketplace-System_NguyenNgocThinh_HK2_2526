@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './ProductSection.css';
@@ -29,6 +29,7 @@ interface ProductSectionItem {
 interface ProductSectionProps {
   title: string;
   products: ProductSectionItem[];
+  eyebrow?: ReactNode;
   viewAllLink?: string;
   staticCards?: boolean;
   showQuickView?: boolean;
@@ -46,11 +47,13 @@ interface ProductSectionProps {
     isOfficialStore?: boolean;
   }) => void;
   className?: string;
+  subHeader?: ReactNode;
 }
 
 const ProductSection = ({
   title,
   products,
+  eyebrow,
   viewAllLink = '/search?scope=products',
   staticCards = false,
   showQuickView = false,
@@ -58,6 +61,7 @@ const ProductSection = ({
   maxItems,
   onQuickAdd,
   className = '',
+  subHeader,
 }: ProductSectionProps) => {
   const sliderRef = useRef<HTMLDivElement>(null);
   const visibleProducts = typeof maxItems === 'number' ? products.slice(0, Math.max(0, maxItems)) : products;
@@ -77,9 +81,13 @@ const ProductSection = ({
   return (
     <section className={`product-section container ${staticCards ? 'product-section-compact' : ''} ${className}`}>
       <div className="section-header">
-        <h2 className="section-title">{title}</h2>
+        <div className="section-header-main">
+          {eyebrow ? <span className="section-eyebrow">{eyebrow}</span> : null}
+          <h2 className="section-title">{title}</h2>
+        </div>
         <Link to={viewAllLink} className="view-all-link">{'Xem t\u1ea5t c\u1ea3'}</Link>
       </div>
+      {subHeader ? <div className="section-subheader">{subHeader}</div> : null}
 
       {useSlider ? (
         <div className="slider-container">

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star } from 'lucide-react';
+import { LayoutGrid, Star } from 'lucide-react';
 import './Categories.css';
 import type {
   MarketplaceStoreCard,
@@ -32,6 +32,13 @@ const Categories = ({
 
   return (
     <section className="categories-section container">
+      <div className="categories-title-wrap">
+        <span className="home-section-eyebrow categories-eyebrow">
+          <LayoutGrid size={13} />
+          {'Danh m\u1EE5c ch\u00EDnh'}
+        </span>
+        <h2 className="categories-heading">{'Danh m\u1EE5c'}</h2>
+      </div>
       <div className="tab-buttons">
         {tabs.map((tab) => (
           <button

@@ -1,6 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Store } from 'lucide-react';
+import { Star, Store, TrendingUp } from 'lucide-react';
 import './Home.css';
 import HeroSlider from '../../components/HeroSlider/HeroSlider';
 import Categories from '../../components/Categories/Categories';
@@ -39,6 +39,20 @@ interface HomeSectionProduct {
   soldCount?: number;
   totalStock?: number;
 }
+
+type TopSellingRootId = 'nam' | 'nu' | 'phu-kien';
+
+interface TopSellingRootTab {
+  id: TopSellingRootId;
+  label: string;
+  slug: string;
+}
+
+const DEFAULT_TOP_SELLING_TABS: TopSellingRootTab[] = [
+  { id: 'nam', label: 'NAM', slug: 'men' },
+  { id: 'nu', label: 'NỮ', slug: 'women' },
+  { id: 'phu-kien', label: 'PHỤ KIỆN', slug: 'accessories' },
+];
 
 const hasSizeVariants = (product: HomeSectionProduct) =>
   Array.isArray(product.variants)
@@ -114,7 +128,13 @@ const Home = () => {
   const [featuredStores, setFeaturedStores] = useState<MarketplaceStoreCard[]>([]);
   const [allStores, setAllStores] = useState<MarketplaceStoreCard[]>([]);
   const [categoryTabs, setCategoryTabs] = useState<MarketplaceHomeCategoryTab[]>([]);
-  const [topSellingProducts, setTopSellingProducts] = useState<HomeSectionProduct[]>([]);
+  const [topSellingTabs, setTopSellingTabs] = useState<TopSellingRootTab[]>(DEFAULT_TOP_SELLING_TABS);
+  const [activeTopSellingTab, setActiveTopSellingTab] = useState<TopSellingRootId>('nam');
+  const [topSellingByTab, setTopSellingByTab] = useState<Record<TopSellingRootId, HomeSectionProduct[]>>({
+    nam: [],
+    nu: [],
+    'phu-kien': [],
+  });
   const [flashSaleData, setFlashSaleData] = useState<MarketplaceFlashSaleData>({ items: [] });
 
   useEffect(() => {
@@ -123,10 +143,9 @@ const Home = () => {
     const loadHomeData = async () => {
       try {
         const emptyFlashSaleData: MarketplaceFlashSaleData = { items: [] };
-        const [data, storesResponse, topSellingResponse, flashSaleResponse] = await Promise.all([
+        const [data, storesResponse, flashSaleResponse] = await Promise.all([
           marketplaceService.getHomeData(),
           marketplaceService.searchStores('', 0, 100).catch(() => null),
-          marketplaceService.searchProducts('', 0, 10).catch(() => null),
           marketplaceService.getActiveFlashSale().catch(() => emptyFlashSaleData),
         ]);
         if (!mounted) return;
@@ -153,19 +172,61 @@ const Home = () => {
 
         const featuredRows = data.featuredProducts;
         const trendingRows = data.trendingProducts;
-        const topSellingRows = (
-          topSellingResponse?.items && topSellingResponse.items.length > 0
-            ? topSellingResponse.items
-            : [...data.featuredProducts, ...data.trendingProducts]
-        ).slice(0, 10);
 
-        const enriched = await enrichProductVariantsForHome(featuredRows, trendingRows, topSellingRows);
+        const resolvedTopSellingTabs: TopSellingRootTab[] = DEFAULT_TOP_SELLING_TABS.map((defaultTab) => {
+          const matched = (data.categoryTabs || []).find((tab) => tab.id === defaultTab.id);
+          return {
+            ...defaultTab,
+            slug: (matched?.slug || defaultTab.slug).trim() || defaultTab.slug,
+          };
+        });
+
+        const topSellingResponses = await Promise.all(
+          resolvedTopSellingTabs.map((tab) => (
+            marketplaceService.searchProducts('', 0, 10, tab.slug).catch(() => null)
+          )),
+        );
+
+        const topSellingRawByTab = resolvedTopSellingTabs.reduce<Record<TopSellingRootId, HomeSectionProduct[]>>(
+          (acc, tab, index) => {
+            acc[tab.id] = topSellingResponses[index]?.items || [];
+            return acc;
+          },
+          { nam: [], nu: [], 'phu-kien': [] },
+        );
+
+        const mergedTopSellingRows = Array.from(
+          new Map(
+            Object.values(topSellingRawByTab)
+              .flat()
+              .map((product) => [String(product.id), product]),
+          ).values(),
+        );
+
+        const enriched = await enrichProductVariantsForHome(featuredRows, trendingRows, mergedTopSellingRows);
         if (!mounted) return;
+
+        const enrichedTopById = new Map(
+          (enriched.topSelling || []).map((product) => [String(product.id), product]),
+        );
+
+        const enrichedTopSellingByTab = resolvedTopSellingTabs.reduce<Record<TopSellingRootId, HomeSectionProduct[]>>(
+          (acc, tab) => {
+            acc[tab.id] = (topSellingRawByTab[tab.id] || []).map(
+              (product) => enrichedTopById.get(String(product.id)) || product,
+            );
+            return acc;
+          },
+          { nam: [], nu: [], 'phu-kien': [] },
+        );
 
         setFeaturedStores(data.featuredStores);
         setAllStores(dedupedStores.length > 0 ? dedupedStores : data.featuredStores || []);
         setCategoryTabs(data.categoryTabs || []);
-        setTopSellingProducts(enriched.topSelling);
+        setTopSellingTabs(resolvedTopSellingTabs);
+        setTopSellingByTab(enrichedTopSellingByTab);
+        const firstNonEmptyTab = resolvedTopSellingTabs.find((tab) => (enrichedTopSellingByTab[tab.id] || []).length > 0);
+        setActiveTopSellingTab(firstNonEmptyTab?.id || resolvedTopSellingTabs[0]?.id || 'nam');
         setFlashSaleData({
           campaignId: flashSaleResponse.campaignId,
           campaignName: flashSaleResponse.campaignName,
@@ -179,7 +240,9 @@ const Home = () => {
         setFeaturedStores([]);
         setAllStores([]);
         setCategoryTabs([]);
-        setTopSellingProducts([]);
+        setTopSellingTabs(DEFAULT_TOP_SELLING_TABS);
+        setTopSellingByTab({ nam: [], nu: [], 'phu-kien': [] });
+        setActiveTopSellingTab('nam');
         setFlashSaleData({ items: [] });
       } finally {
         if (mounted) {
@@ -206,6 +269,12 @@ const Home = () => {
       })
       .slice(0, 4);
   }, [allStores, featuredStores]);
+
+  const activeTopSellingTabMeta = topSellingTabs.find((tab) => tab.id === activeTopSellingTab);
+  const topSellingViewAllLink = activeTopSellingTabMeta?.slug
+    ? `/category/${encodeURIComponent(activeTopSellingTabMeta.slug)}`
+    : '/search?scope=products';
+  const activeTopSellingProducts = topSellingByTab[activeTopSellingTab] || [];
 
   return (
     <div className="home-page">
@@ -267,7 +336,7 @@ const Home = () => {
             <section className="top-vendor-section container home-section-gap">
                 <div className="top-vendor-head">
                   <div className="top-vendor-title-wrap">
-                    <span className="top-vendor-eyebrow">
+                    <span className="top-vendor-eyebrow home-section-eyebrow">
                       <Store size={14} />
                       {'Nh\u00e0 b\u00e1n uy t\u00edn'}
                     </span>
@@ -296,17 +365,37 @@ const Home = () => {
                 </div>
               </section>
 
-            <section className="home-section-gap">
-              <ProductSection
-                title={'Sản phẩm mua nhiều'}
-                products={topSellingProducts}
-                viewAllLink="/search?scope=products"
-                showQuickView={false}
-                useSlider={false}
-                maxItems={10}
-                className="top-selling-section"
-              />
-            </section>
+            <ProductSection
+              title={'Sản phẩm mua nhiều'}
+              products={activeTopSellingProducts}
+              eyebrow={(
+                <span className="home-section-eyebrow top-selling-eyebrow">
+                  <TrendingUp size={13} />
+                  {'Xu h\u01B0\u1EDBng mua s\u1EAFm'}
+                </span>
+              )}
+              viewAllLink={topSellingViewAllLink}
+              showQuickView={false}
+              useSlider={false}
+              maxItems={10}
+              className="top-selling-section home-section-gap"
+              subHeader={(
+                <div className="home-top-selling-tabs" role="tablist" aria-label="Lọc sản phẩm mua nhiều theo danh mục">
+                  {topSellingTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab.id === activeTopSellingTab}
+                      className={`home-top-selling-tab${tab.id === activeTopSellingTab ? ' is-active' : ''}`}
+                      onClick={() => setActiveTopSellingTab(tab.id)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
           </>
         )}
       </main>

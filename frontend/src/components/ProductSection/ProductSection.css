@@ -11,6 +11,22 @@
   margin-bottom: var(--space-6);
 }
 
+.section-header-main {
+  display: grid;
+  gap: 6px;
+}
+
+.section-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+}
+
+.section-subheader {
+  margin: var(--space-2) 0 var(--space-6);
+}
+
 .section-title {
   font-family: var(--font-heading);
   font-size: 2.25rem;

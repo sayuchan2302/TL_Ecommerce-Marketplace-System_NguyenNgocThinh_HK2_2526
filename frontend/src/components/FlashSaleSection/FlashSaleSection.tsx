@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import ProductCard from '../ProductCard/ProductCard';
 import './FlashSaleSection.css';
 
@@ -115,7 +115,13 @@ const FlashSaleSection = ({
     <section className={`flash-sale-section container ${className}`.trim()}>
       <div className="flash-sale-header">
         <div className="flash-sale-header-left">
-          <h2 className="flash-sale-title">Flash Sale</h2>
+          <div className="flash-sale-title-wrap">
+            <span className="home-section-eyebrow flash-sale-eyebrow">
+              <Zap size={13} />
+              {'Khung gi\u1EDD v\u00E0ng'}
+            </span>
+            <h2 className="flash-sale-title">Flash Sale</h2>
+          </div>
           <div className="flash-sale-timer">
             {timeParts.map((part, i) => (
               <div key={`t-${i}`} style={{ display: 'flex', alignItems: 'center' }}>
@@ -195,3 +201,4 @@ const FlashSaleSection = ({
 };
 
 export default FlashSaleSection;
+

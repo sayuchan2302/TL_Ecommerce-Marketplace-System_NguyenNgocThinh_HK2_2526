@@ -14,8 +14,13 @@
 
 .flash-sale-header-left {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: flex-end;
+  gap: 18px;
+}
+
+.flash-sale-title-wrap {
+  display: grid;
+  gap: 6px;
 }
 
 .flash-sale-title {
@@ -211,6 +216,11 @@
 }
 
 @media (max-width: 600px) {
+  .flash-sale-header-left {
+    align-items: center;
+    gap: 10px;
+  }
+
   .flash-sale-title {
     font-size: 18px;
   }
