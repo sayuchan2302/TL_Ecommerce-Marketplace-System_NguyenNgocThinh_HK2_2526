@@ -64,6 +64,13 @@ export interface MarketplaceFlashSaleData {
   items: MarketplaceFlashSaleItem[];
 }
 
+export interface MarketplaceImageSearchData {
+  items: Product[];
+  totalCandidates: number;
+  mode?: string;
+  indexVersion?: string;
+}
+
 export interface MarketplaceFlashSaleItem {
   id: string;
   backendProductId?: string;
@@ -177,6 +184,13 @@ interface MarketplaceFlashSalePayload {
   endAt?: string;
   serverTime?: string;
   items?: MarketplaceFlashSaleItemPayload[];
+}
+
+interface MarketplaceImageSearchPayload {
+  items?: MarketplaceProductCardPayload[];
+  totalCandidates?: number;
+  mode?: string;
+  indexVersion?: string;
 }
 
 interface BackendCategoryTreeNode {
@@ -563,6 +577,27 @@ export const marketplaceService = {
       page: Number(payload.number || 0),
       size: Number(payload.size || size),
       totalPages: Number(payload.totalPages || 1),
+    };
+  },
+
+  async searchProductsByImage(file: File, limit = 120): Promise<MarketplaceImageSearchData> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('limit', String(Math.max(1, limit)));
+
+    const payload = await apiRequest<MarketplaceImageSearchPayload>(
+      '/api/public/marketplace/search/image',
+      {
+        method: 'POST',
+        body: formData,
+      },
+    );
+
+    return {
+      items: (payload.items || []).map(mapProductCard),
+      totalCandidates: Math.max(0, Number(payload.totalCandidates || 0)),
+      mode: (payload.mode || '').trim() || undefined,
+      indexVersion: (payload.indexVersion || '').trim() || undefined,
     };
   },
 };

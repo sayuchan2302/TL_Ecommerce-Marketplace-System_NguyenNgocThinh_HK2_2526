@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, Heart, Menu, X, ChevronDown, Bell, Store, LayoutGrid } from 'lucide-react';
+import { Search, ShoppingCart, Heart, Menu, X, ChevronDown, Bell, Store, LayoutGrid, Camera } from 'lucide-react';
 import SearchDropdown from '../SearchDropdown/SearchDropdown';
+import HeaderImageSearchModal from './HeaderImageSearchModal';
 import NotificationDropdown from '../NotificationDropdown/NotificationDropdown';
 import { useCartAnimation } from '../../context/CartAnimationContext';
 import { useCart } from '../../contexts/CartContext';
@@ -17,9 +18,15 @@ import {
 import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_TOAST_MESSAGES } from '../../utils/clientMessages';
 import { resolveAvatarSrc } from '../../utils/avatar';
+import { extractImageFileFromClipboard, imageSearchSession } from '../../utils/imageSearchSession';
 import './Header.css';
 
 type SearchScope = 'products' | 'stores';
+
+interface ImageSearchDraft {
+  file: File;
+  previewUrl: string;
+}
 
 const FALLBACK_HEADER_CATEGORY_TREE: MarketplaceHeaderCategoryRoot[] = [
   {
@@ -149,6 +156,9 @@ const Header = () => {
   const { unreadCount } = useNotifications();
   const [searchScope, setSearchScope] = useState<SearchScope>('products');
   const [categoryTree, setCategoryTree] = useState<MarketplaceHeaderCategoryRoot[]>(FALLBACK_HEADER_CATEGORY_TREE);
+  const imageInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [isImageSearchModalOpen, setIsImageSearchModalOpen] = useState(false);
+  const [imageSearchDraft, setImageSearchDraft] = useState<ImageSearchDraft | null>(null);
 
   const toggleMobileSubMenu = (menuId: string) => {
     setExpandedMobileMenu((prev) => (prev === menuId ? null : menuId));
@@ -186,6 +196,69 @@ const Header = () => {
     };
   }, []);
 
+  const clearImageSearchDraft = React.useCallback(() => {
+    setImageSearchDraft((current) => {
+      if (current?.previewUrl) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+      return null;
+    });
+  }, []);
+
+  const setImageSearchDraftFile = React.useCallback((file: File) => {
+    const previewUrl = URL.createObjectURL(file);
+    setImageSearchDraft((current) => {
+      if (current?.previewUrl) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+      return { file, previewUrl };
+    });
+  }, []);
+
+  const closeImageSearchModal = React.useCallback(() => {
+    setIsImageSearchModalOpen(false);
+    clearImageSearchDraft();
+  }, [clearImageSearchDraft]);
+
+  React.useEffect(() => {
+    if (!isImageSearchModalOpen) {
+      document.body.classList.remove('header-image-modal-open');
+      return undefined;
+    }
+
+    document.body.classList.add('header-image-modal-open');
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeImageSearchModal();
+      }
+    };
+
+    const handlePaste = (event: ClipboardEvent) => {
+      const file = extractImageFileFromClipboard(event.clipboardData ?? null);
+      if (!file) {
+        return;
+      }
+
+      event.preventDefault();
+      setImageSearchDraftFile(file);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('paste', handlePaste);
+
+    return () => {
+      document.body.classList.remove('header-image-modal-open');
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('paste', handlePaste);
+    };
+  }, [closeImageSearchModal, isImageSearchModalOpen, setImageSearchDraftFile]);
+
+  React.useEffect(() => () => {
+    document.body.classList.remove('header-image-modal-open');
+    clearImageSearchDraft();
+  }, [clearImageSearchDraft]);
+
   const handleSearchSubmit = (query: string, scope: SearchScope = searchScope) => {
     if (query.trim()) {
       searchService.addToHistory(query);
@@ -196,6 +269,53 @@ const Header = () => {
       navigate(`/search?${params.toString()}`);
       setIsSearchDropdownOpen(false);
     }
+  };
+
+  const triggerImageSearch = () => {
+    setIsSearchDropdownOpen(false);
+    closeMobileMenu();
+    setIsImageSearchModalOpen(true);
+  };
+
+  const triggerImagePicker = () => {
+    imageInputRef.current?.click();
+  };
+
+  const handleImageInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+
+    setImageSearchDraftFile(file);
+  };
+
+  const handleModalPaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const file = extractImageFileFromClipboard(event.clipboardData);
+    if (!file) {
+      return;
+    }
+
+    event.preventDefault();
+    setImageSearchDraftFile(file);
+  };
+
+  const handleImageSearchConfirm = () => {
+    if (!imageSearchDraft) {
+      return;
+    }
+
+    imageSearchSession.setPendingFile(imageSearchDraft.file);
+    setSearchScope('products');
+    setIsSearchDropdownOpen(false);
+    setIsImageSearchModalOpen(false);
+    clearImageSearchDraft();
+
+    const params = new URLSearchParams();
+    params.set('scope', 'products');
+    params.set('imageSearch', `${Date.now()}`);
+    navigate(`/search?${params.toString()}`);
   };
 
   const toCategoryLink = (slug?: string) => {
@@ -266,6 +386,13 @@ const Header = () => {
         </nav>
 
         <div className="header-actions">
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="header-image-input"
+            onChange={handleImageInputChange}
+          />
           <form className="search-box" onSubmit={(e) => { e.preventDefault(); handleSearchSubmit(searchValue); }}>
             <label className="search-scope-wrap" htmlFor="header-search-scope">
               <select
@@ -289,6 +416,15 @@ const Header = () => {
               onFocus={() => setIsSearchDropdownOpen(true)}
               aria-label={CLIENT_TEXT.common.actions.search}
             />
+            <button
+              type="button"
+              className="search-image-btn"
+              onClick={triggerImageSearch}
+              aria-label="Tìm kiếm bằng hình ảnh"
+              title="Tìm kiếm bằng hình ảnh"
+            >
+              <Camera size={18} />
+            </button>
             <SearchDropdown
               isOpen={isSearchDropdownOpen}
               onClose={() => setIsSearchDropdownOpen(false)}
@@ -432,6 +568,14 @@ const Header = () => {
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
           />
+          <button
+            type="button"
+            className="mobile-search-image-btn"
+            onClick={triggerImageSearch}
+            aria-label="Tìm kiếm bằng hình ảnh"
+          >
+            <Camera size={18} />
+          </button>
         </form>
 
         <nav className="mobile-nav">
@@ -522,6 +666,14 @@ const Header = () => {
           <Link to="/returns" onClick={closeMobileMenu}><Search size={18} /> Đổi / Trả hàng</Link>
         </div>
       </div>
+      <HeaderImageSearchModal
+        isOpen={isImageSearchModalOpen}
+        imageSearchDraft={imageSearchDraft}
+        onClose={closeImageSearchModal}
+        onPickImage={triggerImagePicker}
+        onPaste={handleModalPaste}
+        onConfirm={handleImageSearchConfirm}
+      />
     </header>
   );
 };

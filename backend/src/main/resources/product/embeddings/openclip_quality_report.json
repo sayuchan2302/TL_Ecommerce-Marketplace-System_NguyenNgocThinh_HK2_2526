@@ -1,0 +1,37 @@
+{
+  "summary": {
+    "input_rows": 4730,
+    "metadata_rows": 4730,
+    "embedding_rows": 4730,
+    "embedding_dim": 512,
+    "coverage_pct": 100.0
+  },
+  "integrity": {
+    "metadata_matches_embeddings": true,
+    "input_key_coverage_pct": 100.0,
+    "missing_input_keys": 0,
+    "extra_metadata_keys": 0,
+    "all_finite": true,
+    "has_nan": false,
+    "has_inf": false
+  },
+  "normalization": {
+    "norm_min": 0.9999998807907104,
+    "norm_max": 1.0000001192092896,
+    "norm_mean": 1.0,
+    "norm_std": 2.2978792202366094e-08,
+    "pct_norm_within_1e3": 100.0
+  },
+  "duplicates": {
+    "duplicate_image_url_rows": 81,
+    "duplicate_image_url_groups": 39,
+    "duplicate_url_groups_cross_product": 39,
+    "duplicate_vector_rows_exact": 109,
+    "duplicate_vector_groups_exact": 52
+  },
+  "retrieval_sanity": {
+    "nn1_same_product_pct": 35.518,
+    "top5_contains_same_product_pct": 59.9577,
+    "nn1_similarity_mean": 0.8752963542938232
+  }
+}

@@ -72,6 +72,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/api/internal/vision/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/vouchers/public").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/ipn").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/payments/vnpay/return/verify").permitAll()

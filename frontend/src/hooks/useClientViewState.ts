@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 type SortDirection = 'asc' | 'desc';
-type SortKey = 'newest' | 'bestseller' | 'price-asc' | 'price-desc' | 'discount';
+type SortKey = 'newest' | 'bestseller' | 'price-asc' | 'price-desc' | 'discount' | 'relevance';
 type FilterQueryState = {
   query: string;
   category: string;

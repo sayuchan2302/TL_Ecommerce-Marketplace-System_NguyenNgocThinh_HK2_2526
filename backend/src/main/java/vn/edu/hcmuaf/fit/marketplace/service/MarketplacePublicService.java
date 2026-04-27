@@ -5,13 +5,18 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vn.edu.hcmuaf.fit.marketplace.config.VisionSearchProperties;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceFlashSaleItemResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceFlashSaleResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceHomeResponse;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceImageSearchResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceProductCardResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.MarketplaceStoreCardResponse;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.VisionCatalogItemResponse;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.VisionCatalogPageResponse;
 import vn.edu.hcmuaf.fit.marketplace.entity.Category;
 import vn.edu.hcmuaf.fit.marketplace.entity.FlashSaleCampaign;
 import vn.edu.hcmuaf.fit.marketplace.entity.FlashSaleItem;
@@ -24,6 +29,8 @@ import vn.edu.hcmuaf.fit.marketplace.repository.FlashSaleCampaignRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.FlashSaleItemRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ProductRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.ArrayDeque;
@@ -55,19 +62,25 @@ public class MarketplacePublicService {
     private final CategoryRepository categoryRepository;
     private final FlashSaleCampaignRepository flashSaleCampaignRepository;
     private final FlashSaleItemRepository flashSaleItemRepository;
+    private final VisionSearchClient visionSearchClient;
+    private final VisionSearchProperties visionSearchProperties;
 
     public MarketplacePublicService(
             ProductRepository productRepository,
             StoreRepository storeRepository,
             CategoryRepository categoryRepository,
             FlashSaleCampaignRepository flashSaleCampaignRepository,
-            FlashSaleItemRepository flashSaleItemRepository
+            FlashSaleItemRepository flashSaleItemRepository,
+            VisionSearchClient visionSearchClient,
+            VisionSearchProperties visionSearchProperties
     ) {
         this.productRepository = productRepository;
         this.storeRepository = storeRepository;
         this.categoryRepository = categoryRepository;
         this.flashSaleCampaignRepository = flashSaleCampaignRepository;
         this.flashSaleItemRepository = flashSaleItemRepository;
+        this.visionSearchClient = visionSearchClient;
+        this.visionSearchProperties = visionSearchProperties;
     }
 
     @Transactional(readOnly = true)
@@ -161,6 +174,68 @@ public class MarketplacePublicService {
     }
 
     @Transactional(readOnly = true)
+    public MarketplaceImageSearchResponse searchProductsByImage(MultipartFile file, int limit) {
+        validateImageSearchFile(file);
+        int resolvedLimit = Math.min(Math.max(limit, 1), Math.max(1, visionSearchProperties.getMaxCandidates()));
+
+        VisionSearchClient.VisionSearchResult rawResult = visionSearchClient.searchImage(file, resolvedLimit);
+        List<UUID> rankedIds = rawResult.candidates().stream()
+                .map(VisionSearchClient.VisionCandidate::backendProductId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (rankedIds.isEmpty()) {
+            return MarketplaceImageSearchResponse.builder()
+                    .items(List.of())
+                    .totalCandidates(0)
+                    .mode("image")
+                    .indexVersion(rawResult.indexVersion())
+                    .build();
+        }
+
+        List<Product> products = productRepository.findPublicMarketplaceProductsByIds(rankedIds);
+        Map<UUID, Product> productsById = products.stream()
+                .filter(product -> product.getId() != null)
+                .collect(Collectors.toMap(Product::getId, product -> product, (left, right) -> left, LinkedHashMap::new));
+        Map<UUID, Store> storesById = loadStoresByProductOwnership(products);
+
+        List<MarketplaceProductCardResponse> items = rankedIds.stream()
+                .map(productsById::get)
+                .filter(Objects::nonNull)
+                .map(product -> toProductCardResponse(product, storesById.get(product.getStoreId())))
+                .limit(resolvedLimit)
+                .toList();
+
+        return MarketplaceImageSearchResponse.builder()
+                .items(items)
+                .totalCandidates(rawResult.totalCandidates())
+                .mode("image")
+                .indexVersion(rawResult.indexVersion())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public VisionCatalogPageResponse exportVisionCatalog(Pageable pageable) {
+        Pageable resolved = resolveVisionCatalogPageable(pageable);
+        Page<Product> productPage = productRepository.findPublicMarketplaceProducts(resolved);
+        Map<UUID, Store> storesById = loadStoresByProductOwnership(productPage.getContent());
+
+        List<VisionCatalogItemResponse> rows = productPage.getContent().stream()
+                .flatMap(product -> mapVisionCatalogRows(product, storesById.get(product.getStoreId())).stream())
+                .toList();
+
+        return VisionCatalogPageResponse.builder()
+                .items(rows)
+                .totalProducts(productPage.getTotalElements())
+                .page(productPage.getNumber())
+                .size(productPage.getSize())
+                .totalPages(productPage.getTotalPages())
+                .generatedAt(LocalDateTime.now())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
     public MarketplaceFlashSaleResponse getActiveFlashSale() {
         LocalDateTime now = LocalDateTime.now();
         FlashSaleCampaign campaign = flashSaleCampaignRepository.findFirstActiveAt(now).orElse(null);
@@ -249,6 +324,20 @@ public class MarketplacePublicService {
             );
         }
 
+        return pageable;
+    }
+
+    private Pageable resolveVisionCatalogPageable(Pageable pageable) {
+        if (pageable == null) {
+            return PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "updatedAt"));
+        }
+        if (pageable.getSort().isUnsorted()) {
+            return PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by(Sort.Direction.DESC, "updatedAt")
+            );
+        }
         return pageable;
     }
 
@@ -414,6 +503,35 @@ public class MarketplacePublicService {
                 .variants(resolveVariants(product))
                 .createdAt(product.getCreatedAt())
                 .build();
+    }
+
+    private List<VisionCatalogItemResponse> mapVisionCatalogRows(Product product, Store store) {
+        if (product == null || product.getId() == null || product.getStoreId() == null || store == null) {
+            return List.of();
+        }
+
+        List<ProductImage> images = product.getImages();
+        if (images == null || images.isEmpty()) {
+            return List.of();
+        }
+
+        return images.stream()
+                .filter(Objects::nonNull)
+                .filter(image -> hasText(image.getUrl()))
+                .sorted(Comparator
+                        .comparing((ProductImage image) -> image.getSortOrder() == null ? Integer.MAX_VALUE : image.getSortOrder())
+                        .thenComparing(image -> !Boolean.TRUE.equals(image.getIsPrimary())))
+                .map(image -> VisionCatalogItemResponse.builder()
+                        .backendProductId(product.getId())
+                        .productSlug(product.getSlug())
+                        .storeId(product.getStoreId())
+                        .storeSlug(store.getSlug())
+                        .categorySlug(product.getCategory() != null ? product.getCategory().getSlug() : null)
+                        .imageUrl(image.getUrl().trim())
+                        .imageIndex(image.getSortOrder() == null ? 0 : image.getSortOrder())
+                        .isPrimary(Boolean.TRUE.equals(image.getIsPrimary()))
+                        .build())
+                .toList();
     }
 
     private boolean hasAvailableStock(Product product) {
@@ -647,5 +765,18 @@ public class MarketplacePublicService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private void validateImageSearchFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file is required");
+        }
+        if (file.getSize() > Math.max(1L, visionSearchProperties.getMaxUploadSizeBytes())) {
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Image file is too large");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Uploaded file must be an image");
+        }
     }
 }

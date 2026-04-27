@@ -1,17 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { SlidersHorizontal, ChevronRight, Clock, Trash2, X, Search as SearchIcon } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight, Clock, Search as SearchIcon, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import FilterSidebar from '../../components/FilterSidebar/FilterSidebar';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
 import EmptySearchState from '../../components/EmptySearchState/EmptySearchState';
+import SearchImageLandingHero from './components/SearchImageLandingHero';
+import SearchImageQueryPanel from './components/SearchImageQueryPanel';
+import { ApiError } from '../../services/apiClient';
 import { searchService } from '../../services/searchService';
 import { CLIENT_TEXT } from '../../utils/texts';
+import {
+  extractImageFileFromClipboard,
+  imageSearchSession as pendingImageSearchSession,
+} from '../../utils/imageSearchSession';
 import { useClientViewState } from '../../hooks/useClientViewState';
 import {
   marketplaceService,
-  type MarketplaceStoreCard,
   type MarketplaceFlashSaleItem,
+  type MarketplaceStoreCard,
 } from '../../services/marketplaceService';
 import type { Product } from '../../types';
 import {
@@ -23,6 +30,20 @@ import './Search.css';
 
 const t = CLIENT_TEXT.search;
 type SearchScope = 'products' | 'stores';
+
+interface ImageSearchSession {
+  fileName: string;
+  previewUrl: string;
+  totalCandidates: number;
+}
+const isEditableTarget = (target: EventTarget | null): boolean => {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  const tagName = target.tagName.toLowerCase();
+  return target.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+};
 
 const mapFlashSaleItemsToProducts = (items: MarketplaceFlashSaleItem[]): Product[] =>
   (items || []).map((item) => {
@@ -68,23 +89,46 @@ const Search = () => {
   const query = searchParams.get('q') || '';
   const scope: SearchScope = searchParams.get('scope') === 'stores' ? 'stores' : 'products';
   const isFlashSaleMode = searchParams.get('flashSale') === '1';
+  const imageSearchToken = searchParams.get('imageSearch') || '';
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [productResults, setProductResults] = useState<Product[]>([]);
   const [storeResults, setStoreResults] = useState<MarketplaceStoreCard[]>([]);
   const [history, setHistory] = useState<string[]>(() => searchService.getRecentSearches());
-  const view = useClientViewState({ validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
+  const [imageSearchSession, setImageSearchSession] = useState<ImageSearchSession | null>(null);
+  const [imageSearchError, setImageSearchError] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const consumedImageTokenRef = useRef<string | null>(null);
+  const pasteTargetRef = useRef<HTMLDivElement | null>(null);
+  const isImageSearchMode = Boolean(imageSearchSession);
+  const view = useClientViewState({
+    validSortKeys: ['relevance', 'newest', 'bestseller', 'price-asc', 'price-desc', 'discount'],
+  });
 
   const clearSearchResults = useCallback(() => {
     setProductResults([]);
     setStoreResults([]);
   }, []);
 
+  const clearImageSearchState = useCallback((clearResults = false) => {
+    setImageSearchError(null);
+    setImageSearchSession((current) => {
+      if (current?.previewUrl) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+      return null;
+    });
+    if (clearResults) {
+      clearSearchResults();
+    }
+  }, [clearSearchResults]);
+
   const refreshHistory = useCallback(() => {
     setHistory(searchService.getRecentSearches());
   }, []);
 
   const updateSearchParams = useCallback((nextQuery: string, nextScope: SearchScope) => {
+    clearImageSearchState(true);
     const normalizedQuery = nextQuery.trim();
     const params = new URLSearchParams();
     if (normalizedQuery) {
@@ -92,12 +136,122 @@ const Search = () => {
     }
     params.set('scope', nextScope);
     setSearchParams(params);
-  }, [setSearchParams]);
+  }, [clearImageSearchState, setSearchParams]);
+
+  const triggerImagePicker = () => {
+    imageInputRef.current?.click();
+  };
+
+  const focusPasteTarget = () => {
+    pasteTargetRef.current?.focus();
+  };
+
+  const handleImageSearch = useCallback(async (file: File) => {
+    setIsSearching(true);
+    setImageSearchError(null);
+    const previewUrl = URL.createObjectURL(file);
+
+    try {
+      const response = await marketplaceService.searchProductsByImage(file, 120);
+      setProductResults(response.items);
+      setStoreResults([]);
+      setImageSearchSession({
+        fileName: file.name,
+        previewUrl,
+        totalCandidates: response.totalCandidates,
+      });
+    } catch (error) {
+      URL.revokeObjectURL(previewUrl);
+      clearSearchResults();
+      setImageSearchSession(null);
+      setImageSearchError(
+        error instanceof ApiError
+          ? error.message
+          : 'Không thể tìm kiếm bằng ảnh lúc này.',
+      );
+    } finally {
+      setIsSearching(false);
+    }
+  }, [clearSearchResults]);
+
+  const handleImageInputChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) {
+      return;
+    }
+    await handleImageSearch(file);
+  };
+
+  const handleClipboardImage = useCallback(async (clipboardData: DataTransfer | null) => {
+    const file = extractImageFileFromClipboard(clipboardData);
+    if (!file) {
+      return false;
+    }
+
+    await handleImageSearch(file);
+    return true;
+  }, [handleImageSearch]);
+
+  const handlePasteTargetPaste = async (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const pasted = await handleClipboardImage(event.clipboardData);
+    if (!pasted) {
+      return;
+    }
+    event.preventDefault();
+  };
+
+  useEffect(() => {
+    if (!imageSearchToken || consumedImageTokenRef.current === imageSearchToken) {
+      return;
+    }
+
+    const pendingFile = pendingImageSearchSession.consumePendingFile();
+    if (!pendingFile) {
+      return;
+    }
+
+    consumedImageTokenRef.current = imageSearchToken;
+    void handleImageSearch(pendingFile);
+  }, [handleImageSearch, imageSearchToken]);
+
+  useEffect(() => {
+    const handleWindowPaste = (event: ClipboardEvent) => {
+      if (isEditableTarget(event.target)) {
+        return;
+      }
+
+      const file = extractImageFileFromClipboard(event.clipboardData ?? null);
+      if (!file) {
+        return;
+      }
+
+      event.preventDefault();
+      void handleImageSearch(file);
+    };
+
+    window.addEventListener('paste', handleWindowPaste);
+    return () => {
+      window.removeEventListener('paste', handleWindowPaste);
+    };
+  }, [handleImageSearch]);
+
+  useEffect(() => {
+    return () => {
+      if (imageSearchSession?.previewUrl) {
+        URL.revokeObjectURL(imageSearchSession.previewUrl);
+      }
+    };
+  }, [imageSearchSession?.previewUrl]);
 
   useEffect(() => {
     let cancelled = false;
 
     const fetchResults = async () => {
+      if (isImageSearchMode) {
+        return;
+      }
+
       if (isFlashSaleMode) {
         setIsSearching(true);
         try {
@@ -153,14 +307,17 @@ const Search = () => {
     return () => {
       cancelled = true;
     };
-  }, [clearSearchResults, isFlashSaleMode, query, scope]);
+  }, [clearSearchResults, isFlashSaleMode, isImageSearchMode, query, scope]);
 
   const filteredResults = useMemo(() => {
-    const source = isFlashSaleMode ? productResults : (query && scope === 'products' ? productResults : []);
-    if (!isFlashSaleMode && !query) {
+    const source = (isFlashSaleMode || isImageSearchMode || (query && scope === 'products'))
+      ? productResults
+      : [];
+
+    if (!isFlashSaleMode && !isImageSearchMode && !query) {
       return [];
     }
-    if (!isFlashSaleMode && scope !== 'products') {
+    if (!isFlashSaleMode && !isImageSearchMode && scope !== 'products') {
       return [];
     }
 
@@ -175,6 +332,7 @@ const Search = () => {
     return filterProducts(source, filterState);
   }, [
     isFlashSaleMode,
+    isImageSearchMode,
     query,
     scope,
     productResults,
@@ -216,35 +374,65 @@ const Search = () => {
     updateSearchParams(query, nextScope);
   };
 
-  const showLanding = !query && !isFlashSaleMode;
-  const hasNoResults = isFlashSaleMode
+  const isAwaitingImageSearch = Boolean(imageSearchToken) && !isImageSearchMode && pendingImageSearchSession.hasPendingFile();
+  const isImageSearchPage = isImageSearchMode || isAwaitingImageSearch;
+  const effectiveSortKey = isImageSearchPage && !searchParams.get('sort') ? 'relevance' : view.sortKey;
+  const showLanding = !query && !isFlashSaleMode && !isImageSearchPage;
+  const hasNoResults = isAwaitingImageSearch
+    ? false
+    : isImageSearchMode
     ? filteredResults.length === 0
-    : scope === 'stores'
-      ? storeResults.length === 0
-      : filteredResults.length === 0;
+    : isFlashSaleMode
+      ? filteredResults.length === 0
+      : scope === 'stores'
+        ? storeResults.length === 0
+        : filteredResults.length === 0;
+  const isLoadingResults = isSearching || isAwaitingImageSearch;
 
-  const headerTitle = isFlashSaleMode ? 'Flash Sale' : t.page.resultsFor(query);
-  const headerCount = isFlashSaleMode
-    ? `(${t.page.productCount(filteredResults.length)})`
-    : scope === 'stores'
-      ? `(${storeResults.length} cửa hàng)`
-      : `(${t.page.productCount(filteredResults.length)})`;
+  const headerTitle = isImageSearchPage
+    ? 'Kết quả tìm kiếm bằng ảnh'
+    : isFlashSaleMode
+      ? 'Flash Sale'
+      : t.page.resultsFor(query);
+  const headerCount = isImageSearchPage
+    ? imageSearchSession
+      ? `(${imageSearchSession.totalCandidates || filteredResults.length} sản phẩm)`
+      : ''
+    : isFlashSaleMode
+      ? `(${t.page.productCount(filteredResults.length)})`
+      : scope === 'stores'
+        ? `(${storeResults.length} cửa hàng)`
+        : `(${t.page.productCount(filteredResults.length)})`;
 
   return (
     <div className="search-page">
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="search-image-input"
+        onChange={(event) => void handleImageInputChange(event)}
+      />
+
       <div className="breadcrumb-wrapper">
         <div className="container">
           <nav className="breadcrumbs">
             <Link to="/" className="breadcrumb-link">{CLIENT_TEXT.common.breadcrumb.home}</Link>
             <ChevronRight size={14} className="breadcrumb-separator" />
             <span className="breadcrumb-current">
-              {isFlashSaleMode ? 'Flash Sale' : CLIENT_TEXT.common.actions.search}
+              {isImageSearchPage ? 'Tìm kiếm bằng ảnh' : isFlashSaleMode ? 'Flash Sale' : CLIENT_TEXT.common.actions.search}
             </span>
           </nav>
         </div>
       </div>
 
       <div className="search-page-container container">
+        {imageSearchError && (
+          <div className="search-image-error" role="alert">
+            {imageSearchError}
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           {showLanding ? (
             <motion.div
@@ -255,6 +443,13 @@ const Search = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
+              <SearchImageLandingHero
+                pasteTargetRef={pasteTargetRef}
+                onPickImage={triggerImagePicker}
+                onFocusPasteTarget={focusPasteTarget}
+                onPaste={(event) => void handlePasteTargetPaste(event)}
+              />
+
               {history.length > 0 && (
                 <div className="search-history-section">
                   <div className="search-section-header">
@@ -293,7 +488,7 @@ const Search = () => {
 
               <div className="search-popular">
                 <h3 className="search-section-title">
-                  <SearchIcon size={16} /> {t.dropdown.popularKeywords}
+                  <SearchIcon size={16} aria-hidden="true" /> {t.dropdown.popularKeywords}
                 </h3>
                 <div className="search-keywords">
                   {searchService.getPopularKeywords().map((keyword, index) => (
@@ -327,7 +522,20 @@ const Search = () => {
                 <span className="plp-count">{headerCount}</span>
               </div>
 
-              {!isFlashSaleMode && (
+              {isImageSearchMode && imageSearchSession && (
+                <SearchImageQueryPanel
+                  fileName={imageSearchSession.fileName}
+                  previewUrl={imageSearchSession.previewUrl}
+                  totalCandidates={imageSearchSession.totalCandidates}
+                  pasteTargetRef={pasteTargetRef}
+                  onPickImage={triggerImagePicker}
+                  onFocusPasteTarget={focusPasteTarget}
+                  onClear={() => clearImageSearchState(true)}
+                  onPaste={(event) => void handlePasteTargetPaste(event)}
+                />
+              )}
+
+              {!isFlashSaleMode && !isImageSearchPage && (
                 <div className="search-scope-switch">
                   <button
                     className={scope === 'products' ? 'active' : ''}
@@ -344,15 +552,21 @@ const Search = () => {
                 </div>
               )}
 
-              {isSearching ? (
+              {isLoadingResults ? (
                 <div className="search-loading-state">
-                  {isFlashSaleMode ? 'Đang tải sản phẩm Flash Sale...' : 'Đang tìm kiếm...'}
+                  {isImageSearchPage
+                    ? 'Đang phân tích ảnh và tìm sản phẩm phù hợp...'
+                    : isFlashSaleMode
+                      ? 'Đang tải sản phẩm Flash Sale...'
+                      : 'Đang tìm kiếm...'}
                 </div>
               ) : hasNoResults ? (
-                (scope === 'products' || isFlashSaleMode)
+                (scope === 'products' || isFlashSaleMode || isImageSearchPage)
                   ? (isFlashSaleMode
                       ? <div className="store-empty-state"><p>Hiện chưa có sản phẩm Flash Sale đang hoạt động.</p></div>
-                      : <EmptySearchState query={query} />)
+                      : isImageSearchPage
+                        ? <div className="store-empty-state"><p>Không tìm thấy sản phẩm phù hợp với ảnh bạn đã tải lên.</p></div>
+                        : <EmptySearchState query={query} />)
                   : <div className="store-empty-state"><p>Không tìm thấy cửa hàng phù hợp cho "{query}".</p></div>
               ) : scope === 'stores' ? (
                 <div className="store-results-grid">
@@ -441,8 +655,11 @@ const Search = () => {
                         genders: view.genders,
                         fits: view.fits,
                         materials: view.materials,
-                        sortKey: view.sortKey,
+                        sortKey: effectiveSortKey,
                         setSort: (value) => view.setSort(value),
+                        availableSortKeys: isImageSearchPage
+                          ? ['relevance', 'newest', 'bestseller', 'price-asc', 'price-desc', 'discount']
+                          : ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'],
                       }}
                     />
                   </main>
@@ -457,3 +674,4 @@ const Search = () => {
 };
 
 export default Search;
+

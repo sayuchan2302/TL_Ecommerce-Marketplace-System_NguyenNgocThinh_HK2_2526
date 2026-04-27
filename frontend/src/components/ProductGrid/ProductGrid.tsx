@@ -26,6 +26,7 @@ interface ProductGridViewState {
   materials: string[];
   sortKey: ProductSortKey;
   setSort: (value: ProductSortKey) => void;
+  availableSortKeys?: readonly ProductSortKey[];
 }
 
 interface ProductGridProps {
@@ -68,6 +69,18 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
   const [pageByScope, setPageByScope] = useState<Record<string, number>>({});
   const internalView = useClientViewState({ validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
   const view = viewState ?? internalView;
+  const sortOptions: Array<{ key: ProductSortKey; label: string }> = [
+    { key: 'relevance', label: 'Liên quan nhất' },
+    { key: 'newest', label: t.sort.newest },
+    { key: 'bestseller', label: t.sort.bestseller },
+    { key: 'price-asc', label: t.sort.priceAsc },
+    { key: 'price-desc', label: t.sort.priceDesc },
+    { key: 'discount', label: t.sort.discount },
+  ];
+  const availableSortKeys = ('availableSortKeys' in view && view.availableSortKeys)
+    ? view.availableSortKeys
+    : ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'];
+  const visibleSortOptions = sortOptions.filter((option) => availableSortKeys.includes(option.key));
 
   useEffect(() => {
     let isMounted = true;
@@ -187,11 +200,9 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
             value={view.sortKey}
             onChange={(e) => view.setSort(e.target.value as ProductSortKey)}
           >
-            <option value="newest">{t.sort.newest}</option>
-            <option value="bestseller">{t.sort.bestseller}</option>
-            <option value="price-asc">{t.sort.priceAsc}</option>
-            <option value="price-desc">{t.sort.priceDesc}</option>
-            <option value="discount">{t.sort.discount}</option>
+            {visibleSortOptions.map((option) => (
+              <option key={option.key} value={option.key}>{option.label}</option>
+            ))}
           </select>
         </div>
       </div>

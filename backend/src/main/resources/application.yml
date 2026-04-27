@@ -50,9 +50,9 @@ app:
     max-review-image-size-bytes: ${APP_UPLOAD_MAX_REVIEW_IMAGE_SIZE_BYTES:5242880}
     max-return-evidence-size-bytes: ${APP_UPLOAD_MAX_RETURN_EVIDENCE_SIZE_BYTES:5242880}
   seed:
-    enabled: ${APP_SEED_ENABLED:true}
+    enabled: ${APP_SEED_ENABLED:false}
     gap:
-      enabled: ${APP_SEED_GAP_ENABLED:true}
+      enabled: ${APP_SEED_GAP_ENABLED:false}
       target-count: ${APP_SEED_GAP_TARGET_COUNT:1000}
       styles-path: ${APP_SEED_GAP_STYLES_PATH:backend/src/main/resources/product/styles.csv}
       images-path: ${APP_SEED_GAP_IMAGES_PATH:backend/src/main/resources/product/images.csv}
@@ -62,6 +62,14 @@ app:
     direct-line-secret: ${BOT_DIRECT_LINE_SECRET:}
     direct-line-token-endpoint: ${BOT_DIRECT_LINE_TOKEN_ENDPOINT:https://directline.botframework.com/v3/directline/tokens/generate}
     direct-line-conversation-endpoint: ${BOT_DIRECT_LINE_CONVERSATION_ENDPOINT:https://directline.botframework.com/v3/directline/conversations}
+  vision:
+    enabled: ${APP_VISION_ENABLED:true}
+    base-url: ${APP_VISION_BASE_URL:http://localhost:8001}
+    internal-secret: ${APP_VISION_INTERNAL_SECRET:}
+    connect-timeout-ms: ${APP_VISION_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${APP_VISION_READ_TIMEOUT_MS:20000}
+    max-candidates: ${APP_VISION_MAX_CANDIDATES:120}
+    max-upload-size-bytes: ${APP_VISION_MAX_UPLOAD_SIZE_BYTES:5242880}
   notifications:
     promotion:
       timezone: ${APP_PROMOTION_NOTIFICATION_TIMEZONE:Asia/Ho_Chi_Minh}

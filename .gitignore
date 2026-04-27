@@ -13,6 +13,7 @@ node_modules
 node_modules/
 frontend/node_modules/
 backend/.m2/
+vision-engine/.venv/
 
 # Build artifacts
 frontend/dist/
@@ -26,6 +27,8 @@ backend/upload/*
 .env.*
 !backend/.env.example
 !frontend/.env.example
+!vision-engine/.env.example
+!vision-engine/.env.local.example
 
 # Logs
 *.log
@@ -48,4 +51,5 @@ AGENTS.md
 .m2
 
 # Local CI runtime files
+.ci-logs-local/
 .ci-logs-local/*.pid

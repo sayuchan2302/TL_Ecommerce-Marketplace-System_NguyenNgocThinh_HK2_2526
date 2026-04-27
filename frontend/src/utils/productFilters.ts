@@ -1,7 +1,7 @@
 import type { Product } from '../types';
 import { resolveColorSwatch } from './colorSwatch';
 
-export type ProductSortKey = 'newest' | 'bestseller' | 'price-asc' | 'price-desc' | 'discount';
+export type ProductSortKey = 'newest' | 'bestseller' | 'price-asc' | 'price-desc' | 'discount' | 'relevance';
 
 export interface PriceRangeOption {
   id: string;
@@ -226,6 +226,7 @@ export const sortProducts = (source: Product[], sortKey: ProductSortKey) => {
         return discountB - discountA;
       });
       break;
+    case 'relevance':
     case 'newest':
     case 'bestseller':
     default:
