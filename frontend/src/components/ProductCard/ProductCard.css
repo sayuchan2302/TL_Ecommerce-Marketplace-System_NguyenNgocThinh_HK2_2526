@@ -242,21 +242,22 @@
 .product-prices {
   display: flex;
   align-items: baseline;
-  gap: var(--space-2);
-  flex-wrap: wrap; /* allow wrapping if price is too long */
+  gap: 6px;
+  flex-wrap: nowrap;
 }
 
 .current-price {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--co-blue);
   line-height: 1;
 }
 
 .original-price {
-  font-size: 14px;
+  font-size: 11px;
   color: var(--co-gray-400);
   text-decoration: line-through;
+  line-height: 1;
 }
 /* Add to d:\project\frontend\src\components\ProductCard\ProductCard.css */
 /* ... */

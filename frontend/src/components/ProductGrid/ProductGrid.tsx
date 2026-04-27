@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import './ProductGrid.css';
-import ProductCard from '../ProductCard/ProductCard';
 import ProductCardSkeleton from '../ProductCardSkeleton/ProductCardSkeleton';
+import ProductCardGrid from '../ProductCardGrid/ProductCardGrid';
 import { productService } from '../../services/productService';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_DICTIONARY } from '../../utils/clientDictionary';
@@ -213,9 +213,15 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
               <ProductCardSkeleton key={index} />
             ))
           : pagedProducts.length > 0
-          ? pagedProducts.map((product) => (
-              <ProductCard key={product.id} {...product} />
-            ))
+          ? (
+              <div className="plp-grid__content">
+                <ProductCardGrid
+                  items={pagedProducts}
+                  getItemKey={(product) => product.id}
+                  mapItemToCardProps={(product) => product}
+                />
+              </div>
+            )
           : (
               <div className="no-products">
                 <p>{dictionary.empty}</p>

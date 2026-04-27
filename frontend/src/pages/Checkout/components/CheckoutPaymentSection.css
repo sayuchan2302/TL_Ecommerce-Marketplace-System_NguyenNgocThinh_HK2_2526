@@ -1,0 +1,117 @@
+﻿.payment-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.payment-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+  background: var(--co-white);
+}
+
+.payment-card:hover {
+  border-color: var(--co-gray-400);
+}
+
+.payment-card.selected {
+  border-color: var(--co-blue);
+  background: var(--co-blue-light);
+}
+
+.payment-card input {
+  display: none;
+}
+
+.radio-circle {
+  width: 10px;
+  height: 10px;
+  position: relative;
+  flex-shrink: 0;
+  transition: border-color 0.2s;
+}
+
+.payment-card.selected .radio-circle {
+  border-color: var(--co-blue);
+}
+
+.payment-card.selected .radio-circle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 6px;
+  height: 6px;
+  background: var(--co-blue);
+  border-radius: 50%;
+}
+
+.payment-info {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  border-radius: 2px;
+  padding: 1px 2px;
+}
+
+.payment-col {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.payment-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.payment-icon {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.payment-name-text {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.payment-sub-text {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.vnpay-promo-badge {
+  display: inline-block;
+  background: var(--co-blue-light);
+  color: var(--co-blue);
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.payment-return-policy {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-top: 16px;
+}
+
+.payment-return-policy a {
+  color: var(--co-blue);
+  text-decoration: underline;
+}

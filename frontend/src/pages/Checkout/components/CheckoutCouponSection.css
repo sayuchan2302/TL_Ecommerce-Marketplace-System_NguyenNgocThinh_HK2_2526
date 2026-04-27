@@ -1,0 +1,178 @@
+﻿.coupon-ticket-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--co-gray-900);
+  margin-top: 8px;
+}
+
+.coupon-ticket-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 14px 0;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  -ms-overflow-style: none;
+}
+
+.coupon-ticket-scroll:hover {
+  cursor: grab;
+}
+
+.coupon-ticket-scroll:active {
+  cursor: grabbing;
+}
+
+.coupon-ticket-scroll::-webkit-scrollbar {
+  height: 3px;
+}
+
+.coupon-ticket-scroll::-webkit-scrollbar-thumb {
+  background: var(--co-gray-300);
+  border-radius: 3px;
+}
+
+.coupon-ticket {
+  background: var(--co-blue-light);
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-width: 240px;
+  display: flex;
+  justify-content: space-between;
+  border-left: 4px dashed var(--border-color);
+  flex-shrink: 0;
+}
+
+.ticket-info strong {
+  font-size: 14px;
+  color: var(--co-blue);
+}
+
+.ticket-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ticket-expiry {
+  font-size: 11px;
+  color: var(--co-gray-400);
+  margin-top: 6px;
+}
+
+.ticket-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.ticket-radio {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--co-gray-400);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.ticket-radio.checked {
+  background: var(--co-green);
+  border-color: var(--co-green);
+  color: white;
+}
+
+.checkout-coupon-box {
+  margin-top: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.input-group-row {
+  display: flex;
+  gap: 8px;
+}
+
+.coupon-input {
+  flex: 1;
+}
+
+.btn-dark-apply {
+  background: var(--co-black);
+  color: var(--co-white);
+  border: none;
+  padding: 0 24px;
+  border-radius: 24px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btn-dark-apply:hover {
+  background: #333;
+}
+
+.btn-dark-apply:disabled {
+  background: var(--co-gray-300);
+  cursor: not-allowed;
+}
+
+.btn-remove-coupon {
+  background: var(--co-red);
+  color: white;
+  border: none;
+  padding: 0 16px;
+  border-radius: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-remove-coupon:hover {
+  background: #dc2626;
+}
+
+.coupon-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--co-red);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.coupon-success {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--co-blue);
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 12px 16px;
+  background-color: var(--co-blue-light);
+  border-radius: 8px;
+}
+
+.coupon-selected {
+  background: #dbeafe;
+  border-left-color: var(--co-blue);
+  cursor: pointer;
+}
+
+.coupon-selected .ticket-info strong {
+  color: var(--co-blue);
+}
+
+.coupon-selected .ticket-radio.checked {
+  background: var(--co-blue);
+  border-color: var(--co-blue);
+  color: var(--co-white);
+}
+
+.coupon-ticket:not(.coupon-selected):hover {
+  background: #e0f2fe;
+  cursor: pointer;
+}

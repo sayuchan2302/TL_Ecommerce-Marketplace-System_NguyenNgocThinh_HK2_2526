@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { X, MapPin, Home, Building2, Phone, Loader2 } from 'lucide-react';
 import { addressService } from '../../services/addressService';
 import type { Address } from '../../types';
@@ -34,7 +34,9 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
   }, []);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     void loadAddresses();
   }, [isOpen, loadAddresses]);
 
@@ -55,27 +57,43 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
 
   const handleSelect = () => {
     const selected = addresses.find((address) => address.id === selectedId);
-    if (!selected) return;
+    if (!selected) {
+      return;
+    }
 
     onSelectAddress(selected);
     onClose();
   };
 
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) onClose();
+  const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   const addressIcon = (address: Address) => {
     const label = (address.detail || '').toLowerCase();
-    if (label.includes('nhà') || label.includes('home')) return <Home size={16} />;
-    if (label.includes('công ty') || label.includes('office') || label.includes('cơ quan')) return <Building2 size={16} />;
+    if (label.includes('nhà') || label.includes('home')) {
+      return <Home size={16} />;
+    }
+    if (label.includes('công ty') || label.includes('office') || label.includes('cơ quan')) {
+      return <Building2 size={16} />;
+    }
     return <MapPin size={16} />;
   };
 
   return (
-    <div className="address-modal-overlay" onClick={handleOverlayClick} role="dialog" aria-modal="true" aria-label="Chọn địa chỉ giao hàng">
+    <div
+      className="address-modal-overlay"
+      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Chọn địa chỉ giao hàng"
+    >
       <div className="address-modal-container">
         <div className="address-modal-header">
           <div className="address-modal-title">
@@ -131,9 +149,7 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
                           {addressIcon(address)}
                           <span className="address-name">{address.fullName}</span>
                         </div>
-                        {address.isDefault && (
-                          <span className="address-badge">Mặc định</span>
-                        )}
+                        {address.isDefault && <span className="address-badge">Mặc định</span>}
                       </div>
                       <div className="address-contact">
                         <Phone size={13} />
@@ -166,4 +182,3 @@ const AddressBookModal = ({ isOpen, onClose, onSelectAddress }: AddressBookModal
 };
 
 export default AddressBookModal;
-

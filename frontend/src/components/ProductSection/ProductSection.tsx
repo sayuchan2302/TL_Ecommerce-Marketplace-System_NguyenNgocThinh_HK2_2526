@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import './ProductSection.css';
 import ProductCard from '../ProductCard/ProductCard';
+import ProductCardGrid from '../ProductCardGrid/ProductCardGrid';
 
 interface ProductSectionItem {
   id: number | string;
@@ -108,13 +109,17 @@ const ProductSection = ({
           </button>
         </div>
       ) : (
-        <div className="product-grid product-grid-static">
-          {visibleProducts.map((product) => (
-            <div key={product.id} className="grid-item">
-              <ProductCard {...product} staticMode={staticCards} showQuickView={showQuickView} onQuickAdd={onQuickAdd} />
-            </div>
-          ))}
-        </div>
+        <ProductCardGrid
+          items={visibleProducts}
+          className="product-grid-static"
+          getItemKey={(product) => product.id}
+          mapItemToCardProps={(product) => ({
+            ...product,
+            staticMode: staticCards,
+            showQuickView,
+            onQuickAdd,
+          })}
+        />
       )}
     </section>
   );

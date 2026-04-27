@@ -1,0 +1,36 @@
+﻿.address-book-toggle-btn {
+  color: var(--co-blue);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.address-book-toggle-btn:hover {
+  text-decoration: underline;
+}
+
+.save-address-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--co-gray-600);
+}
+
+.save-address-checkbox input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.save-address-checkbox:hover {
+  color: var(--co-admin-text);
+}

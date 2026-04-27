@@ -15,6 +15,7 @@ import AddressModal from './AddressModal';
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
 import ReviewModal from '../../components/ReviewModal/ReviewModal';
 import ProfileTabContent from './components/ProfileTabContent';
+import type { PendingProduct } from './components/ProfileTabContent.types';
 import ProfileAccountModal from './components/ProfileAccountModal';
 import ProfilePasswordModal from './components/ProfilePasswordModal';
 import ProfileFollowingModal from './components/ProfileFollowingModal';
@@ -46,15 +47,6 @@ type TabId = 'account' | 'orders' | 'vouchers' | 'addresses' | 'reviews' | 'noti
 const VALID_PROFILE_TABS: TabId[] = ['account', 'orders', 'vouchers', 'addresses', 'reviews', 'notifications'];
 const NOTIFICATIONS_PREVIEW_LIMIT = 7;
 const VOUCHERS_PER_PAGE = 10;
-
-interface PendingProduct {
-  productId: string;
-  productName: string;
-  productImage: string;
-  orderId: string;
-  orderCode?: string;
-  variant: string;
-}
 
 const mapEligibleReview = (item: EligibleReviewItem): PendingProduct => {
   const details = [

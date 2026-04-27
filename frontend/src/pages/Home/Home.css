@@ -56,21 +56,6 @@
   font-style: normal;
 }
 
-/* Keep price and original price on one row like Flash Sale cards */
-.home-page .product-prices {
-  flex-wrap: nowrap;
-  gap: 6px;
-}
-
-.home-page .product-prices .current-price {
-  font-size: 14px;
-}
-
-.home-page .product-prices .original-price {
-  font-size: 11px;
-  line-height: 1;
-}
-
 .home-page .categories-section {
   margin-top: var(--space-12);
   margin-bottom: 0;

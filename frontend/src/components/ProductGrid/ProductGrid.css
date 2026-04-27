@@ -72,6 +72,10 @@
   contain-intrinsic-size: 800px;
 }
 
+.plp-grid__content {
+  grid-column: 1 / -1;
+}
+
 /* Pagination */
 .plp-pagination {
   display: flex;
