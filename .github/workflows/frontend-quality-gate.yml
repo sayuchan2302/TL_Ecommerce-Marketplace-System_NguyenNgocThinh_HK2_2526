@@ -101,6 +101,19 @@ jobs:
           tail -n 200 .ci-logs/backend.log || true
           exit 1
 
+      - name: Wait for seeded marketplace products
+        run: |
+          for i in {1..180}; do
+            if curl -sf "http://localhost:8080/api/public/marketplace/search/products?category=men&page=0&size=1" | grep -Eq '"totalElements":[1-9]'; then
+              echo "Seeded marketplace products are ready."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Seeded marketplace products did not become ready in time."
+          tail -n 200 .ci-logs/backend.log || true
+          exit 1
+
       - name: Frontend lint
         run: npm run lint --prefix frontend
 
