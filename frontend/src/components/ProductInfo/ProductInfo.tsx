@@ -130,7 +130,6 @@ const ProductInfo = ({ product, averageRating = null, reviewCount = 0, onVariant
         <div className="pdp-variant-group">
           <div className="variant-header">
             <span className="variant-label">Kích cỡ: <strong>{selectedSize}</strong></span>
-            <button className="size-guide-link">Bảng kích cỡ</button>
           </div>
           <div className="size-options">
             {sizeOptions.map((size) => (

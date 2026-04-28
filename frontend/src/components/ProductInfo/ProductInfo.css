@@ -51,13 +51,13 @@
   margin-bottom: 8px;
 }
 
-.current-price {
+.pdp-price-box .current-price {
   font-size: 22px;
   font-weight: 700;
   color: var(--co-blue);
 }
 
-.original-price {
+.pdp-price-box .original-price {
   font-size: 14px;
   color: var(--co-gray-500);
   text-decoration: line-through;
@@ -95,56 +95,48 @@
   font-weight: 600;
 }
 
-.size-guide-link {
-  background: none;
-  border: none;
-  color: var(--co-blue);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-}
-
-.color-options {
+.product-info-container .color-options {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.color-btn {
+.product-info-container .color-btn {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 1px solid var(--co-gray-300);
+  border: 1px solid transparent;
   background-color: var(--co-white);
   padding: 3px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: inset 0 0 0 1px var(--co-gray-300);
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.color-btn.selected {
-  border-color: var(--co-black);
-  border-width: 2px;
+.product-info-container .color-btn.selected {
+  border-color: var(--co-blue);
+  box-shadow:
+    inset 0 0 0 1px var(--co-blue),
+    0 0 0 2px rgba(45, 95, 201, 0.18);
 }
 
-.color-swatch-inner {
+.product-info-container .color-swatch-inner {
   width: 100%;
   height: 100%;
   border-radius: 50%;
   border: 1px solid rgba(0,0,0,0.1);
 }
 
-.size-options {
+.product-info-container .size-options {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.size-btn {
+.product-info-container .size-btn {
   min-width: 60px;
   height: 40px;
   border: 1px solid var(--co-gray-300);
@@ -161,11 +153,11 @@
   padding: 0 16px;
 }
 
-.size-btn:hover {
+.product-info-container .size-btn:hover {
   border-color: var(--co-black);
 }
 
-.size-btn.selected {
+.product-info-container .size-btn.selected {
   background-color: var(--co-black);
   color: var(--co-white);
   border-color: var(--co-black);

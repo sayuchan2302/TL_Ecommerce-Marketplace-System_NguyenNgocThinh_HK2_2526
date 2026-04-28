@@ -246,14 +246,14 @@
   flex-wrap: nowrap;
 }
 
-.current-price {
+.product-card .current-price {
   font-size: 14px;
   font-weight: 700;
   color: var(--co-blue);
   line-height: 1;
 }
 
-.original-price {
+.product-card .original-price {
   font-size: 11px;
   color: var(--co-gray-400);
   text-decoration: line-through;

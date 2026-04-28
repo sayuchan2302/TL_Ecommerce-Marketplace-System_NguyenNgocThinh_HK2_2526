@@ -236,7 +236,9 @@ const ProductListing = () => {
                 fits: view.fits,
                 materials: view.materials,
                 sortKey: view.sortKey,
+                page: view.page,
                 setSort: (value) => view.setSort(value),
+                setPage: (value) => view.setPage(value),
               }}
             />
           </main>

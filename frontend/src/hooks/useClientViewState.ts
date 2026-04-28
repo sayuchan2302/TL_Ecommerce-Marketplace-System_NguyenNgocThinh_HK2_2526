@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 
 type SortDirection = 'asc' | 'desc';
 type SortKey = 'newest' | 'bestseller' | 'price-asc' | 'price-desc' | 'discount' | 'relevance';
+const MANAGED_QUERY_KEYS = ['q', 'cat', 'price', 'size', 'color', 'gender', 'fit', 'material', 'sort', 'dir', 'page'];
+
 type FilterQueryState = {
   query: string;
   category: string;
@@ -14,6 +16,7 @@ type FilterQueryState = {
   materials: string[];
   sortKey: SortKey;
   sortDirection: SortDirection;
+  page: number;
 };
 
 interface UseClientViewStateOptions {
@@ -44,6 +47,8 @@ export const useClientViewState = ({
     const rawSort = (searchParams.get('sort') || defaultSort) as SortKey;
     const sortKey = validSortSet.size === 0 || validSortSet.has(rawSort) ? rawSort : defaultSort;
     const sortDirection: SortDirection = searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
+    const rawPage = Number.parseInt(searchParams.get('page') || '1', 10);
+    const page = Number.isFinite(rawPage) && rawPage > 0 ? rawPage : 1;
     return {
       query,
       category,
@@ -55,11 +60,15 @@ export const useClientViewState = ({
       materials,
       sortKey,
       sortDirection,
+      page,
     };
   }, [searchParams, defaultCategory, defaultSort, validSortSet]);
 
   const buildParams = (state: FilterQueryState) => {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams);
+    for (const key of MANAGED_QUERY_KEYS) {
+      params.delete(key);
+    }
     if (state.query.trim()) params.set('q', state.query.trim());
     if (state.category && state.category !== defaultCategory) params.set('cat', state.category);
     if (state.priceRanges.length) params.set('price', state.priceRanges.join(','));
@@ -72,6 +81,7 @@ export const useClientViewState = ({
       params.set('sort', state.sortKey);
       params.set('dir', state.sortDirection);
     }
+    if (state.page > 1) params.set('page', String(state.page));
     return params;
   };
 
@@ -86,11 +96,11 @@ export const useClientViewState = ({
   };
 
   const setCategory = (value: string) => {
-    commit({ ...state, category: value });
+    commit({ ...state, category: value, page: 1 });
   };
 
   const setQueryValue = (value: string) => {
-    commit({ ...state, query: value });
+    commit({ ...state, query: value, page: 1 });
   };
 
   const toggleListValue = (list: string[], value: string) =>
@@ -98,37 +108,42 @@ export const useClientViewState = ({
 
   const togglePrice = (value: string) => {
     const next = toggleListValue(state.priceRanges, value);
-    commit({ ...state, priceRanges: next });
+    commit({ ...state, priceRanges: next, page: 1 });
   };
 
   const toggleSize = (value: string) => {
     const next = toggleListValue(state.sizes, value);
-    commit({ ...state, sizes: next });
+    commit({ ...state, sizes: next, page: 1 });
   };
 
   const toggleColor = (value: string) => {
     const next = toggleListValue(state.colors, value);
-    commit({ ...state, colors: next });
+    commit({ ...state, colors: next, page: 1 });
   };
 
   const toggleGender = (value: string) => {
     const next = toggleListValue(state.genders, value);
-    commit({ ...state, genders: next });
+    commit({ ...state, genders: next, page: 1 });
   };
 
   const toggleFit = (value: string) => {
     const next = toggleListValue(state.fits, value);
-    commit({ ...state, fits: next });
+    commit({ ...state, fits: next, page: 1 });
   };
 
   const toggleMaterial = (value: string) => {
     const next = toggleListValue(state.materials, value);
-    commit({ ...state, materials: next });
+    commit({ ...state, materials: next, page: 1 });
   };
 
   const setSort = (value: SortKey, direction: SortDirection = 'asc') => {
     if (validSortSet.size > 0 && !validSortSet.has(value)) return;
-    commit({ ...state, sortKey: value, sortDirection: direction });
+    commit({ ...state, sortKey: value, sortDirection: direction, page: 1 });
+  };
+
+  const setPage = (value: number) => {
+    const nextPage = Number.isFinite(value) ? Math.max(1, Math.floor(value)) : 1;
+    commit({ ...state, page: nextPage });
   };
 
   const reset = () => {
@@ -143,6 +158,7 @@ export const useClientViewState = ({
       materials: [],
       sortKey: defaultSort,
       sortDirection: 'asc',
+      page: 1,
     });
   };
 
@@ -157,6 +173,7 @@ export const useClientViewState = ({
     materials: state.materials,
     sortKey: state.sortKey,
     sortDirection: state.sortDirection,
+    page: state.page,
     setQuery: setQueryValue,
     setCategory,
     togglePrice,
@@ -166,6 +183,7 @@ export const useClientViewState = ({
     toggleFit,
     toggleMaterial,
     setSort,
+    setPage,
     reset,
   };
 };

@@ -661,7 +661,9 @@ const Search = () => {
                         fits: view.fits,
                         materials: view.materials,
                         sortKey: effectiveSortKey,
+                        page: view.page,
                         setSort: (value) => view.setSort(value),
+                        setPage: (value) => view.setPage(value),
                         availableSortKeys: isImageSearchPage
                           ? ['relevance', 'newest', 'bestseller', 'price-asc', 'price-desc', 'discount']
                           : ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'],
