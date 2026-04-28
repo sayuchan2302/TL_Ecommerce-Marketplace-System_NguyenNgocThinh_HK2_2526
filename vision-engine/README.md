@@ -32,6 +32,8 @@ Then adjust at least:
 - `MARKETPLACE_BASE_URL`
 - `VISION_DATABASE_URL`
 - `VISION_INTERNAL_SECRET`
+- `OPENCLIP_MODEL_NAME`
+- `OPENCLIP_PRETRAINED`
 
 Optional relevance tuning:
 
@@ -49,6 +51,10 @@ Optional relevance tuning:
 - `SEARCH_HNSW_EF_SEARCH`
 - `DB_POOL_MIN_SIZE`
 - `DB_POOL_MAX_SIZE`
+- `MAX_UPLOAD_SIZE_BYTES`
+- `MAX_CATALOG_IMAGE_DOWNLOAD_BYTES`
+- `MAX_IMAGE_PIXELS`
+- `METRICS_WINDOW_SIZE`
 
 For local Windows development without Docker, use:
 
@@ -113,7 +119,14 @@ The metrics payload includes:
 - request counters by status
 - threshold-filtered candidate count
 - average and last search / encode / DB-query latency
+- rolling-window search / encode / DB-query latency p50, p95, p99
 - last empty-result reason and cumulative empty-reason counts
+
+## Index notes
+
+- Normal search always filters `is_active = true`, so `product_image_embeddings_active_embedding_hnsw_idx` is the preferred ANN index.
+- The full-table HNSW index is kept for compatibility and manual diagnostics; the bootstrap step does not drop indexes automatically.
+- To inspect planner behavior on a live database, run `EXPLAIN ANALYZE` on the same query shape used by `/v1/search/image` with `WHERE is_active = true`.
 
 ## Smoke test
 
@@ -148,3 +161,5 @@ Run:
 ```powershell
 ./vision-engine/scripts/benchmark-image-search.ps1 -VisionSecret "change-me-vision-secret"
 ```
+
+Each successful run updates [BENCHMARK_REPORT.md](/d:/Project/vision-engine/BENCHMARK_REPORT.md).

@@ -19,7 +19,9 @@ class Settings(BaseSettings):
     read_timeout_seconds: int = 20
     image_download_timeout_seconds: int = 20
     max_upload_size_bytes: int = 5_242_880
+    max_catalog_image_download_bytes: int = 8_388_608
     max_image_pixels: int = 20_000_000
+    metrics_window_size: int = 500
     search_candidate_multiplier: int = 8
     search_candidate_cap: int = 500
     search_hnsw_ef_search: int = 80

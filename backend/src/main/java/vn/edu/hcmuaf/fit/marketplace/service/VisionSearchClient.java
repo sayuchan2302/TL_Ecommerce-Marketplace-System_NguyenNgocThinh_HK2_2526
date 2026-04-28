@@ -120,9 +120,7 @@ public class VisionSearchClient {
     }
 
     private byte[] buildMultipartBody(MultipartFile file, String boundary) throws IOException {
-        String filename = file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()
-                ? "query-image"
-                : file.getOriginalFilename();
+        String filename = sanitizeMultipartFilename(file.getOriginalFilename());
         String contentType = file.getContentType() == null || file.getContentType().isBlank()
                 ? "application/octet-stream"
                 : file.getContentType();
@@ -135,6 +133,26 @@ public class VisionSearchClient {
         output.write("\r\n".getBytes(StandardCharsets.UTF_8));
         output.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
         return output.toByteArray();
+    }
+
+    static String sanitizeMultipartFilename(String originalFilename) {
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return "query-image";
+        }
+
+        StringBuilder sanitized = new StringBuilder(originalFilename.length());
+        for (int index = 0; index < originalFilename.length(); index++) {
+            char current = originalFilename.charAt(index);
+            if (current < 32 || current == 127 || current == '"' || current == '\r' || current == '\n'
+                    || current == '/' || current == '\\') {
+                sanitized.append('_');
+                continue;
+            }
+            sanitized.append(current);
+        }
+
+        String normalized = sanitized.toString().trim();
+        return normalized.isEmpty() ? "query-image" : normalized;
     }
 
     private String readResponseBody(HttpURLConnection connection, int statusCode) throws IOException {

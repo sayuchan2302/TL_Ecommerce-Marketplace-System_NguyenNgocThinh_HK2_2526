@@ -41,7 +41,12 @@ Fashion Marketplace is a multi-vendor e-commerce system with three core roles:
 │   ├── src/             # Components, pages, hooks
 │   ├── scripts/         # Utility scripts
 │   └── tests/           # Playwright tests
+├── vision-engine/       # FastAPI + OpenCLIP + pgvector image search service
+│   ├── app/             # Search, sync, DB, metrics runtime
+│   ├── scripts/         # Local run, smoke, benchmark utilities
+│   └── tests/           # Python unit tests
 ├── crawl/gap/           # GAP dataset crawler
+├── docker-compose.vision.yml
 └── .github/workflows/   # CI pipelines
 ```
 
@@ -132,14 +137,42 @@ chmod +x backend/mvnw
 npm run dev --prefix frontend
 ```
 
+**Vision engine:**
+
+```bash
+# Windows PowerShell
+Copy-Item vision-engine/.env.local.example vision-engine/.env
+./vision-engine/scripts/install-local.ps1
+./vision-engine/scripts/run-local.ps1
+```
+
 ### 5. Access
 
 | Service | URL |
 |---------|-----|
 | Frontend | http://localhost:5173 |
 | Backend API | http://localhost:8080 |
+| Vision engine | http://localhost:8001 |
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | Health Check | http://localhost:8080/actuator/health |
+
+## Vision Engine Config
+
+Key image-search variables:
+
+| Variable | Purpose |
+|----------|---------|
+| `VISION_INTERNAL_SECRET` | Shared internal auth between backend and `vision-engine` |
+| `VISION_DATABASE_URL` | PostgreSQL / pgvector connection for embeddings |
+| `MARKETPLACE_BASE_URL` | Spring Boot base URL used for catalog sync |
+| `OPENCLIP_MODEL_NAME` / `OPENCLIP_PRETRAINED` | OpenCLIP model selection |
+| `IMAGE_SEARCH_MIN_CONFIDENCE_SCORE` | Minimum top-score gate |
+| `IMAGE_SEARCH_RELATIVE_SCORE_FLOOR` | Relative floor against top score |
+| `IMAGE_SEARCH_ABSOLUTE_SCORE_FLOOR` | Absolute similarity floor |
+| `MAX_UPLOAD_SIZE_BYTES` | Search upload payload cap |
+| `MAX_IMAGE_PIXELS` | Decoded pixel safety cap |
+| `SEARCH_HNSW_EF_SEARCH` | pgvector HNSW recall/speed tuning |
+| `DB_POOL_MIN_SIZE` / `DB_POOL_MAX_SIZE` | Vision DB pool sizing |
 
 ## API Reference
 

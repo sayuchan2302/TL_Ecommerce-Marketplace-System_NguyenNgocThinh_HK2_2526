@@ -4,7 +4,9 @@ from collections import defaultdict
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from io import BytesIO
+import logging
 from uuid import NAMESPACE_URL, UUID, uuid5
+import warnings
 
 import requests
 from PIL import Image, ImageOps
@@ -17,6 +19,15 @@ from .openclip_service import OpenClipService
 
 CATALOG_ENDPOINT = "/api/internal/vision/catalog"
 DEACTIVATED_PRODUCTS_ENDPOINT = "/api/internal/vision/catalog/deactivated-products"
+DOWNLOAD_CHUNK_SIZE = 64 * 1024
+logger = logging.getLogger("uvicorn.error")
+
+
+class CatalogSyncError(Exception):
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.message = message
 
 
 class CatalogSyncService:
@@ -36,6 +47,7 @@ class CatalogSyncService:
         failed_images = 0
         inactive_stale_rows = 0
         failures: list[dict[str, str]] = []
+        failed_image_reason_counts: dict[str, int] = defaultdict(int)
         changed_images_by_product: dict[str, set[str]] = defaultdict(set)
 
         updated_since = self._resolve_updated_since_cursor()
@@ -71,10 +83,20 @@ class CatalogSyncService:
                         batch_items.append(item)
                     except Exception as exc:  # noqa: BLE001
                         failed_images += 1
+                        reason = self._classify_failure_reason(exc)
+                        failed_image_reason_counts[reason] += 1
+                        logger.warning(
+                            "catalog_sync image_download_failed reason=%s backend_product_id=%s image_url=%s error=%s",
+                            reason,
+                            item.backend_product_id,
+                            item.image_url,
+                            exc,
+                        )
                         failures.append(
                             {
                                 "image_url": item.image_url,
                                 "backend_product_id": str(item.backend_product_id),
+                                "reason": reason,
                                 "error": str(exc),
                             }
                         )
@@ -99,6 +121,14 @@ class CatalogSyncService:
 
         index_version = self._resolve_index_version()
         synced_rows = embeddings_inserted + embeddings_updated
+        logger.info(
+            "catalog_sync completed synced_rows=%s failed_images=%s inactive_stale_rows=%s skipped_unchanged=%s reason_counts=%s",
+            synced_rows,
+            failed_images,
+            inactive_stale_rows,
+            skipped_unchanged,
+            dict(failed_image_reason_counts),
+        )
         return SyncCatalogResponse(
             synced_rows=synced_rows,
             failed_rows=failed_images,
@@ -109,6 +139,7 @@ class CatalogSyncService:
             skipped_unchanged=skipped_unchanged,
             failed_images=failed_images,
             inactive_stale_rows=inactive_stale_rows,
+            failed_image_reason_counts=dict(failed_image_reason_counts),
             sync_token=sync_token,
             index_version=index_version,
             failures=failures[:100],
@@ -147,19 +178,81 @@ class CatalogSyncService:
     def _download_image(self, image_url: str) -> Image.Image:
         response = self.http.get(
             image_url,
+            stream=True,
             timeout=(settings.connect_timeout_seconds, settings.image_download_timeout_seconds),
         )
-        response.raise_for_status()
-        return self._decode_downloaded_image(response.content)
+        try:
+            response.raise_for_status()
+            max_bytes = max(1, settings.max_catalog_image_download_bytes)
+            content_length = response.headers.get("Content-Length")
+            if content_length:
+                try:
+                    declared_length = int(content_length)
+                except ValueError:
+                    declared_length = None
+                else:
+                    if declared_length > max_bytes:
+                        raise CatalogSyncError(
+                            "download_too_large",
+                            f"Catalog image exceeds download limit ({declared_length} bytes)",
+                        )
+
+            payload = bytearray()
+            for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
+                if not chunk:
+                    continue
+                payload.extend(chunk)
+                if len(payload) > max_bytes:
+                    raise CatalogSyncError(
+                        "download_too_large",
+                        f"Catalog image exceeds download limit ({len(payload)} bytes)",
+                    )
+            return self._decode_downloaded_image(bytes(payload))
+        finally:
+            response.close()
 
     def _decode_downloaded_image(self, payload: bytes) -> Image.Image:
-        with Image.open(BytesIO(payload)) as probe:
-            probe.verify()
+        original_max_pixels = Image.MAX_IMAGE_PIXELS
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                Image.MAX_IMAGE_PIXELS = max(1, settings.max_image_pixels)
+                with Image.open(BytesIO(payload)) as probe:
+                    probe.verify()
 
-        with Image.open(BytesIO(payload)) as source:
-            normalized = ImageOps.exif_transpose(source)
-            normalized.load()
-            return normalized.convert("RGB")
+                with Image.open(BytesIO(payload)) as source:
+                    if source.width * source.height > settings.max_image_pixels:
+                        raise CatalogSyncError(
+                            "decoded_pixels_too_large",
+                            f"Catalog image exceeds decoded pixel limit ({source.width}x{source.height})",
+                        )
+                    normalized = ImageOps.exif_transpose(source)
+                    if normalized.width * normalized.height > settings.max_image_pixels:
+                        raise CatalogSyncError(
+                            "decoded_pixels_too_large",
+                            f"Catalog image exceeds decoded pixel limit ({normalized.width}x{normalized.height})",
+                        )
+                    normalized.load()
+                    return normalized.convert("RGB")
+        except CatalogSyncError:
+            raise
+        except Image.DecompressionBombError as exc:
+            raise CatalogSyncError("decompression_bomb", "Catalog image triggered decompression bomb protection") from exc
+        except Image.DecompressionBombWarning as exc:
+            raise CatalogSyncError("decompression_bomb", "Catalog image triggered decompression bomb protection") from exc
+        except Exception as exc:  # noqa: BLE001
+            raise CatalogSyncError("decode_error", "Unable to decode catalog image") from exc
+        finally:
+            Image.MAX_IMAGE_PIXELS = original_max_pixels
+
+    def _classify_failure_reason(self, exc: Exception) -> str:
+        if isinstance(exc, CatalogSyncError):
+            return exc.reason
+        if isinstance(exc, requests.HTTPError):
+            return "http_error"
+        if isinstance(exc, requests.RequestException):
+            return "download_error"
+        return "unknown_error"
 
     def _catalog_key(self, item: VisionCatalogItem) -> tuple[str, str]:
         return str(item.backend_product_id), item.image_url

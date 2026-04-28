@@ -58,6 +58,10 @@ class SearchServiceLogicTests(unittest.TestCase):
         self.assertEqual(context.exception.status_code, 400)
         self.assertEqual(context.exception.metrics_status, "invalid_content_type")
 
+    def test_validate_image_upload_accepts_standard_image_content_types(self) -> None:
+        validate_image_upload("image/jpeg", b"jpeg-bytes")
+        validate_image_upload("image/png", b"png-bytes")
+
     def test_validate_image_upload_rejects_empty_payload(self) -> None:
         with self.assertRaises(SearchValidationError) as context:
             validate_image_upload("image/png", b"")
@@ -72,6 +76,12 @@ class SearchServiceLogicTests(unittest.TestCase):
 
         self.assertEqual(context.exception.status_code, 413)
         self.assertEqual(context.exception.metrics_status, "oversized_payload")
+
+    def test_validate_image_upload_accepts_octet_stream(self) -> None:
+        validate_image_upload("application/octet-stream", b"real-bytes")
+
+    def test_validate_image_upload_accepts_missing_content_type(self) -> None:
+        validate_image_upload(None, b"real-bytes")
 
     def test_decode_search_image_rejects_invalid_bytes(self) -> None:
         with self.assertRaises(SearchValidationError) as context:
@@ -100,6 +110,24 @@ class SearchServiceLogicTests(unittest.TestCase):
         decoded = decode_search_image(buffer.getvalue())
 
         self.assertEqual(decoded.size, (24, 12))
+
+    def test_decode_search_image_accepts_valid_octet_stream_payload(self) -> None:
+        image = Image.new("RGB", (6, 6), color="yellow")
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG")
+
+        decoded = decode_search_image(buffer.getvalue())
+
+        self.assertEqual(decoded.mode, "RGB")
+
+    def test_decode_search_image_rejects_text_payload_even_when_octet_stream_is_allowed(self) -> None:
+        validate_image_upload("application/octet-stream", b"hello world")
+
+        with self.assertRaises(SearchValidationError) as context:
+            decode_search_image(b"hello world")
+
+        self.assertEqual(context.exception.status_code, 400)
+        self.assertEqual(context.exception.metrics_status, "decode_error")
 
     def test_group_search_candidates_prefers_higher_ranking_score(self) -> None:
         product_id = uuid4()
@@ -163,6 +191,41 @@ class SearchServiceLogicTests(unittest.TestCase):
 
         self.assertEqual(status, "accepted")
         self.assertEqual(candidates[0].backend_product_id, product_b)
+
+    def test_apply_candidate_thresholds_breaks_ties_by_backend_product_id(self) -> None:
+        lower_product_id = uuid4()
+        higher_product_id = uuid4()
+        if str(lower_product_id) > str(higher_product_id):
+            lower_product_id, higher_product_id = higher_product_id, lower_product_id
+
+        grouped = group_search_candidates(
+            [
+                {
+                    "backend_product_id": higher_product_id,
+                    "image_url": "https://example.com/b.jpg",
+                    "image_index": 0,
+                    "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 1,
+                    "score": 0.88,
+                },
+                {
+                    "backend_product_id": lower_product_id,
+                    "image_url": "https://example.com/a.jpg",
+                    "image_index": 0,
+                    "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 1,
+                    "score": 0.88,
+                },
+            ]
+        )
+
+        candidates, _, _, status, _, _ = apply_candidate_thresholds(grouped)
+
+        self.assertEqual(status, "accepted")
+        self.assertEqual(candidates[0].backend_product_id, lower_product_id)
+        self.assertEqual(candidates[1].backend_product_id, higher_product_id)
 
     def test_apply_candidate_thresholds_returns_low_confidence_when_top_score_is_too_low(self) -> None:
         grouped = group_search_candidates(

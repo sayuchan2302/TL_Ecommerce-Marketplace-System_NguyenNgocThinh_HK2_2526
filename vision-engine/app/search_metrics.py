@@ -1,8 +1,29 @@
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import Lock
+
+from .config import settings
+
+
+def _calculate_percentile(values: list[float], percentile: float) -> float:
+    if not values:
+        return 0.0
+
+    normalized = min(max(percentile, 0.0), 1.0)
+    ranked = sorted(values)
+    if len(ranked) == 1:
+        return float(ranked[0])
+
+    position = normalized * (len(ranked) - 1)
+    lower_index = int(position)
+    upper_index = min(lower_index + 1, len(ranked) - 1)
+    lower_value = ranked[lower_index]
+    upper_value = ranked[upper_index]
+    weight = position - lower_index
+    return float(lower_value + (upper_value - lower_value) * weight)
 
 
 @dataclass(slots=True)
@@ -24,6 +45,15 @@ class SearchMetricsSnapshot:
     average_search_latency_ms: float
     average_encode_latency_ms: float
     average_db_query_latency_ms: float
+    search_latency_p50_ms: float
+    search_latency_p95_ms: float
+    search_latency_p99_ms: float
+    encode_latency_p50_ms: float
+    encode_latency_p95_ms: float
+    encode_latency_p99_ms: float
+    db_query_latency_p50_ms: float
+    db_query_latency_p95_ms: float
+    db_query_latency_p99_ms: float
     last_status: str | None
     last_empty_reason: str | None
     last_top_score: float | None
@@ -36,8 +66,9 @@ class SearchMetricsSnapshot:
 
 
 class SearchMetricsCollector:
-    def __init__(self) -> None:
+    def __init__(self, window_size: int | None = None) -> None:
         self._lock = Lock()
+        self._window_size = max(1, window_size or settings.metrics_window_size)
         self._total_requests = 0
         self._accepted_requests = 0
         self._low_confidence_requests = 0
@@ -55,6 +86,9 @@ class SearchMetricsCollector:
         self._encode_latency_sum_ms = 0.0
         self._db_query_latency_sum_ms = 0.0
         self._latency_sample_count = 0
+        self._search_latency_samples_ms: deque[float] = deque(maxlen=self._window_size)
+        self._encode_latency_samples_ms: deque[float] = deque(maxlen=self._window_size)
+        self._db_query_latency_samples_ms: deque[float] = deque(maxlen=self._window_size)
         self._last_status: str | None = None
         self._last_empty_reason: str | None = None
         self._last_top_score: float | None = None
@@ -102,6 +136,9 @@ class SearchMetricsCollector:
                 self._encode_latency_sum_ms += encode_latency_ms or 0.0
                 self._db_query_latency_sum_ms += db_query_latency_ms or 0.0
                 self._latency_sample_count += 1
+                self._search_latency_samples_ms.append(float(search_latency_ms))
+                self._encode_latency_samples_ms.append(float(encode_latency_ms or 0.0))
+                self._db_query_latency_samples_ms.append(float(db_query_latency_ms or 0.0))
 
             if empty_reason:
                 self._empty_reason_counts[empty_reason] = self._empty_reason_counts.get(empty_reason, 0) + 1
@@ -129,6 +166,9 @@ class SearchMetricsCollector:
 
             request_count = self._total_requests if self._total_requests > 0 else 1
             latency_sample_count = self._latency_sample_count if self._latency_sample_count > 0 else 1
+            search_latency_values = list(self._search_latency_samples_ms)
+            encode_latency_values = list(self._encode_latency_samples_ms)
+            db_query_latency_values = list(self._db_query_latency_samples_ms)
             return SearchMetricsSnapshot(
                 total_requests=self._total_requests,
                 accepted_requests=self._accepted_requests,
@@ -147,6 +187,15 @@ class SearchMetricsCollector:
                 average_search_latency_ms=self._search_latency_sum_ms / latency_sample_count,
                 average_encode_latency_ms=self._encode_latency_sum_ms / latency_sample_count,
                 average_db_query_latency_ms=self._db_query_latency_sum_ms / latency_sample_count,
+                search_latency_p50_ms=_calculate_percentile(search_latency_values, 0.50),
+                search_latency_p95_ms=_calculate_percentile(search_latency_values, 0.95),
+                search_latency_p99_ms=_calculate_percentile(search_latency_values, 0.99),
+                encode_latency_p50_ms=_calculate_percentile(encode_latency_values, 0.50),
+                encode_latency_p95_ms=_calculate_percentile(encode_latency_values, 0.95),
+                encode_latency_p99_ms=_calculate_percentile(encode_latency_values, 0.99),
+                db_query_latency_p50_ms=_calculate_percentile(db_query_latency_values, 0.50),
+                db_query_latency_p95_ms=_calculate_percentile(db_query_latency_values, 0.95),
+                db_query_latency_p99_ms=_calculate_percentile(db_query_latency_values, 0.99),
                 last_status=self._last_status,
                 last_empty_reason=self._last_empty_reason,
                 last_top_score=self._last_top_score,

@@ -73,10 +73,12 @@ CREATE INDEX IF NOT EXISTS product_image_embeddings_active_source_updated_at_idx
     ON vision.product_image_embeddings (source_updated_at)
     WHERE is_active = true;
 
+-- Keep the full HNSW index for manual diagnostics or future queries that may not scope to is_active.
 CREATE INDEX IF NOT EXISTS product_image_embeddings_embedding_hnsw_idx
     ON vision.product_image_embeddings
     USING hnsw (embedding vector_cosine_ops);
 
+-- Normal search always filters is_active = true, so this partial HNSW index is the preferred ANN path.
 CREATE INDEX IF NOT EXISTS product_image_embeddings_active_embedding_hnsw_idx
     ON vision.product_image_embeddings
     USING hnsw (embedding vector_cosine_ops)

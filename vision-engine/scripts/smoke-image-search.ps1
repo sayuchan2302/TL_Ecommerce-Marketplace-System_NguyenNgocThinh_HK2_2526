@@ -103,6 +103,7 @@ Write-Step "Smoke summary"
   SkippedUnchanged    = $syncResponse.skipped_unchanged
   FailedRows          = $syncResponse.failed_rows
   FailedImages        = $syncResponse.failed_images
+  FailedReasonCounts  = ($syncResponse.failed_image_reason_counts | ConvertTo-Json -Compress)
   DeactivatedRows     = $syncResponse.deactivated_rows
   InactiveStaleRows   = $syncResponse.inactive_stale_rows
   IndexVersion        = $syncResponse.index_version

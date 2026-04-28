@@ -71,6 +71,15 @@ class SearchMetricsResponse(BaseModel):
     average_search_latency_ms: float
     average_encode_latency_ms: float
     average_db_query_latency_ms: float
+    search_latency_p50_ms: float
+    search_latency_p95_ms: float
+    search_latency_p99_ms: float
+    encode_latency_p50_ms: float
+    encode_latency_p95_ms: float
+    encode_latency_p99_ms: float
+    db_query_latency_p50_ms: float
+    db_query_latency_p95_ms: float
+    db_query_latency_p99_ms: float
     last_status: str | None = None
     last_empty_reason: str | None = None
     last_top_score: float | None = None
@@ -92,6 +101,7 @@ class SyncCatalogResponse(BaseModel):
     skipped_unchanged: int
     failed_images: int
     inactive_stale_rows: int
+    failed_image_reason_counts: dict[str, int] = Field(default_factory=dict)
     sync_token: str
     index_version: str
     failures: list[dict[str, Any]] = Field(default_factory=list)

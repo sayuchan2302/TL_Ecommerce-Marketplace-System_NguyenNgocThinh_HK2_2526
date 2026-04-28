@@ -14,11 +14,16 @@ param(
   [double]$MaxEmptyRate = 1.0,
   [double]$MaxLowConfidenceRate = 1.0,
   [double]$MaxP95LatencyMs = [double]::PositiveInfinity,
+  [string]$ReportPath = "",
   [switch]$FailOnGate,
   [switch]$SkipSync
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($ReportPath)) {
+  $ReportPath = Join-Path (Split-Path $PSScriptRoot -Parent) "BENCHMARK_REPORT.md"
+}
 
 function Write-Step {
   param([string]$Message)
@@ -198,6 +203,91 @@ function Get-P95 {
   return [double]$sorted[$index]
 }
 
+function Get-Average {
+  param([double[]]$Values)
+
+  if (-not $Values -or $Values.Length -eq 0) {
+    return 0.0
+  }
+  $sum = 0.0
+  foreach ($value in $Values) {
+    $sum += [double]$value
+  }
+  return [double]($sum / $Values.Length)
+}
+
+function Write-BenchmarkReport {
+  param(
+    [string]$Path,
+    [pscustomobject]$Summary,
+    $Metrics,
+    [string[]]$Failures,
+    [hashtable]$ReportContext
+  )
+
+  $reportDirectory = Split-Path -Parent $Path
+  if (-not [string]::IsNullOrWhiteSpace($reportDirectory) -and -not (Test-Path $reportDirectory)) {
+    New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null
+  }
+
+  $failureSection = if ($Failures.Count -gt 0) {
+    ($Failures | ForEach-Object { "- $_" }) -join "`r`n"
+  } else {
+    "- None"
+  }
+
+  $content = @"
+# Vision Benchmark Report
+
+Generated at: $($ReportContext.GeneratedAt)
+
+## Run Context
+
+- Backend: $($ReportContext.BackendBaseUrl)
+- Vision engine: $($ReportContext.VisionBaseUrl)
+- Index version: $($Summary.index_version)
+- Requests evaluated: $($Summary.request_count)
+
+## Quality Gates
+
+| Case | Result | Metric |
+|------|--------|--------|
+| Exact image top-1 | $($ReportContext.ExactStatus) | top1_acc = $($Summary.top1_acc) |
+| Cropped image top-k | $($ReportContext.CropStatus) | top5_recall = $($Summary.top5_recall) |
+| Synthetic no-match | $($ReportContext.NoMatchStatus) | synthetic_empty_rate = $($Summary.synthetic_empty_rate) |
+| Category filter | $($ReportContext.CategoryStatus) | category_filter_pass_rate = $($Summary.category_filter_pass_rate) |
+| Corrupted image 4xx | $($ReportContext.CorruptedStatus) | HTTP $($Summary.corrupted_status_code) |
+| Oversized image 4xx | $($ReportContext.OversizedStatus) | HTTP $($Summary.oversized_status_code) |
+
+## Latency
+
+- Observed average search latency: $($Summary.average_latency_ms) ms
+- Observed p95 search latency: $($Summary.p95_latency) ms
+- Metrics average encode latency: $($Metrics.average_encode_latency_ms) ms
+- Metrics average DB query latency: $($Metrics.average_db_query_latency_ms) ms
+- Metrics search latency p50/p95/p99: $($Metrics.search_latency_p50_ms) / $($Metrics.search_latency_p95_ms) / $($Metrics.search_latency_p99_ms) ms
+- Metrics encode latency p50/p95/p99: $($Metrics.encode_latency_p50_ms) / $($Metrics.encode_latency_p95_ms) / $($Metrics.encode_latency_p99_ms) ms
+- Metrics DB latency p50/p95/p99: $($Metrics.db_query_latency_p50_ms) / $($Metrics.db_query_latency_p95_ms) / $($Metrics.db_query_latency_p99_ms) ms
+
+## Result Counts
+
+- Average returned result count: $($Summary.average_returned_count)
+- Total returned result count: $($Summary.total_returned_count)
+- Empty rate: $($Summary.empty_rate)
+- Low-confidence rate: $($Summary.low_confidence_rate)
+- No-match false positive rate: $($Summary.no_match_false_positive_rate)
+- Accepted requests delta: $($Summary.accepted)
+- Empty requests delta: $($Summary.empty)
+- Low-confidence requests delta: $($Summary.low_confidence)
+
+## Failed Cases
+
+$failureSection
+"@
+
+  Set-Content -Path $Path -Value $content -Encoding utf8
+}
+
 Write-Step "Checking backend health"
 $backendHealth = Invoke-JsonGet -Url "$BackendBaseUrl/actuator/health"
 
@@ -239,6 +329,8 @@ $workDir = Join-Path $env:TEMP ("vision-benchmark-" + [Guid]::NewGuid().ToString
 New-Item -ItemType Directory -Path $workDir | Out-Null
 
 $latencies = New-Object System.Collections.Generic.List[double]
+$returnedCounts = New-Object System.Collections.Generic.List[double]
+$failures = New-Object System.Collections.Generic.List[string]
 $exactPass = 0
 $exactTotal = 0
 $cropPass = 0
@@ -266,13 +358,17 @@ try {
     $exactTotal += 1
 
     $items = @($result.response.items)
+    $returnedCounts.Add([double]$items.Count)
     if ($items.Count -eq 0) {
       $allEmptyCount += 1
+      $failures.Add("Exact image sample $i returned 0 items for expected product $expectedProductId.")
       continue
     }
 
     if ([string]$items[0].id -eq $expectedProductId) {
       $exactPass += 1
+    } else {
+      $failures.Add("Exact image sample $i expected top-1 $expectedProductId but got $([string]$items[0].id).")
     }
   }
 
@@ -293,14 +389,18 @@ try {
     $cropTotal += 1
 
     $items = @($result.response.items)
+    $returnedCounts.Add([double]$items.Count)
     if ($items.Count -eq 0) {
       $allEmptyCount += 1
+      $failures.Add("Crop sample $i returned 0 items for expected product $expectedProductId.")
       continue
     }
 
     $topKIds = @($items | Select-Object -First $CropPassTopK | ForEach-Object { [string]$_.id })
     if ($topKIds -contains $expectedProductId) {
       $cropPass += 1
+    } else {
+      $failures.Add("Crop sample $i expected product $expectedProductId in top-$CropPassTopK.")
     }
   }
 
@@ -319,15 +419,19 @@ try {
       $categoryTotal += 1
 
       $items = @($result.response.items)
+      $returnedCounts.Add([double]$items.Count)
       if ($items.Count -eq 0) {
         $allEmptyCount += 1
+        $failures.Add("Category sample $i returned 0 items for category $expectedCategorySlug.")
         continue
       }
 
-      $allMatchCategory = (@($items | Where-Object { [string]$_.categorySlug -ne $expectedCategorySlug }).Count -eq 0)
+      $outOfCategoryItems = @($items | Where-Object { [string]$_.categorySlug -ne $expectedCategorySlug })
       $returnedIds = @($items | ForEach-Object { [string]$_.id })
-      if ($allMatchCategory -and ($returnedIds -contains $expectedProductId)) {
+      if ($outOfCategoryItems.Count -eq 0 -and ($returnedIds -contains $expectedProductId)) {
         $categoryPass += 1
+      } else {
+        $failures.Add("Category sample $i returned items outside category $expectedCategorySlug or missed product $expectedProductId.")
       }
     }
   }
@@ -342,9 +446,12 @@ try {
     $totalQueries += 1
 
     $items = @($result.response.items)
+    $returnedCounts.Add([double]$items.Count)
     if ($items.Count -eq 0) {
       $syntheticEmptyPass += 1
       $allEmptyCount += 1
+    } else {
+      $failures.Add("Synthetic no-match sample $i returned $($items.Count) items.")
     }
   }
 
@@ -353,12 +460,18 @@ try {
   Set-Content -Path $corruptedPath -Value "not a real image" -Encoding utf8
   $corruptedResponse = Invoke-PublicImageSearchRequest -ImagePath $corruptedPath
   $corruptedStatusCode = $corruptedResponse.statusCode
+  if ($corruptedStatusCode -ne 400) {
+    $failures.Add("Corrupted image expected HTTP 400 but got $corruptedStatusCode.")
+  }
 
   Write-Step "Running oversized-image benchmark"
   $oversizedPath = Join-Path $workDir "oversized-query.jpg"
   [System.IO.File]::WriteAllBytes($oversizedPath, (New-Object byte[] (6 * 1024 * 1024)))
   $oversizedResponse = Invoke-PublicImageSearchRequest -ImagePath $oversizedPath
   $oversizedStatusCode = $oversizedResponse.statusCode
+  if ($oversizedStatusCode -ne 413) {
+    $failures.Add("Oversized image expected HTTP 413 but got $oversizedStatusCode.")
+  }
 
   $metricsAfter = Invoke-JsonGet -Url "$VisionBaseUrl/v1/metrics" -Headers $headers
   $indexInfo = Invoke-JsonGet -Url "$VisionBaseUrl/v1/index/info"
@@ -389,9 +502,13 @@ try {
     top5_recall = [Math]::Round(($cropPass / $cropDenominator), 4)
     category_filter_pass_rate = $categoryFilterPassRate
     synthetic_empty_rate = [Math]::Round(($syntheticEmptyPass / $syntheticDenominator), 4)
+    no_match_false_positive_rate = [Math]::Round((1.0 - ($syntheticEmptyPass / $syntheticDenominator)), 4)
     empty_rate = [Math]::Round(($allEmptyCount / $total), 4)
     low_confidence_rate = [Math]::Round(($deltaLowConfidence / $total), 4)
+    average_latency_ms = [Math]::Round((Get-Average -Values $latencies.ToArray()), 2)
     p95_latency = [Math]::Round((Get-P95 -Values $latencies.ToArray()), 2)
+    average_returned_count = [Math]::Round((Get-Average -Values $returnedCounts.ToArray()), 2)
+    total_returned_count = [int](($returnedCounts | Measure-Object -Sum).Sum)
     accepted = $deltaAccepted
     low_confidence = $deltaLowConfidence
     empty = $deltaEmpty
@@ -415,6 +532,20 @@ try {
 
   Write-Step "Benchmark summary"
   $summary | Format-List
+
+  $reportContext = @{
+    GeneratedAt = (Get-Date).ToString("u")
+    BackendBaseUrl = $BackendBaseUrl
+    VisionBaseUrl = $VisionBaseUrl
+    ExactStatus = if ($summary.top1_acc -ge 1.0) { "PASS" } else { "FAIL" }
+    CropStatus = if ($summary.top5_recall -ge 1.0) { "PASS" } else { "FAIL" }
+    NoMatchStatus = if ($summary.synthetic_empty_rate -ge 1.0) { "PASS" } else { "FAIL" }
+    CategoryStatus = if ($summary.category_filter_pass_rate -ge 1.0) { "PASS" } else { "FAIL" }
+    CorruptedStatus = if ($summary.corrupted_error_pass) { "PASS" } else { "FAIL" }
+    OversizedStatus = if ($summary.oversized_error_pass) { "PASS" } else { "FAIL" }
+  }
+  Write-BenchmarkReport -Path $ReportPath -Summary $summary -Metrics $metricsAfter -Failures $failures -ReportContext $reportContext
+  Write-Step "Benchmark report written to $ReportPath"
 
   if ($FailOnGate -and -not $gatePass) {
     throw "Benchmark quality gate failed."

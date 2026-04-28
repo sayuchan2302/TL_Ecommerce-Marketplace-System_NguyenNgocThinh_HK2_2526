@@ -17,6 +17,7 @@ from .openclip_service import OpenClipService
 
 
 Image.MAX_IMAGE_PIXELS = max(1, settings.max_image_pixels)
+GENERIC_BINARY_CONTENT_TYPES = {"", "application/octet-stream"}
 
 
 class SearchValidationError(Exception):
@@ -55,12 +56,16 @@ class RankedSearchCandidate:
 
 
 def validate_image_upload(content_type: str | None, payload: bytes) -> None:
-    if not (content_type or "").lower().startswith("image/"):
-        raise SearchValidationError(400, "Uploaded file must be an image", "invalid_content_type")
     if not payload:
         raise SearchValidationError(400, "Image file is required", "empty_payload")
     if len(payload) > settings.max_upload_size_bytes:
         raise SearchValidationError(413, "Image file is too large", "oversized_payload")
+    normalized_content_type = (content_type or "").strip().lower()
+    if normalized_content_type.startswith("image/"):
+        return
+    if normalized_content_type in GENERIC_BINARY_CONTENT_TYPES:
+        return
+    raise SearchValidationError(400, "Uploaded file must be an image", "invalid_content_type")
 
 
 def decode_search_image(payload: bytes) -> Image.Image:
@@ -70,9 +75,9 @@ def decode_search_image(payload: bytes) -> Image.Image:
 
         with Image.open(BytesIO(payload)) as source:
             normalized = ImageOps.exif_transpose(source)
-            normalized.load()
             if normalized.width * normalized.height > settings.max_image_pixels:
                 raise SearchValidationError(413, "Image dimensions are too large", "oversized_payload")
+            normalized.load()
             return normalized.convert("RGB")
     except SearchValidationError:
         raise
