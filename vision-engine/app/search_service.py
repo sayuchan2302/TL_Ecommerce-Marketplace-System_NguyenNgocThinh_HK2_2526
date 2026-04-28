@@ -3,15 +3,20 @@ from __future__ import annotations
 from collections import OrderedDict
 from dataclasses import dataclass
 from io import BytesIO
+from threading import Lock
+from time import perf_counter
 from typing import Any
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageOps
 
 from .config import settings
 from .db import get_connection
 from .models import SearchCandidate
 from .openclip_service import OpenClipService
+
+
+Image.MAX_IMAGE_PIXELS = max(1, settings.max_image_pixels)
 
 
 class SearchValidationError(Exception):
@@ -26,16 +31,27 @@ class SearchValidationError(Exception):
 class SearchExecutionResult:
     candidates: list[SearchCandidate]
     grouped_candidate_count: int
+    threshold_filtered_count: int
     top_score: float | None
     score_floor: float | None
     status: str
+    empty_reason: str | None
     index_version: str
+    search_latency_ms: float
+    encode_latency_ms: float
+    db_query_latency_ms: float
 
 
 @dataclass(frozen=True, slots=True)
 class QueryView:
     name: str
     image: Image.Image
+
+
+@dataclass(frozen=True, slots=True)
+class RankedSearchCandidate:
+    candidate: SearchCandidate
+    ranking_score: float
 
 
 def validate_image_upload(content_type: str | None, payload: bytes) -> None:
@@ -49,15 +65,78 @@ def validate_image_upload(content_type: str | None, payload: bytes) -> None:
 
 def decode_search_image(payload: bytes) -> Image.Image:
     try:
-        return Image.open(BytesIO(payload)).convert("RGB")
+        with Image.open(BytesIO(payload)) as probe:
+            probe.verify()
+
+        with Image.open(BytesIO(payload)) as source:
+            normalized = ImageOps.exif_transpose(source)
+            normalized.load()
+            if normalized.width * normalized.height > settings.max_image_pixels:
+                raise SearchValidationError(413, "Image dimensions are too large", "oversized_payload")
+            return normalized.convert("RGB")
+    except SearchValidationError:
+        raise
+    except Image.DecompressionBombError as exc:
+        raise SearchValidationError(413, "Image dimensions are too large", "oversized_payload") from exc
     except Exception as exc:  # noqa: BLE001
         raise SearchValidationError(400, "Unable to decode image", "decode_error") from exc
 
 
-def group_search_candidates(rows: list[dict[str, Any]]) -> list[SearchCandidate]:
-    grouped: OrderedDict[str, SearchCandidate] = OrderedDict()
+def _normalize_slug(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
+
+
+def _build_product_ranking_score(
+    row: dict[str, Any],
+    *,
+    category_slug: str | None,
+    apply_soft_category_boost: bool,
+) -> float:
+    ranking_score = float(row["score"]) * settings.image_search_product_best_image_weight
+
+    if bool(row["is_primary"]):
+        ranking_score += settings.image_search_product_primary_image_boost
+
+    if int(row.get("available_stock") or 0) > 0:
+        ranking_score += settings.image_search_product_in_stock_boost
+
+    if apply_soft_category_boost:
+        row_category_slug = _normalize_slug(str(row.get("category_slug") or ""))
+        if row_category_slug and row_category_slug == category_slug:
+            ranking_score += settings.image_search_product_category_match_boost
+
+    return ranking_score
+
+
+def _is_better_ranked_candidate(left: RankedSearchCandidate, right: RankedSearchCandidate) -> bool:
+    if left.ranking_score != right.ranking_score:
+        return left.ranking_score > right.ranking_score
+    if left.candidate.score != right.candidate.score:
+        return left.candidate.score > right.candidate.score
+    if left.candidate.is_primary != right.candidate.is_primary:
+        return left.candidate.is_primary
+    if left.candidate.matched_image_index != right.candidate.matched_image_index:
+        return left.candidate.matched_image_index < right.candidate.matched_image_index
+    return str(left.candidate.backend_product_id) < str(right.candidate.backend_product_id)
+
+
+def group_search_candidates(
+    rows: list[dict[str, Any]],
+    *,
+    category_slug: str | None = None,
+    apply_soft_category_boost: bool = False,
+) -> list[RankedSearchCandidate]:
+    normalized_category_slug = _normalize_slug(category_slug)
+    grouped: OrderedDict[str, RankedSearchCandidate] = OrderedDict()
     for row in rows:
-        key = str(row["backend_product_id"])
+        ranking_score = _build_product_ranking_score(
+            row,
+            category_slug=normalized_category_slug,
+            apply_soft_category_boost=apply_soft_category_boost,
+        )
         candidate = SearchCandidate(
             backend_product_id=row["backend_product_id"],
             score=float(row["score"]),
@@ -65,41 +144,49 @@ def group_search_candidates(rows: list[dict[str, Any]]) -> list[SearchCandidate]
             matched_image_index=int(row["image_index"] or 0),
             is_primary=bool(row["is_primary"]),
         )
+        ranked_candidate = RankedSearchCandidate(candidate=candidate, ranking_score=ranking_score)
+        key = str(row["backend_product_id"])
         existing = grouped.get(key)
-        if existing is None:
-            grouped[key] = candidate
-            continue
-        if candidate.score > existing.score:
-            grouped[key] = candidate
-            continue
-        if candidate.score == existing.score:
-            if candidate.is_primary and not existing.is_primary:
-                grouped[key] = candidate
-            elif candidate.is_primary == existing.is_primary and candidate.matched_image_index < existing.matched_image_index:
-                grouped[key] = candidate
+        if existing is None or _is_better_ranked_candidate(ranked_candidate, existing):
+            grouped[key] = ranked_candidate
     return list(grouped.values())
 
 
 def apply_candidate_thresholds(
-    candidates: list[SearchCandidate],
-) -> tuple[list[SearchCandidate], float | None, float | None, str]:
+    candidates: list[RankedSearchCandidate],
+) -> tuple[list[SearchCandidate], float | None, float | None, str, str | None, int]:
     if not candidates:
-        return [], None, None, "empty"
+        return [], None, None, "empty", "no_similar_images", 0
+
+    top_score = max(item.candidate.score for item in candidates)
+    score_floor = min(
+        top_score,
+        max(
+            settings.image_search_absolute_score_floor,
+            top_score * settings.image_search_relative_score_floor,
+        ),
+    )
+    threshold_filtered_count = len(candidates)
+
+    if top_score < settings.image_search_min_confidence_score:
+        return [], top_score, score_floor, "low_confidence", "top_score_below_min_confidence", threshold_filtered_count
+
+    filtered = [item for item in candidates if item.candidate.score >= score_floor]
+    threshold_filtered_count = max(0, len(candidates) - len(filtered))
+    if not filtered:
+        return [], top_score, score_floor, "empty", "all_candidates_below_score_floor", threshold_filtered_count
 
     ranked = sorted(
-        candidates,
-        key=lambda item: (-item.score, not item.is_primary, item.matched_image_index),
+        filtered,
+        key=lambda item: (
+            -item.ranking_score,
+            -item.candidate.score,
+            not item.candidate.is_primary,
+            item.candidate.matched_image_index,
+            str(item.candidate.backend_product_id),
+        ),
     )
-    top_score = ranked[0].score
-    score_floor = max(
-        settings.image_search_absolute_score_floor,
-        top_score * settings.image_search_relative_score_floor,
-    )
-    if top_score < settings.image_search_min_confidence_score:
-        return [], top_score, score_floor, "low_confidence"
-
-    filtered = [candidate for candidate in ranked if candidate.score >= score_floor]
-    return filtered, top_score, score_floor, "accepted"
+    return [item.candidate for item in ranked], top_score, score_floor, "accepted", None, threshold_filtered_count
 
 
 def format_score(value: float | None) -> str:
@@ -191,6 +278,12 @@ def build_query_views(image: Image.Image) -> list[QueryView]:
 class ImageSearchService:
     def __init__(self, clip_service: OpenClipService) -> None:
         self.clip_service = clip_service
+        self._index_info_lock = Lock()
+        self._cached_index_info = {
+            "active_image_count": 0,
+            "active_product_count": 0,
+            "index_version": "empty",
+        }
 
     def search_bytes(
         self,
@@ -201,30 +294,52 @@ class ImageSearchService:
         category_slug: str | None,
         store_slug: str | None,
     ) -> SearchExecutionResult:
+        search_started_at = perf_counter()
         validate_image_upload(content_type, payload)
         image = decode_search_image(payload)
         query_views = build_query_views(image)
+
+        encode_started_at = perf_counter()
         vectors = self.clip_service.encode_images([view.image for view in query_views])
-        rows = self._query_similar_images_with_views(
+        encode_latency_ms = (perf_counter() - encode_started_at) * 1000
+
+        rows, db_query_latency_ms = self._query_similar_images_with_views(
             vectors=vectors,
             view_names=[view.name for view in query_views],
             limit=limit,
             category_slug=category_slug,
             store_slug=store_slug,
         )
-        grouped_candidates = group_search_candidates(rows)
-        candidates, top_score, score_floor, status = apply_candidate_thresholds(grouped_candidates)
+        apply_soft_category_boost = self._should_apply_soft_category_boost(category_slug)
+        grouped_candidates = group_search_candidates(
+            rows,
+            category_slug=category_slug,
+            apply_soft_category_boost=apply_soft_category_boost,
+        )
+        candidates, top_score, score_floor, status, empty_reason, threshold_filtered_count = apply_candidate_thresholds(
+            grouped_candidates,
+        )
+        search_latency_ms = (perf_counter() - search_started_at) * 1000
         index_info = self.load_index_info()
         return SearchExecutionResult(
             candidates=candidates[:limit],
             grouped_candidate_count=len(grouped_candidates),
+            threshold_filtered_count=threshold_filtered_count,
             top_score=top_score,
             score_floor=score_floor,
             status=status,
+            empty_reason=empty_reason,
             index_version=str(index_info["index_version"]),
+            search_latency_ms=search_latency_ms,
+            encode_latency_ms=encode_latency_ms,
+            db_query_latency_ms=db_query_latency_ms,
         )
 
-    def load_index_info(self) -> dict[str, int | str | None]:
+    def load_index_info(self, *, force_refresh: bool = False) -> dict[str, int | str | None]:
+        if not force_refresh:
+            with self._index_info_lock:
+                return dict(self._cached_index_info)
+
         sql = """
             SELECT
                 COUNT(*) FILTER (WHERE is_active = true) AS active_image_count,
@@ -243,33 +358,35 @@ class ImageSearchService:
                 cur.execute(sql)
                 row = cur.fetchone()
 
-        return {
+        info = {
             "active_image_count": int(row[0] or 0),
             "active_product_count": int(row[1] or 0),
             "index_version": row[2] or "empty",
         }
+        with self._index_info_lock:
+            self._cached_index_info = dict(info)
+        return info
+
+    def refresh_index_info(self) -> dict[str, int | str | None]:
+        return self.load_index_info(force_refresh=True)
 
     def _resolve_query_view_weights(self, view_names: list[str]) -> dict[str, float]:
         if not view_names:
             return {}
 
-        if "foreground" in view_names:
-            base_weights = {
-                "foreground": 0.6,
-                "center": 0.25,
-                "original": 0.15,
-            }
-        else:
-            base_weights = {
-                "center": 0.35,
-                "original": 0.65,
-            }
-
+        base_weights = {
+            "foreground": settings.image_search_foreground_view_weight,
+            "center": settings.image_search_center_view_weight,
+            "original": settings.image_search_original_view_weight,
+        }
         active_total = sum(base_weights.get(name, 0.0) for name in view_names)
         if active_total <= 0:
             uniform = 1.0 / len(view_names)
             return {name: uniform for name in view_names}
         return {name: base_weights.get(name, 0.0) / active_total for name in view_names}
+
+    def _should_apply_soft_category_boost(self, category_slug: str | None) -> bool:
+        return _normalize_slug(category_slug) is not None and settings.image_search_category_filter_mode.lower() == "soft"
 
     def _query_similar_images_with_views(
         self,
@@ -279,16 +396,20 @@ class ImageSearchService:
         limit: int,
         category_slug: str | None,
         store_slug: str | None,
-    ) -> list[dict[str, Any]]:
+    ) -> tuple[list[dict[str, Any]], float]:
         if not vectors:
-            return []
+            return [], 0.0
 
         ann_limit = min(max(limit * settings.search_candidate_multiplier, limit), settings.search_candidate_cap)
         weights = self._resolve_query_view_weights(view_names)
+        query_category_slug = None if self._should_apply_soft_category_boost(category_slug) else category_slug
         merged: OrderedDict[tuple[str, str, int, bool], dict[str, Any]] = OrderedDict()
+        db_query_latency_ms = 0.0
 
         for vector, view_name in zip(vectors, view_names, strict=True):
-            rows = self._query_similar_images(vector, ann_limit, category_slug, store_slug)
+            query_started_at = perf_counter()
+            rows = self._query_similar_images(vector, ann_limit, query_category_slug, store_slug)
+            db_query_latency_ms += (perf_counter() - query_started_at) * 1000
             weight = weights.get(view_name, 0.0)
             for row in rows:
                 key = (
@@ -304,6 +425,8 @@ class ImageSearchService:
                         "image_url": row["image_url"],
                         "image_index": int(row["image_index"] or 0),
                         "is_primary": bool(row["is_primary"]),
+                        "category_slug": row.get("category_slug"),
+                        "available_stock": int(row.get("available_stock") or 0),
                         "weighted_score": 0.0,
                         "best_score": 0.0,
                     }
@@ -316,21 +439,28 @@ class ImageSearchService:
 
         scored_rows: list[dict[str, Any]] = []
         for entry in merged.values():
-            blended_score = entry["weighted_score"] + 0.08 * entry["best_score"]
+            blended_score = entry["weighted_score"] + settings.image_search_best_view_bonus * entry["best_score"]
             scored_rows.append(
                 {
                     "backend_product_id": entry["backend_product_id"],
                     "image_url": entry["image_url"],
                     "image_index": entry["image_index"],
                     "is_primary": entry["is_primary"],
+                    "category_slug": entry["category_slug"],
+                    "available_stock": entry["available_stock"],
                     "score": blended_score,
                 }
             )
 
         scored_rows.sort(
-            key=lambda item: (-float(item["score"]), not bool(item["is_primary"]), int(item["image_index"])),
+            key=lambda item: (
+                -float(item["score"]),
+                not bool(item["is_primary"]),
+                int(item["image_index"]),
+                str(item["backend_product_id"]),
+            ),
         )
-        return scored_rows[:ann_limit]
+        return scored_rows[:ann_limit], db_query_latency_ms
 
     def _query_similar_images(
         self,
@@ -356,6 +486,8 @@ class ImageSearchService:
                 image_url,
                 image_index,
                 is_primary,
+                category_slug,
+                available_stock,
                 1 - (embedding <=> %s) AS score
             FROM vision.product_image_embeddings
             WHERE {where_sql}
@@ -365,6 +497,8 @@ class ImageSearchService:
 
         with get_connection() as conn:
             with conn.cursor() as cur:
+                if settings.search_hnsw_ef_search > 0:
+                    cur.execute("SET LOCAL hnsw.ef_search = %s", (settings.search_hnsw_ef_search,))
                 cur.execute(sql, [vector, *params, vector, ann_limit])
                 rows = cur.fetchall()
 
@@ -374,7 +508,9 @@ class ImageSearchService:
                 "image_url": row[1],
                 "image_index": row[2],
                 "is_primary": row[3],
-                "score": row[4],
+                "category_slug": row[4],
+                "available_stock": row[5],
+                "score": row[6],
             }
             for row in rows
         ]

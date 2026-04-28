@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import Lock
 
@@ -15,15 +15,24 @@ class SearchMetricsSnapshot:
     empty_payload_requests: int
     oversized_payload_requests: int
     decode_error_requests: int
+    threshold_filtered_candidates: int
     total_grouped_candidates: int
     total_returned_candidates: int
     average_top_score: float | None
     average_grouped_candidates: float
     average_returned_candidates: float
+    average_search_latency_ms: float
+    average_encode_latency_ms: float
+    average_db_query_latency_ms: float
     last_status: str | None
+    last_empty_reason: str | None
     last_top_score: float | None
     last_score_floor: float | None
+    last_search_latency_ms: float | None
+    last_encode_latency_ms: float | None
+    last_db_query_latency_ms: float | None
     last_search_at: datetime | None
+    empty_reason_counts: dict[str, int] = field(default_factory=dict)
 
 
 class SearchMetricsCollector:
@@ -37,14 +46,24 @@ class SearchMetricsCollector:
         self._empty_payload_requests = 0
         self._oversized_payload_requests = 0
         self._decode_error_requests = 0
+        self._threshold_filtered_candidates = 0
         self._total_grouped_candidates = 0
         self._total_returned_candidates = 0
         self._top_score_sum = 0.0
         self._top_score_count = 0
+        self._search_latency_sum_ms = 0.0
+        self._encode_latency_sum_ms = 0.0
+        self._db_query_latency_sum_ms = 0.0
+        self._latency_sample_count = 0
         self._last_status: str | None = None
+        self._last_empty_reason: str | None = None
         self._last_top_score: float | None = None
         self._last_score_floor: float | None = None
+        self._last_search_latency_ms: float | None = None
+        self._last_encode_latency_ms: float | None = None
+        self._last_db_query_latency_ms: float | None = None
         self._last_search_at: datetime | None = None
+        self._empty_reason_counts: dict[str, int] = {}
 
     def record_request(
         self,
@@ -52,21 +71,40 @@ class SearchMetricsCollector:
         status: str,
         grouped_candidates: int = 0,
         returned_candidates: int = 0,
+        threshold_filtered_count: int = 0,
         top_score: float | None = None,
         score_floor: float | None = None,
+        empty_reason: str | None = None,
+        search_latency_ms: float | None = None,
+        encode_latency_ms: float | None = None,
+        db_query_latency_ms: float | None = None,
     ) -> None:
         with self._lock:
             self._total_requests += 1
+            self._threshold_filtered_candidates += max(0, threshold_filtered_count)
             self._total_grouped_candidates += grouped_candidates
             self._total_returned_candidates += returned_candidates
             self._last_status = status
+            self._last_empty_reason = empty_reason
             self._last_top_score = top_score
             self._last_score_floor = score_floor
+            self._last_search_latency_ms = search_latency_ms
+            self._last_encode_latency_ms = encode_latency_ms
+            self._last_db_query_latency_ms = db_query_latency_ms
             self._last_search_at = datetime.now(timezone.utc)
 
             if top_score is not None:
                 self._top_score_sum += top_score
                 self._top_score_count += 1
+
+            if search_latency_ms is not None:
+                self._search_latency_sum_ms += search_latency_ms
+                self._encode_latency_sum_ms += encode_latency_ms or 0.0
+                self._db_query_latency_sum_ms += db_query_latency_ms or 0.0
+                self._latency_sample_count += 1
+
+            if empty_reason:
+                self._empty_reason_counts[empty_reason] = self._empty_reason_counts.get(empty_reason, 0) + 1
 
             if status == "accepted":
                 self._accepted_requests += 1
@@ -90,6 +128,7 @@ class SearchMetricsCollector:
                 top_score_average = self._top_score_sum / self._top_score_count
 
             request_count = self._total_requests if self._total_requests > 0 else 1
+            latency_sample_count = self._latency_sample_count if self._latency_sample_count > 0 else 1
             return SearchMetricsSnapshot(
                 total_requests=self._total_requests,
                 accepted_requests=self._accepted_requests,
@@ -99,13 +138,22 @@ class SearchMetricsCollector:
                 empty_payload_requests=self._empty_payload_requests,
                 oversized_payload_requests=self._oversized_payload_requests,
                 decode_error_requests=self._decode_error_requests,
+                threshold_filtered_candidates=self._threshold_filtered_candidates,
                 total_grouped_candidates=self._total_grouped_candidates,
                 total_returned_candidates=self._total_returned_candidates,
                 average_top_score=top_score_average,
                 average_grouped_candidates=self._total_grouped_candidates / request_count,
                 average_returned_candidates=self._total_returned_candidates / request_count,
+                average_search_latency_ms=self._search_latency_sum_ms / latency_sample_count,
+                average_encode_latency_ms=self._encode_latency_sum_ms / latency_sample_count,
+                average_db_query_latency_ms=self._db_query_latency_sum_ms / latency_sample_count,
                 last_status=self._last_status,
+                last_empty_reason=self._last_empty_reason,
                 last_top_score=self._last_top_score,
                 last_score_floor=self._last_score_floor,
+                last_search_latency_ms=self._last_search_latency_ms,
+                last_encode_latency_ms=self._last_encode_latency_ms,
+                last_db_query_latency_ms=self._last_db_query_latency_ms,
                 last_search_at=self._last_search_at,
+                empty_reason_counts=dict(self._empty_reason_counts),
             )

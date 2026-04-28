@@ -6,7 +6,7 @@ from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 
 from .catalog_sync import CatalogSyncService
 from .config import settings
-from .db import bootstrap_database, get_connection
+from .db import bootstrap_database, close_database_pool, get_connection, initialize_database_pool
 from .models import IndexInfoResponse, SearchMetricsResponse, SearchResponse, SyncCatalogResponse
 from .openclip_service import OpenClipService
 from .search_metrics import SearchMetricsCollector
@@ -25,9 +25,18 @@ search_metrics = SearchMetricsCollector()
 def startup_event() -> None:
     global clip_service, catalog_sync_service, image_search_service
     bootstrap_database()
+    initialize_database_pool()
     clip_service = OpenClipService()
     catalog_sync_service = CatalogSyncService(clip_service)
     image_search_service = ImageSearchService(clip_service)
+    image_search_service.refresh_index_info()
+
+
+@app.on_event("shutdown")
+def shutdown_event() -> None:
+    if catalog_sync_service is not None:
+        catalog_sync_service.close()
+    close_database_pool()
 
 
 @app.get("/health")
@@ -54,7 +63,7 @@ def index_info() -> IndexInfoResponse:
     if image_search_service is None:
         info = {"active_image_count": 0, "active_product_count": 0, "index_version": "empty"}
     else:
-        info = image_search_service.load_index_info()
+        info = image_search_service.load_index_info(force_refresh=True)
     return IndexInfoResponse(
         ready=clip_service is not None,
         model_name=settings.openclip_model_name,
@@ -71,7 +80,10 @@ def sync_catalog(x_vision_internal_secret: str | None = Header(default=None)) ->
     _ensure_internal_secret(x_vision_internal_secret)
     if catalog_sync_service is None:
         raise HTTPException(status_code=503, detail="OpenCLIP model is not ready")
-    return catalog_sync_service.run_full_sync()
+    response = catalog_sync_service.run_full_sync()
+    if image_search_service is not None:
+        image_search_service.refresh_index_info()
+    return response
 
 
 @app.get("/v1/metrics", response_model=SearchMetricsResponse)
@@ -87,15 +99,24 @@ def metrics(x_vision_internal_secret: str | None = Header(default=None)) -> Sear
         empty_payload_requests=snapshot.empty_payload_requests,
         oversized_payload_requests=snapshot.oversized_payload_requests,
         decode_error_requests=snapshot.decode_error_requests,
+        threshold_filtered_candidates=snapshot.threshold_filtered_candidates,
         total_grouped_candidates=snapshot.total_grouped_candidates,
         total_returned_candidates=snapshot.total_returned_candidates,
         average_top_score=snapshot.average_top_score,
         average_grouped_candidates=snapshot.average_grouped_candidates,
         average_returned_candidates=snapshot.average_returned_candidates,
+        average_search_latency_ms=snapshot.average_search_latency_ms,
+        average_encode_latency_ms=snapshot.average_encode_latency_ms,
+        average_db_query_latency_ms=snapshot.average_db_query_latency_ms,
         last_status=snapshot.last_status,
+        last_empty_reason=snapshot.last_empty_reason,
         last_top_score=snapshot.last_top_score,
         last_score_floor=snapshot.last_score_floor,
+        last_search_latency_ms=snapshot.last_search_latency_ms,
+        last_encode_latency_ms=snapshot.last_encode_latency_ms,
+        last_db_query_latency_ms=snapshot.last_db_query_latency_ms,
         last_search_at=snapshot.last_search_at,
+        empty_reason_counts=snapshot.empty_reason_counts,
     )
 
 
@@ -126,14 +147,19 @@ async def search_image(
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     logger.info(
-        "image_search status=%s content_type=%s bytes=%s grouped=%s returned=%s top_score=%s score_floor=%s category_slug=%s store_slug=%s",
+        "image_search status=%s empty_reason=%s content_type=%s bytes=%s grouped=%s returned=%s threshold_filtered=%s top_score=%s score_floor=%s search_ms=%.2f encode_ms=%.2f db_ms=%.2f category_slug=%s store_slug=%s",
         result.status,
+        result.empty_reason or "-",
         file.content_type or "unknown",
         len(payload),
         result.grouped_candidate_count,
         len(result.candidates),
+        result.threshold_filtered_count,
         format_score(result.top_score),
         format_score(result.score_floor),
+        result.search_latency_ms,
+        result.encode_latency_ms,
+        result.db_query_latency_ms,
         category_slug or "-",
         store_slug or "-",
     )
@@ -141,8 +167,13 @@ async def search_image(
         status=result.status,
         grouped_candidates=result.grouped_candidate_count,
         returned_candidates=len(result.candidates),
+        threshold_filtered_count=result.threshold_filtered_count,
         top_score=result.top_score,
         score_floor=result.score_floor,
+        empty_reason=result.empty_reason,
+        search_latency_ms=result.search_latency_ms,
+        encode_latency_ms=result.encode_latency_ms,
+        db_query_latency_ms=result.db_query_latency_ms,
     )
     return SearchResponse(
         candidates=result.candidates,

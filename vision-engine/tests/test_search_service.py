@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from io import BytesIO
 from pathlib import Path
 import sys
 import unittest
-from uuid import uuid4
-from contextlib import nullcontext
 from unittest.mock import patch
+from uuid import uuid4
 
 from PIL import Image, ImageDraw
 
@@ -65,120 +65,20 @@ class SearchServiceLogicTests(unittest.TestCase):
         self.assertEqual(context.exception.status_code, 400)
         self.assertEqual(context.exception.metrics_status, "empty_payload")
 
+    def test_validate_image_upload_rejects_oversized_payload(self) -> None:
+        with patch("app.search_service.settings.max_upload_size_bytes", 4):
+            with self.assertRaises(SearchValidationError) as context:
+                validate_image_upload("image/png", b"12345")
+
+        self.assertEqual(context.exception.status_code, 413)
+        self.assertEqual(context.exception.metrics_status, "oversized_payload")
+
     def test_decode_search_image_rejects_invalid_bytes(self) -> None:
         with self.assertRaises(SearchValidationError) as context:
             decode_search_image(b"not-an-image")
 
         self.assertEqual(context.exception.status_code, 400)
         self.assertEqual(context.exception.metrics_status, "decode_error")
-
-    def test_group_search_candidates_prefers_higher_score(self) -> None:
-        product_id = uuid4()
-        rows = [
-            {
-                "backend_product_id": product_id,
-                "image_url": "https://example.com/a.jpg",
-                "image_index": 2,
-                "is_primary": False,
-                "score": 0.82,
-            },
-            {
-                "backend_product_id": product_id,
-                "image_url": "https://example.com/b.jpg",
-                "image_index": 1,
-                "is_primary": True,
-                "score": 0.91,
-            },
-        ]
-
-        grouped = group_search_candidates(rows)
-
-        self.assertEqual(len(grouped), 1)
-        self.assertEqual(grouped[0].matched_image_url, "https://example.com/b.jpg")
-        self.assertTrue(grouped[0].is_primary)
-
-    def test_group_search_candidates_prefers_primary_then_lower_index_on_tie(self) -> None:
-        product_id = uuid4()
-        rows = [
-            {
-                "backend_product_id": product_id,
-                "image_url": "https://example.com/a.jpg",
-                "image_index": 3,
-                "is_primary": False,
-                "score": 0.88,
-            },
-            {
-                "backend_product_id": product_id,
-                "image_url": "https://example.com/b.jpg",
-                "image_index": 4,
-                "is_primary": True,
-                "score": 0.88,
-            },
-            {
-                "backend_product_id": product_id,
-                "image_url": "https://example.com/c.jpg",
-                "image_index": 1,
-                "is_primary": True,
-                "score": 0.88,
-            },
-        ]
-
-        grouped = group_search_candidates(rows)
-
-        self.assertEqual(len(grouped), 1)
-        self.assertEqual(grouped[0].matched_image_url, "https://example.com/c.jpg")
-        self.assertEqual(grouped[0].matched_image_index, 1)
-
-    def test_apply_candidate_thresholds_returns_low_confidence_when_top_score_is_too_low(self) -> None:
-        product_id = uuid4()
-        grouped = group_search_candidates([
-            {
-                "backend_product_id": product_id,
-                "image_url": "https://example.com/a.jpg",
-                "image_index": 0,
-                "is_primary": True,
-                "score": 0.5,
-            }
-        ])
-
-        candidates, top_score, score_floor, status = apply_candidate_thresholds(grouped)
-
-        self.assertEqual(candidates, [])
-        self.assertEqual(status, "low_confidence")
-        self.assertEqual(top_score, 0.5)
-        self.assertIsNotNone(score_floor)
-
-    def test_apply_candidate_thresholds_filters_tail_candidates(self) -> None:
-        grouped = group_search_candidates([
-            {
-                "backend_product_id": uuid4(),
-                "image_url": "https://example.com/a.jpg",
-                "image_index": 0,
-                "is_primary": True,
-                "score": 0.9,
-            },
-            {
-                "backend_product_id": uuid4(),
-                "image_url": "https://example.com/b.jpg",
-                "image_index": 0,
-                "is_primary": True,
-                "score": 0.7,
-            },
-            {
-                "backend_product_id": uuid4(),
-                "image_url": "https://example.com/c.jpg",
-                "image_index": 0,
-                "is_primary": True,
-                "score": 0.5,
-            },
-        ])
-
-        candidates, top_score, score_floor, status = apply_candidate_thresholds(grouped)
-
-        self.assertEqual(status, "accepted")
-        self.assertEqual(top_score, 0.9)
-        self.assertAlmostEqual(score_floor or 0.0, 0.63, places=2)
-        self.assertEqual(len(candidates), 2)
 
     def test_decode_search_image_accepts_real_image_bytes(self) -> None:
         image = Image.new("RGB", (4, 4), color="red")
@@ -190,10 +90,152 @@ class SearchServiceLogicTests(unittest.TestCase):
 
         self.assertEqual(decoded.size, (4, 4))
 
+    def test_decode_search_image_normalizes_exif_orientation(self) -> None:
+        image = Image.new("RGB", (12, 24), color="blue")
+        exif = Image.Exif()
+        exif[274] = 6
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG", exif=exif)
+
+        decoded = decode_search_image(buffer.getvalue())
+
+        self.assertEqual(decoded.size, (24, 12))
+
+    def test_group_search_candidates_prefers_higher_ranking_score(self) -> None:
+        product_id = uuid4()
+        rows = [
+            {
+                "backend_product_id": product_id,
+                "image_url": "https://example.com/a.jpg",
+                "image_index": 2,
+                "is_primary": False,
+                "category_slug": "men",
+                "available_stock": 0,
+                "score": 0.82,
+            },
+            {
+                "backend_product_id": product_id,
+                "image_url": "https://example.com/b.jpg",
+                "image_index": 1,
+                "is_primary": True,
+                "category_slug": "men",
+                "available_stock": 3,
+                "score": 0.81,
+            },
+        ]
+
+        grouped = group_search_candidates(rows)
+
+        self.assertEqual(len(grouped), 1)
+        self.assertEqual(grouped[0].candidate.matched_image_url, "https://example.com/b.jpg")
+        self.assertTrue(grouped[0].candidate.is_primary)
+
+    def test_group_search_candidates_applies_soft_category_boost(self) -> None:
+        product_a = uuid4()
+        product_b = uuid4()
+        rows = [
+            {
+                "backend_product_id": product_a,
+                "image_url": "https://example.com/a.jpg",
+                "image_index": 0,
+                "is_primary": False,
+                "category_slug": "women",
+                "available_stock": 0,
+                "score": 0.82,
+            },
+            {
+                "backend_product_id": product_b,
+                "image_url": "https://example.com/b.jpg",
+                "image_index": 0,
+                "is_primary": True,
+                "category_slug": "men",
+                "available_stock": 5,
+                "score": 0.78,
+            },
+        ]
+
+        grouped = group_search_candidates(
+            rows,
+            category_slug="men",
+            apply_soft_category_boost=True,
+        )
+        candidates, _, _, status, _, _ = apply_candidate_thresholds(grouped)
+
+        self.assertEqual(status, "accepted")
+        self.assertEqual(candidates[0].backend_product_id, product_b)
+
+    def test_apply_candidate_thresholds_returns_low_confidence_when_top_score_is_too_low(self) -> None:
+        grouped = group_search_candidates(
+            [
+                {
+                    "backend_product_id": uuid4(),
+                    "image_url": "https://example.com/a.jpg",
+                    "image_index": 0,
+                    "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 2,
+                    "score": 0.5,
+                }
+            ]
+        )
+
+        candidates, top_score, score_floor, status, empty_reason, threshold_filtered_count = apply_candidate_thresholds(grouped)
+
+        self.assertEqual(candidates, [])
+        self.assertEqual(status, "low_confidence")
+        self.assertEqual(empty_reason, "top_score_below_min_confidence")
+        self.assertEqual(top_score, 0.5)
+        self.assertIsNotNone(score_floor)
+        self.assertEqual(threshold_filtered_count, 1)
+
+    def test_apply_candidate_thresholds_filters_tail_candidates(self) -> None:
+        grouped = group_search_candidates(
+            [
+                {
+                    "backend_product_id": uuid4(),
+                    "image_url": "https://example.com/a.jpg",
+                    "image_index": 0,
+                    "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 3,
+                    "score": 0.9,
+                },
+                {
+                    "backend_product_id": uuid4(),
+                    "image_url": "https://example.com/b.jpg",
+                    "image_index": 0,
+                    "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 1,
+                    "score": 0.7,
+                },
+                {
+                    "backend_product_id": uuid4(),
+                    "image_url": "https://example.com/c.jpg",
+                    "image_index": 0,
+                    "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 0,
+                    "score": 0.5,
+                },
+            ]
+        )
+
+        candidates, top_score, score_floor, status, empty_reason, threshold_filtered_count = apply_candidate_thresholds(grouped)
+
+        self.assertEqual(status, "accepted")
+        self.assertIsNone(empty_reason)
+        self.assertEqual(top_score, 0.9)
+        self.assertAlmostEqual(score_floor or 0.0, 0.63, places=2)
+        self.assertEqual(len(candidates), 2)
+        self.assertEqual(threshold_filtered_count, 1)
+
     def test_query_similar_images_applies_category_store_filters(self) -> None:
-        fake_cursor = self._FakeCursor([
-            (uuid4(), "https://example.com/a.jpg", 0, True, 0.91),
-        ])
+        fake_cursor = self._FakeCursor(
+            [
+                (uuid4(), "https://example.com/a.jpg", 0, True, "men", 5, 0.91),
+            ]
+        )
         service = ImageSearchService(clip_service=object())  # type: ignore[arg-type]
 
         with patch("app.search_service.get_connection", return_value=nullcontext(self._FakeConnection(fake_cursor))):
@@ -251,6 +293,8 @@ class SearchServiceLogicTests(unittest.TestCase):
                     "image_url": "https://example.com/a.jpg",
                     "image_index": 0,
                     "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 3,
                     "score": 0.62,
                 },
                 {
@@ -258,6 +302,8 @@ class SearchServiceLogicTests(unittest.TestCase):
                     "image_url": "https://example.com/b.jpg",
                     "image_index": 0,
                     "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 3,
                     "score": 0.81,
                 },
             ],
@@ -267,6 +313,8 @@ class SearchServiceLogicTests(unittest.TestCase):
                     "image_url": "https://example.com/a.jpg",
                     "image_index": 0,
                     "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 3,
                     "score": 0.87,
                 },
             ],
@@ -276,6 +324,8 @@ class SearchServiceLogicTests(unittest.TestCase):
                     "image_url": "https://example.com/a.jpg",
                     "image_index": 0,
                     "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 3,
                     "score": 0.79,
                 },
                 {
@@ -283,6 +333,8 @@ class SearchServiceLogicTests(unittest.TestCase):
                     "image_url": "https://example.com/b.jpg",
                     "image_index": 0,
                     "is_primary": True,
+                    "category_slug": "men",
+                    "available_stock": 3,
                     "score": 0.7,
                 },
             ],
@@ -296,7 +348,7 @@ class SearchServiceLogicTests(unittest.TestCase):
 
         service._query_similar_images = fake_query  # type: ignore[method-assign]
 
-        ranked = service._query_similar_images_with_views(
+        ranked, db_query_latency_ms = service._query_similar_images_with_views(
             vectors=[[0.1], [0.2], [0.3]],
             view_names=["foreground", "center", "original"],
             limit=10,
@@ -306,6 +358,7 @@ class SearchServiceLogicTests(unittest.TestCase):
 
         self.assertGreaterEqual(len(ranked), 2)
         self.assertEqual(ranked[0]["backend_product_id"], product_a)
+        self.assertGreaterEqual(db_query_latency_ms, 0.0)
 
 
 if __name__ == "__main__":

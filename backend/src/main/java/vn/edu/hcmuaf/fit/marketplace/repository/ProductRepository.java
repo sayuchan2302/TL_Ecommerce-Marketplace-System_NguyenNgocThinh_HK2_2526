@@ -231,6 +231,11 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
                   WHERE pi.product = p
                     AND pi.updatedAt >= :updatedSince
                 )
+                OR EXISTS (
+                  SELECT 1 FROM ProductVariant pv
+                  WHERE pv.product = p
+                    AND pv.updatedAt >= :updatedSince
+                )
               )
             """)
     Page<Product> findPublicMarketplaceProductsUpdatedSince(
@@ -246,6 +251,11 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
                   SELECT 1 FROM ProductImage pi
                   WHERE pi.product = p
                     AND pi.updatedAt >= :updatedSince
+                )
+                OR EXISTS (
+                  SELECT 1 FROM ProductVariant pv
+                  WHERE pv.product = p
+                    AND pv.updatedAt >= :updatedSince
                 )
             )
             AND (

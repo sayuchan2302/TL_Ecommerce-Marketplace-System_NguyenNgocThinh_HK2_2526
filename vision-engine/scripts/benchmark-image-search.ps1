@@ -8,6 +8,7 @@ param(
   [int]$ExactSamples = 5,
   [int]$CropSamples = 5,
   [int]$NoMatchSamples = 5,
+  [int]$CategorySamples = 3,
   [double]$MinTop1Acc = 0.0,
   [double]$MinTop5Recall = 0.0,
   [double]$MaxEmptyRate = 1.0,
@@ -45,25 +46,73 @@ function Get-MimeType {
   }
 }
 
-function Invoke-PublicImageSearch {
+function Build-SearchUrl {
   param(
-    [string]$ImagePath
+    [string]$CategorySlug,
+    [string]$StoreSlug
+  )
+
+  $query = [System.Collections.Generic.List[string]]::new()
+  $query.Add("limit=$Limit")
+
+  if (-not [string]::IsNullOrWhiteSpace($CategorySlug)) {
+    $query.Add("category=$([System.Uri]::EscapeDataString($CategorySlug))")
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($StoreSlug)) {
+    $query.Add("store=$([System.Uri]::EscapeDataString($StoreSlug))")
+  }
+
+  return "$BackendBaseUrl/api/public/marketplace/search/image?" + ($query -join "&")
+}
+
+function Invoke-PublicImageSearchRequest {
+  param(
+    [string]$ImagePath,
+    [string]$CategorySlug = "",
+    [string]$StoreSlug = ""
   )
 
   $mimeType = Get-MimeType -Path $ImagePath
+  $responsePath = [System.IO.Path]::GetTempFileName()
   $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-  $responseRaw = & curl.exe -sS -X POST `
-    -F "file=@$ImagePath;type=$mimeType" `
-    "$BackendBaseUrl/api/public/marketplace/search/image?limit=$Limit"
-  $stopwatch.Stop()
+  try {
+    $statusCode = & curl.exe -sS -o $responsePath -w "%{http_code}" -X POST `
+      -F "file=@$ImagePath;type=$mimeType" `
+      (Build-SearchUrl -CategorySlug $CategorySlug -StoreSlug $StoreSlug)
+    $body = if (Test-Path $responsePath) { Get-Content -Path $responsePath -Raw } else { "" }
+  } finally {
+    $stopwatch.Stop()
+    if (Test-Path $responsePath) {
+      Remove-Item $responsePath -Force
+    }
+  }
 
-  if ([string]::IsNullOrWhiteSpace($responseRaw)) {
+  return [pscustomobject]@{
+    statusCode = [int]$statusCode
+    body = $body
+    latencyMs = [double]$stopwatch.Elapsed.TotalMilliseconds
+  }
+}
+
+function Invoke-PublicImageSearch {
+  param(
+    [string]$ImagePath,
+    [string]$CategorySlug = "",
+    [string]$StoreSlug = ""
+  )
+
+  $request = Invoke-PublicImageSearchRequest -ImagePath $ImagePath -CategorySlug $CategorySlug -StoreSlug $StoreSlug
+  if ($request.statusCode -lt 200 -or $request.statusCode -ge 300) {
+    throw "Public image search failed for $ImagePath with status $($request.statusCode). Body: $($request.body)"
+  }
+  if ([string]::IsNullOrWhiteSpace($request.body)) {
     throw "Public image search returned an empty response for $ImagePath."
   }
 
   return [pscustomobject]@{
-    response = ($responseRaw | ConvertFrom-Json)
-    latencyMs = [double]$stopwatch.Elapsed.TotalMilliseconds
+    response = ($request.body | ConvertFrom-Json)
+    latencyMs = $request.latencyMs
   }
 }
 
@@ -168,7 +217,7 @@ if (-not $SkipSync) {
 }
 
 Write-Step "Loading benchmark samples from internal catalog"
-$catalogSize = [Math]::Max([Math]::Max($ExactSamples, $CropSamples), 1)
+$catalogSize = [Math]::Max([Math]::Max($ExactSamples, $CropSamples), $CategorySamples)
 $catalogResponse = Invoke-JsonGet -Url "$BackendBaseUrl/api/internal/vision/catalog?page=0&size=$catalogSize" -Headers $headers
 if (-not $catalogResponse.items -or $catalogResponse.items.Count -eq 0) {
   throw "Catalog export returned no public image rows."
@@ -177,6 +226,8 @@ if (-not $catalogResponse.items -or $catalogResponse.items.Count -eq 0) {
 $samples = @($catalogResponse.items)
 $exactTotalTarget = [Math]::Min($ExactSamples, $samples.Count)
 $cropTotalTarget = [Math]::Min($CropSamples, $samples.Count)
+$categoryRows = @($samples | Where-Object { -not [string]::IsNullOrWhiteSpace($_.category_slug) } | Select-Object -First $CategorySamples)
+$categoryTotalTarget = $categoryRows.Count
 
 if ($exactTotalTarget -le 0 -or $cropTotalTarget -le 0) {
   throw "Not enough catalog rows to run exact/crop benchmark."
@@ -192,10 +243,14 @@ $exactPass = 0
 $exactTotal = 0
 $cropPass = 0
 $cropTotal = 0
+$categoryPass = 0
+$categoryTotal = 0
 $syntheticEmptyPass = 0
 $syntheticTotal = [Math]::Max($NoMatchSamples, 0)
 $allEmptyCount = 0
 $totalQueries = 0
+$corruptedStatusCode = 0
+$oversizedStatusCode = 0
 
 try {
   Write-Step "Running exact-image benchmark"
@@ -249,6 +304,34 @@ try {
     }
   }
 
+  if ($categoryTotalTarget -gt 0) {
+    Write-Step "Running category-filter benchmark"
+    for ($i = 0; $i -lt $categoryTotalTarget; $i++) {
+      $sample = $categoryRows[$i]
+      $expectedProductId = [string]$sample.backend_product_id
+      $expectedCategorySlug = [string]$sample.category_slug
+      $categoryImagePath = Join-Path $workDir ("category-" + $i + ".jpg")
+      Invoke-WebRequest -Uri $sample.image_url -OutFile $categoryImagePath -TimeoutSec 60
+
+      $result = Invoke-PublicImageSearch -ImagePath $categoryImagePath -CategorySlug $expectedCategorySlug
+      $latencies.Add($result.latencyMs)
+      $totalQueries += 1
+      $categoryTotal += 1
+
+      $items = @($result.response.items)
+      if ($items.Count -eq 0) {
+        $allEmptyCount += 1
+        continue
+      }
+
+      $allMatchCategory = (@($items | Where-Object { [string]$_.categorySlug -ne $expectedCategorySlug }).Count -eq 0)
+      $returnedIds = @($items | ForEach-Object { [string]$_.id })
+      if ($allMatchCategory -and ($returnedIds -contains $expectedProductId)) {
+        $categoryPass += 1
+      }
+    }
+  }
+
   Write-Step "Running no-match benchmark"
   for ($i = 0; $i -lt $syntheticTotal; $i++) {
     $syntheticPath = Join-Path $workDir ("synthetic-" + $i + ".png")
@@ -265,6 +348,18 @@ try {
     }
   }
 
+  Write-Step "Running corrupted-image benchmark"
+  $corruptedPath = Join-Path $workDir "corrupted-query.jpg"
+  Set-Content -Path $corruptedPath -Value "not a real image" -Encoding utf8
+  $corruptedResponse = Invoke-PublicImageSearchRequest -ImagePath $corruptedPath
+  $corruptedStatusCode = $corruptedResponse.statusCode
+
+  Write-Step "Running oversized-image benchmark"
+  $oversizedPath = Join-Path $workDir "oversized-query.jpg"
+  [System.IO.File]::WriteAllBytes($oversizedPath, (New-Object byte[] (6 * 1024 * 1024)))
+  $oversizedResponse = Invoke-PublicImageSearchRequest -ImagePath $oversizedPath
+  $oversizedStatusCode = $oversizedResponse.statusCode
+
   $metricsAfter = Invoke-JsonGet -Url "$VisionBaseUrl/v1/metrics" -Headers $headers
   $indexInfo = Invoke-JsonGet -Url "$VisionBaseUrl/v1/index/info"
 
@@ -275,7 +370,15 @@ try {
   $total = [Math]::Max(1, $totalQueries)
   $exactDenominator = [Math]::Max(1, $exactTotal)
   $cropDenominator = [Math]::Max(1, $cropTotal)
+  $categoryDenominator = [Math]::Max(1, $categoryTotal)
   $syntheticDenominator = [Math]::Max(1, $syntheticTotal)
+  $corruptedErrorPass = ($corruptedStatusCode -eq 400)
+  $oversizedErrorPass = ($oversizedStatusCode -eq 413)
+  $categoryFilterPassRate = if ($categoryTotal -gt 0) {
+    [Math]::Round(($categoryPass / $categoryDenominator), 4)
+  } else {
+    1.0
+  }
 
   $summary = [pscustomobject]@{
     backend_status = $backendHealth.status
@@ -284,13 +387,18 @@ try {
     request_count = $totalQueries
     top1_acc = [Math]::Round(($exactPass / $exactDenominator), 4)
     top5_recall = [Math]::Round(($cropPass / $cropDenominator), 4)
+    category_filter_pass_rate = $categoryFilterPassRate
+    synthetic_empty_rate = [Math]::Round(($syntheticEmptyPass / $syntheticDenominator), 4)
     empty_rate = [Math]::Round(($allEmptyCount / $total), 4)
     low_confidence_rate = [Math]::Round(($deltaLowConfidence / $total), 4)
     p95_latency = [Math]::Round((Get-P95 -Values $latencies.ToArray()), 2)
     accepted = $deltaAccepted
     low_confidence = $deltaLowConfidence
     empty = $deltaEmpty
-    synthetic_empty_rate = [Math]::Round(($syntheticEmptyPass / $syntheticDenominator), 4)
+    corrupted_status_code = $corruptedStatusCode
+    corrupted_error_pass = $corruptedErrorPass
+    oversized_status_code = $oversizedStatusCode
+    oversized_error_pass = $oversizedErrorPass
   }
 
   $gatePass = (
@@ -298,7 +406,10 @@ try {
     $summary.top5_recall -ge $MinTop5Recall -and
     $summary.empty_rate -le $MaxEmptyRate -and
     $summary.low_confidence_rate -le $MaxLowConfidenceRate -and
-    $summary.p95_latency -le $MaxP95LatencyMs
+    $summary.p95_latency -le $MaxP95LatencyMs -and
+    $summary.category_filter_pass_rate -ge 1.0 -and
+    $summary.corrupted_error_pass -and
+    $summary.oversized_error_pass
   )
   $summary | Add-Member -NotePropertyName "gate_pass" -NotePropertyValue $gatePass
 

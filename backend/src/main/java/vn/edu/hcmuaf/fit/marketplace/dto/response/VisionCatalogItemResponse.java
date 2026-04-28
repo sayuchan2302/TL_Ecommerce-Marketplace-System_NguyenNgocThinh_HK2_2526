@@ -38,6 +38,9 @@ public class VisionCatalogItemResponse {
     @JsonProperty("is_primary")
     private Boolean isPrimary;
 
+    @JsonProperty("available_stock")
+    private Integer availableStock;
+
     @JsonProperty("source_updated_at")
     private LocalDateTime sourceUpdatedAt;
 }

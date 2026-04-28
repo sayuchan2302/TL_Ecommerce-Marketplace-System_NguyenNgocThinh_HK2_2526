@@ -19,11 +19,24 @@ class Settings(BaseSettings):
     read_timeout_seconds: int = 20
     image_download_timeout_seconds: int = 20
     max_upload_size_bytes: int = 5_242_880
+    max_image_pixels: int = 20_000_000
     search_candidate_multiplier: int = 8
     search_candidate_cap: int = 500
+    search_hnsw_ef_search: int = 80
+    db_pool_min_size: int = 1
+    db_pool_max_size: int = 8
     image_search_min_confidence_score: float = 0.55
     image_search_relative_score_floor: float = 0.7
     image_search_absolute_score_floor: float = 0.4
+    image_search_foreground_view_weight: float = 0.6
+    image_search_center_view_weight: float = 0.25
+    image_search_original_view_weight: float = 0.15
+    image_search_best_view_bonus: float = 0.08
+    image_search_product_best_image_weight: float = 1.0
+    image_search_product_primary_image_boost: float = 0.03
+    image_search_product_category_match_boost: float = 0.02
+    image_search_product_in_stock_boost: float = 0.04
+    image_search_category_filter_mode: str = "hard"
     sync_page_size: int = 100
     sync_batch_size: int = 32
 

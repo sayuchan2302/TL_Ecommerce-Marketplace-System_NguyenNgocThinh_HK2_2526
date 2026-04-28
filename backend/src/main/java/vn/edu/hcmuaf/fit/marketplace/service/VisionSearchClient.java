@@ -150,7 +150,7 @@ public class VisionSearchClient {
     }
 
     private ResponseStatusException translateError(int statusCode, String body) {
-        String message = body == null || body.isBlank() ? "Image search service returned an error" : body;
+        String message = extractErrorMessage(body);
         HttpStatus status = switch (statusCode) {
             case 400 -> HttpStatus.BAD_REQUEST;
             case 401, 403 -> HttpStatus.BAD_GATEWAY;
@@ -161,6 +161,21 @@ public class VisionSearchClient {
             default -> HttpStatus.BAD_GATEWAY;
         };
         return new ResponseStatusException(status, message);
+    }
+
+    private String extractErrorMessage(String body) {
+        if (body == null || body.isBlank()) {
+            return "Image search service returned an error";
+        }
+        try {
+            VisionSearchErrorPayload payload = objectMapper.readValue(body, VisionSearchErrorPayload.class);
+            if (payload.detail != null && !payload.detail.isBlank()) {
+                return payload.detail;
+            }
+        } catch (IOException ignored) {
+            // Fall back to the raw body when the upstream error is not JSON.
+        }
+        return body;
     }
 
     public record VisionSearchResult(
@@ -193,5 +208,10 @@ public class VisionSearchClient {
 
         @JsonProperty("index_version")
         private String indexVersion;
+    }
+
+    private static class VisionSearchErrorPayload {
+        @JsonProperty("detail")
+        private String detail;
     }
 }

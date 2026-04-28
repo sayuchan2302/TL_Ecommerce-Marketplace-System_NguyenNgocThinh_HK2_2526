@@ -595,6 +595,7 @@ public class MarketplacePublicService {
                         .imageUrl(image.getUrl().trim())
                         .imageIndex(image.getSortOrder() == null ? 0 : image.getSortOrder())
                         .isPrimary(Boolean.TRUE.equals(image.getIsPrimary()))
+                        .availableStock(resolveTotalStock(product))
                         .sourceUpdatedAt(resolveVisionSourceUpdatedAt(product, image))
                         .build())
                 .toList();
@@ -606,6 +607,16 @@ public class MarketplacePublicService {
         latest = newestDate(latest, product.getCreatedAt());
         latest = newestDate(latest, image.getUpdatedAt());
         latest = newestDate(latest, image.getCreatedAt());
+        List<ProductVariant> variants = product.getVariants();
+        if (variants != null) {
+            for (ProductVariant variant : variants) {
+                if (variant == null) {
+                    continue;
+                }
+                latest = newestDate(latest, variant.getUpdatedAt());
+                latest = newestDate(latest, variant.getCreatedAt());
+            }
+        }
         return latest;
     }
 

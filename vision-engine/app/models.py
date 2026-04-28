@@ -16,6 +16,7 @@ class VisionCatalogItem(BaseModel):
     image_url: str
     image_index: int = 0
     is_primary: bool = False
+    available_stock: int = 0
     source_updated_at: datetime | None = None
 
 
@@ -61,21 +62,36 @@ class SearchMetricsResponse(BaseModel):
     empty_payload_requests: int
     oversized_payload_requests: int
     decode_error_requests: int
+    threshold_filtered_candidates: int
     total_grouped_candidates: int
     total_returned_candidates: int
     average_top_score: float | None = None
     average_grouped_candidates: float
     average_returned_candidates: float
+    average_search_latency_ms: float
+    average_encode_latency_ms: float
+    average_db_query_latency_ms: float
     last_status: str | None = None
+    last_empty_reason: str | None = None
     last_top_score: float | None = None
     last_score_floor: float | None = None
+    last_search_latency_ms: float | None = None
+    last_encode_latency_ms: float | None = None
+    last_db_query_latency_ms: float | None = None
     last_search_at: datetime | None = None
+    empty_reason_counts: dict[str, int] = Field(default_factory=dict)
 
 
 class SyncCatalogResponse(BaseModel):
     synced_rows: int
     failed_rows: int
     deactivated_rows: int
+    images_processed: int
+    embeddings_inserted: int
+    embeddings_updated: int
+    skipped_unchanged: int
+    failed_images: int
+    inactive_stale_rows: int
     sync_token: str
     index_version: str
     failures: list[dict[str, Any]] = Field(default_factory=list)

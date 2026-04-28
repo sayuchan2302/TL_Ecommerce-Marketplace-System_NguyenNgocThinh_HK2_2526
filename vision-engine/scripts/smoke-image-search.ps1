@@ -96,9 +96,15 @@ Write-Step "Smoke summary"
   BackendStatus       = $backendHealth.status
   VisionStatus        = $visionHealth.status
   VisionReady         = $visionReady.ready
+  ImagesProcessed     = $syncResponse.images_processed
   SyncedRows          = $syncResponse.synced_rows
+  EmbeddingsInserted  = $syncResponse.embeddings_inserted
+  EmbeddingsUpdated   = $syncResponse.embeddings_updated
+  SkippedUnchanged    = $syncResponse.skipped_unchanged
   FailedRows          = $syncResponse.failed_rows
+  FailedImages        = $syncResponse.failed_images
   DeactivatedRows     = $syncResponse.deactivated_rows
+  InactiveStaleRows   = $syncResponse.inactive_stale_rows
   IndexVersion        = $syncResponse.index_version
   ExpectedProductId   = $expectedProductId
   Top1ProductId       = $actualProductId

@@ -29,10 +29,9 @@ class OpenClipService:
         if not tensors:
             return []
 
-        with torch.no_grad():
+        with torch.inference_mode():
             batch = torch.stack(tensors).to(self.device)
             features = self.model.encode_image(batch)
             features = features / features.norm(dim=-1, keepdim=True)
             rows = features.detach().cpu().numpy().astype(np.float32)
         return [row for row in rows]
-

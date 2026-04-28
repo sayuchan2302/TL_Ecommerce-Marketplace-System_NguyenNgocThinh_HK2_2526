@@ -7,7 +7,7 @@ from io import BytesIO
 from uuid import NAMESPACE_URL, UUID, uuid5
 
 import requests
-from PIL import Image
+from PIL import Image, ImageOps
 
 from .config import settings
 from .db import get_connection
@@ -24,11 +24,17 @@ class CatalogSyncService:
         self.clip_service = clip_service
         self.http = requests.Session()
 
+    def close(self) -> None:
+        self.http.close()
+
     def run_full_sync(self) -> SyncCatalogResponse:
         sync_token = datetime.now(UTC).isoformat()
-        synced_rows = 0
-        failed_rows = 0
-        deactivated_rows = 0
+        images_processed = 0
+        embeddings_inserted = 0
+        embeddings_updated = 0
+        skipped_unchanged = 0
+        failed_images = 0
+        inactive_stale_rows = 0
         failures: list[dict[str, str]] = []
         changed_images_by_product: dict[str, set[str]] = defaultdict(set)
 
@@ -45,42 +51,64 @@ class CatalogSyncService:
                 changed_images_by_product[str(item.backend_product_id)].add(item.image_url)
 
             for batch in self._iter_batches(payload.items, settings.sync_batch_size):
+                if not batch:
+                    continue
+
+                images_processed += len(batch)
+                existing_rows = self._load_existing_rows(batch)
+                reusable_items: list[VisionCatalogItem] = []
                 images: list[Image.Image] = []
                 batch_items: list[VisionCatalogItem] = []
 
                 for item in batch:
+                    if self._can_reuse_embedding(item, existing_rows.get(self._catalog_key(item))):
+                        reusable_items.append(item)
+                        continue
+
                     try:
                         image = self._download_image(item.image_url)
                         images.append(image)
                         batch_items.append(item)
                     except Exception as exc:  # noqa: BLE001
-                        failed_rows += 1
-                        failures.append({
-                            "image_url": item.image_url,
-                            "backend_product_id": str(item.backend_product_id),
-                            "error": str(exc),
-                        })
+                        failed_images += 1
+                        failures.append(
+                            {
+                                "image_url": item.image_url,
+                                "backend_product_id": str(item.backend_product_id),
+                                "error": str(exc),
+                            }
+                        )
 
-                if not batch_items:
-                    continue
+                if reusable_items:
+                    skipped_unchanged += self._refresh_reusable_rows(reusable_items, sync_token)
 
-                vectors = self.clip_service.encode_images(images)
-                synced_rows += self._upsert_batch(batch_items, vectors, sync_token)
+                if batch_items:
+                    vectors = self.clip_service.encode_images(images)
+                    inserted, updated = self._upsert_batch(batch_items, vectors, sync_token, existing_rows)
+                    embeddings_inserted += inserted
+                    embeddings_updated += updated
 
             page += 1
 
         if incremental_mode:
-            deactivated_rows += self._deactivate_missing_images_for_changed_products(changed_images_by_product)
+            inactive_stale_rows += self._deactivate_missing_images_for_changed_products(changed_images_by_product)
             deactivated_product_ids = self._fetch_deactivated_product_ids(updated_since)
-            deactivated_rows += self._deactivate_products(deactivated_product_ids)
+            inactive_stale_rows += self._deactivate_products(deactivated_product_ids)
         else:
-            deactivated_rows += self._deactivate_stale_rows(sync_token)
+            inactive_stale_rows += self._deactivate_stale_rows(sync_token)
 
         index_version = self._resolve_index_version()
+        synced_rows = embeddings_inserted + embeddings_updated
         return SyncCatalogResponse(
             synced_rows=synced_rows,
-            failed_rows=failed_rows,
-            deactivated_rows=deactivated_rows,
+            failed_rows=failed_images,
+            deactivated_rows=inactive_stale_rows,
+            images_processed=images_processed,
+            embeddings_inserted=embeddings_inserted,
+            embeddings_updated=embeddings_updated,
+            skipped_unchanged=skipped_unchanged,
+            failed_images=failed_images,
+            inactive_stale_rows=inactive_stale_rows,
             sync_token=sync_token,
             index_version=index_version,
             failures=failures[:100],
@@ -122,32 +150,150 @@ class CatalogSyncService:
             timeout=(settings.connect_timeout_seconds, settings.image_download_timeout_seconds),
         )
         response.raise_for_status()
-        return Image.open(BytesIO(response.content)).convert("RGB")
+        return self._decode_downloaded_image(response.content)
 
-    def _upsert_batch(self, items: list[VisionCatalogItem], vectors: list, sync_token: str) -> int:
-        rows = []
-        for item, vector in zip(items, vectors, strict=True):
-            row_id = uuid5(NAMESPACE_URL, f"{item.backend_product_id}:{item.image_url}")
-            rows.append((
-                row_id,
-                item.backend_product_id,
+    def _decode_downloaded_image(self, payload: bytes) -> Image.Image:
+        with Image.open(BytesIO(payload)) as probe:
+            probe.verify()
+
+        with Image.open(BytesIO(payload)) as source:
+            normalized = ImageOps.exif_transpose(source)
+            normalized.load()
+            return normalized.convert("RGB")
+
+    def _catalog_key(self, item: VisionCatalogItem) -> tuple[str, str]:
+        return str(item.backend_product_id), item.image_url
+
+    def _load_existing_rows(self, items: list[VisionCatalogItem]) -> dict[tuple[str, str], dict[str, object]]:
+        if not items:
+            return {}
+
+        placeholders = ",".join(["(%s, %s)"] * len(items))
+        params: list[object] = []
+        for item in items:
+            params.extend([item.backend_product_id, item.image_url])
+
+        sql = f"""
+            SELECT
+                backend_product_id,
+                image_url,
+                source_updated_at,
+                model_name,
+                model_pretrained
+            FROM vision.product_image_embeddings
+            WHERE (backend_product_id, image_url) IN ({placeholders})
+        """
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+
+        existing: dict[tuple[str, str], dict[str, object]] = {}
+        for row in rows:
+            key = str(row[0]), str(row[1])
+            existing[key] = {
+                "source_updated_at": row[2],
+                "model_name": row[3],
+                "model_pretrained": row[4],
+            }
+        return existing
+
+    def _can_reuse_embedding(self, item: VisionCatalogItem, existing: dict[str, object] | None) -> bool:
+        if existing is None:
+            return False
+        if existing.get("model_name") != settings.openclip_model_name:
+            return False
+        if existing.get("model_pretrained") != settings.openclip_pretrained:
+            return False
+        return existing.get("source_updated_at") == item.source_updated_at
+
+    def _refresh_reusable_rows(self, items: list[VisionCatalogItem], sync_token: str) -> int:
+        if not items:
+            return 0
+
+        sql = """
+            UPDATE vision.product_image_embeddings
+            SET
+                product_slug = %s,
+                store_id = %s,
+                store_slug = %s,
+                category_slug = %s,
+                image_index = %s,
+                is_primary = %s,
+                available_stock = %s,
+                source_updated_at = %s,
+                is_active = true,
+                model_name = %s,
+                model_pretrained = %s,
+                sync_token = %s,
+                updated_at = now()
+            WHERE backend_product_id = %s
+              AND image_url = %s
+        """
+        rows = [
+            (
                 item.product_slug,
                 item.store_id,
                 item.store_slug,
                 item.category_slug,
-                item.image_url,
                 item.image_index,
                 item.is_primary,
+                item.available_stock,
                 item.source_updated_at,
-                vector,
-                True,
                 settings.openclip_model_name,
                 settings.openclip_pretrained,
                 sync_token,
-            ))
+                item.backend_product_id,
+                item.image_url,
+            )
+            for item in items
+        ]
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.executemany(sql, rows)
+            conn.commit()
+        return len(rows)
+
+    def _upsert_batch(
+        self,
+        items: list[VisionCatalogItem],
+        vectors: list,
+        sync_token: str,
+        existing_rows: dict[tuple[str, str], dict[str, object]],
+    ) -> tuple[int, int]:
+        rows = []
+        inserted = 0
+        updated = 0
+        for item, vector in zip(items, vectors, strict=True):
+            row_id = uuid5(NAMESPACE_URL, f"{item.backend_product_id}:{item.image_url}")
+            rows.append(
+                (
+                    row_id,
+                    item.backend_product_id,
+                    item.product_slug,
+                    item.store_id,
+                    item.store_slug,
+                    item.category_slug,
+                    item.image_url,
+                    item.image_index,
+                    item.is_primary,
+                    item.available_stock,
+                    item.source_updated_at,
+                    vector,
+                    True,
+                    settings.openclip_model_name,
+                    settings.openclip_pretrained,
+                    sync_token,
+                )
+            )
+            if self._catalog_key(item) in existing_rows:
+                updated += 1
+            else:
+                inserted += 1
 
         if not rows:
-            return 0
+            return 0, 0
 
         sql = """
             INSERT INTO vision.product_image_embeddings (
@@ -160,6 +306,7 @@ class CatalogSyncService:
                 image_url,
                 image_index,
                 is_primary,
+                available_stock,
                 source_updated_at,
                 embedding,
                 is_active,
@@ -168,7 +315,7 @@ class CatalogSyncService:
                 sync_token
             )
             VALUES (
-                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
             )
             ON CONFLICT (backend_product_id, image_url)
             DO UPDATE SET
@@ -178,6 +325,7 @@ class CatalogSyncService:
                 category_slug = EXCLUDED.category_slug,
                 image_index = EXCLUDED.image_index,
                 is_primary = EXCLUDED.is_primary,
+                available_stock = EXCLUDED.available_stock,
                 source_updated_at = EXCLUDED.source_updated_at,
                 embedding = EXCLUDED.embedding,
                 is_active = true,
@@ -191,7 +339,7 @@ class CatalogSyncService:
             with conn.cursor() as cur:
                 cur.executemany(sql, rows)
             conn.commit()
-        return len(rows)
+        return inserted, updated
 
     def _deactivate_stale_rows(self, sync_token: str) -> int:
         sql = """

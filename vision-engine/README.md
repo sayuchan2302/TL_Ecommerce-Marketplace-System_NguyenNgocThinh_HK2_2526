@@ -38,6 +38,17 @@ Optional relevance tuning:
 - `IMAGE_SEARCH_MIN_CONFIDENCE_SCORE`
 - `IMAGE_SEARCH_RELATIVE_SCORE_FLOOR`
 - `IMAGE_SEARCH_ABSOLUTE_SCORE_FLOOR`
+- `IMAGE_SEARCH_FOREGROUND_VIEW_WEIGHT`
+- `IMAGE_SEARCH_CENTER_VIEW_WEIGHT`
+- `IMAGE_SEARCH_ORIGINAL_VIEW_WEIGHT`
+- `IMAGE_SEARCH_BEST_VIEW_BONUS`
+- `IMAGE_SEARCH_PRODUCT_PRIMARY_IMAGE_BOOST`
+- `IMAGE_SEARCH_PRODUCT_CATEGORY_MATCH_BOOST`
+- `IMAGE_SEARCH_PRODUCT_IN_STOCK_BOOST`
+- `IMAGE_SEARCH_CATEGORY_FILTER_MODE`
+- `SEARCH_HNSW_EF_SEARCH`
+- `DB_POOL_MIN_SIZE`
+- `DB_POOL_MAX_SIZE`
 
 For local Windows development without Docker, use:
 
@@ -97,6 +108,13 @@ Invoke-RestMethod `
   -Headers @{ "X-Vision-Internal-Secret" = "change-me-vision-secret" }
 ```
 
+The metrics payload includes:
+
+- request counters by status
+- threshold-filtered candidate count
+- average and last search / encode / DB-query latency
+- last empty-result reason and cumulative empty-reason counts
+
 ## Smoke test
 
 The smoke script:
@@ -121,6 +139,9 @@ The benchmark script validates three behaviors through the public API:
 - exact catalog image returns the expected product at top-1
 - center-cropped image still keeps the expected product in top-k
 - no-match synthetic image returns zero products
+- category filter does not return products outside the requested category
+- corrupted image returns a 4xx error through the backend gateway
+- oversized image returns a 4xx error through the backend gateway
 
 Run:
 
