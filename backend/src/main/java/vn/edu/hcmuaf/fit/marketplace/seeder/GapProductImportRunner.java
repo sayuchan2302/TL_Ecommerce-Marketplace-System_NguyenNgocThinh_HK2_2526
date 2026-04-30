@@ -53,92 +53,183 @@ import java.util.stream.Collectors;
 @Component
 public class GapProductImportRunner implements ApplicationRunner {
 
-    private static final Logger log = LoggerFactory.getLogger(GapProductImportRunner.class);
-    private static final Set<String> ALLOWED_MASTER_CATEGORIES = Set.of("apparel", "accessories");
-    private static final Set<String> ALLOWED_ROOTS = Set.of("men", "women", "accessories");
+    private static final Logger log = LoggerFactory
+            .getLogger(GapProductImportRunner.class);
+    private static final Set<String> ALLOWED_MASTER_CATEGORIES = Set
+            .of("apparel", "accessories");
+    private static final Set<String> ALLOWED_ROOTS = Set.of("men", "women",
+            "accessories");
     private static final int MAX_IMAGES_PER_PRODUCT = 6;
     private static final int MAX_COLORS_PER_PRODUCT = 4;
     private static final int MAX_SIZES_PER_PRODUCT = 6;
-    private static final String DEFAULT_IMAGE =
-            "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=672&h=990&fit=crop&fm=webp&q=80&auto=format";
-    private static final List<ImportCategoryDefinition> IMPORT_CATEGORY_DEFINITIONS = List.of(
-            new ImportCategoryDefinition("Nam", "men", "Danh mục gốc cho thời trang nam.", null, 1),
-            new ImportCategoryDefinition("Nữ", "women", "Danh mục gốc cho thời trang nữ.", null, 2),
-            new ImportCategoryDefinition("Phụ kiện", "accessories", "Danh mục gốc cho phụ kiện.", null, 3),
+    private static final String DEFAULT_IMAGE = "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=672&h=990&fit=crop&fm=webp&q=80&auto=format";
+    private static final List<ImportCategoryDefinition> IMPORT_CATEGORY_DEFINITIONS = List
+            .of(
+                    new ImportCategoryDefinition("Nam", "men",
+                            "Danh mục gốc cho thời trang nam.", null, 1),
+                    new ImportCategoryDefinition("Nữ", "women",
+                            "Danh mục gốc cho thời trang nữ.", null, 2),
+                    new ImportCategoryDefinition("Phụ kiện", "accessories",
+                            "Danh mục gốc cho phụ kiện.", null, 3),
 
-            new ImportCategoryDefinition("Áo nam", "men-ao", "Nhóm áo dành cho nam.", "men", 10),
-            new ImportCategoryDefinition("Quần nam", "men-quan", "Nhóm quần dành cho nam.", "men", 20),
-            new ImportCategoryDefinition("Đồ thể thao nam", "men-do-the-thao", "Nhóm đồ thể thao nam.", "men", 30),
-            new ImportCategoryDefinition("Đồ mặc nhà nam", "men-do-mac-nha", "Nhóm đồ mặc nhà nam.", "men", 40),
+                    new ImportCategoryDefinition("Áo nam", "men-ao",
+                            "Nhóm áo dành cho nam.", "men", 10),
+                    new ImportCategoryDefinition("Quần nam", "men-quan",
+                            "Nhóm quần dành cho nam.", "men", 20),
+                    new ImportCategoryDefinition("Đồ thể thao nam",
+                            "men-do-the-thao", "Nhóm đồ thể thao nam.", "men",
+                            30),
+                    new ImportCategoryDefinition("Đồ mặc nhà nam",
+                            "men-do-mac-nha", "Nhóm đồ mặc nhà nam.", "men",
+                            40),
 
-            new ImportCategoryDefinition("Áo nữ", "women-ao", "Nhóm áo dành cho nữ.", "women", 10),
-            new ImportCategoryDefinition("Váy đầm nữ", "women-vay-dam", "Nhóm váy đầm dành cho nữ.", "women", 20),
-            new ImportCategoryDefinition("Quần nữ", "women-quan", "Nhóm quần dành cho nữ.", "women", 30),
-            new ImportCategoryDefinition("Đồ thể thao nữ", "women-do-the-thao", "Nhóm đồ thể thao nữ.", "women", 40),
-            new ImportCategoryDefinition("Đồ mặc nhà nữ", "women-do-mac-nha", "Nhóm đồ mặc nhà nữ.", "women", 50),
+                    new ImportCategoryDefinition("Áo nữ", "women-ao",
+                            "Nhóm áo dành cho nữ.", "women", 10),
+                    new ImportCategoryDefinition("Váy đầm nữ", "women-vay-dam",
+                            "Nhóm váy đầm dành cho nữ.", "women", 20),
+                    new ImportCategoryDefinition("Quần nữ", "women-quan",
+                            "Nhóm quần dành cho nữ.", "women", 30),
+                    new ImportCategoryDefinition("Đồ thể thao nữ",
+                            "women-do-the-thao", "Nhóm đồ thể thao nữ.",
+                            "women", 40),
+                    new ImportCategoryDefinition("Đồ mặc nhà nữ",
+                            "women-do-mac-nha", "Nhóm đồ mặc nhà nữ.", "women",
+                            50),
 
-            new ImportCategoryDefinition("Túi và ví", "accessories-tui-va-vi", "Nhóm túi và ví.", "accessories", 10),
-            new ImportCategoryDefinition("Phụ kiện thời trang", "accessories-phu-kien-thoi-trang", "Nhóm phụ kiện thời trang.", "accessories", 20),
-            new ImportCategoryDefinition("Phụ kiện khác", "accessories-phu-kien-khac", "Nhóm phụ kiện khác.", "accessories", 30),
+                    new ImportCategoryDefinition("Túi và ví",
+                            "accessories-tui-va-vi", "Nhóm túi và ví.",
+                            "accessories", 10),
+                    new ImportCategoryDefinition("Phụ kiện thời trang",
+                            "accessories-phu-kien-thoi-trang",
+                            "Nhóm phụ kiện thời trang.", "accessories", 20),
+                    new ImportCategoryDefinition("Phụ kiện khác",
+                            "accessories-phu-kien-khac", "Nhóm phụ kiện khác.",
+                            "accessories", 30),
 
-            new ImportCategoryDefinition("Áo thun nam", "men-ao-thun", "Áo thun nam.", "men-ao", 1),
-            new ImportCategoryDefinition("Áo polo nam", "men-ao-polo", "Áo polo nam.", "men-ao", 2),
-            new ImportCategoryDefinition("Áo sơ mi nam", "men-ao-so-mi", "Áo sơ mi nam.", "men-ao", 3),
-            new ImportCategoryDefinition("Áo hoodie nam", "men-ao-hoodie", "Áo hoodie nam.", "men-ao", 4),
-            new ImportCategoryDefinition("Áo len nam", "men-ao-len", "Áo len nam.", "men-ao", 5),
+                    new ImportCategoryDefinition("Áo thun nam", "men-ao-thun",
+                            "Áo thun nam.", "men-ao", 1),
+                    new ImportCategoryDefinition("Áo polo nam", "men-ao-polo",
+                            "Áo polo nam.", "men-ao", 2),
+                    new ImportCategoryDefinition("Áo sơ mi nam", "men-ao-so-mi",
+                            "Áo sơ mi nam.", "men-ao", 3),
+                    new ImportCategoryDefinition("Áo hoodie nam",
+                            "men-ao-hoodie", "Áo hoodie nam.", "men-ao", 4),
+                    new ImportCategoryDefinition("Áo len nam", "men-ao-len",
+                            "Áo len nam.", "men-ao", 5),
 
-            new ImportCategoryDefinition("Quần jeans nam", "men-quan-jeans", "Quần jeans nam.", "men-quan", 1),
-            new ImportCategoryDefinition("Quần tây nam", "men-quan-tay", "Quần tây nam.", "men-quan", 2),
-            new ImportCategoryDefinition("Quần kaki nam", "men-quan-kaki", "Quần kaki nam.", "men-quan", 3),
-            new ImportCategoryDefinition("Quần short nam", "men-quan-short", "Quần short nam.", "men-quan", 4),
-            new ImportCategoryDefinition("Quần jogger nam", "men-quan-jogger", "Quần jogger nam.", "men-quan", 5),
+                    new ImportCategoryDefinition("Quần jeans nam",
+                            "men-quan-jeans", "Quần jeans nam.", "men-quan", 1),
+                    new ImportCategoryDefinition("Quần tây nam", "men-quan-tay",
+                            "Quần tây nam.", "men-quan", 2),
+                    new ImportCategoryDefinition("Quần kaki nam",
+                            "men-quan-kaki", "Quần kaki nam.", "men-quan", 3),
+                    new ImportCategoryDefinition("Quần short nam",
+                            "men-quan-short", "Quần short nam.", "men-quan", 4),
+                    new ImportCategoryDefinition("Quần jogger nam",
+                            "men-quan-jogger", "Quần jogger nam.", "men-quan",
+                            5),
 
-            new ImportCategoryDefinition("Áo thể thao nam", "men-ao-the-thao", "Áo thể thao nam.", "men-do-the-thao", 1),
-            new ImportCategoryDefinition("Quần thể thao nam", "men-quan-the-thao", "Quần thể thao nam.", "men-do-the-thao", 2),
-            new ImportCategoryDefinition("Set thể thao nam", "men-set-the-thao", "Set thể thao nam.", "men-do-the-thao", 3),
+                    new ImportCategoryDefinition("Áo thể thao nam",
+                            "men-ao-the-thao", "Áo thể thao nam.",
+                            "men-do-the-thao", 1),
+                    new ImportCategoryDefinition("Quần thể thao nam",
+                            "men-quan-the-thao", "Quần thể thao nam.",
+                            "men-do-the-thao", 2),
+                    new ImportCategoryDefinition("Set thể thao nam",
+                            "men-set-the-thao", "Set thể thao nam.",
+                            "men-do-the-thao", 3),
 
-            new ImportCategoryDefinition("Áo mặc nhà nam", "men-ao-mac-nha", "Áo mặc nhà nam.", "men-do-mac-nha", 1),
-            new ImportCategoryDefinition("Quần mặc nhà nam", "men-quan-mac-nha", "Quần mặc nhà nam.", "men-do-mac-nha", 2),
-            new ImportCategoryDefinition("Bộ mặc nhà nam", "men-bo-mac-nha", "Bộ mặc nhà nam.", "men-do-mac-nha", 3),
+                    new ImportCategoryDefinition("Áo mặc nhà nam",
+                            "men-ao-mac-nha", "Áo mặc nhà nam.",
+                            "men-do-mac-nha", 1),
+                    new ImportCategoryDefinition("Quần mặc nhà nam",
+                            "men-quan-mac-nha", "Quần mặc nhà nam.",
+                            "men-do-mac-nha", 2),
+                    new ImportCategoryDefinition("Bộ mặc nhà nam",
+                            "men-bo-mac-nha", "Bộ mặc nhà nam.",
+                            "men-do-mac-nha", 3),
 
-            new ImportCategoryDefinition("Áo thun nữ", "women-ao-thun", "Áo thun nữ.", "women-ao", 1),
-            new ImportCategoryDefinition("Áo kiểu nữ", "women-ao-kieu", "Áo kiểu nữ.", "women-ao", 2),
-            new ImportCategoryDefinition("Áo sơ mi nữ", "women-ao-so-mi", "Áo sơ mi nữ.", "women-ao", 3),
-            new ImportCategoryDefinition("Áo croptop nữ", "women-ao-croptop", "Áo croptop nữ.", "women-ao", 4),
-            new ImportCategoryDefinition("Áo khoác nữ", "women-ao-khoac", "Áo khoác nữ.", "women-ao", 5),
+                    new ImportCategoryDefinition("Áo thun nữ", "women-ao-thun",
+                            "Áo thun nữ.", "women-ao", 1),
+                    new ImportCategoryDefinition("Áo kiểu nữ", "women-ao-kieu",
+                            "Áo kiểu nữ.", "women-ao", 2),
+                    new ImportCategoryDefinition("Áo sơ mi nữ",
+                            "women-ao-so-mi", "Áo sơ mi nữ.", "women-ao", 3),
+                    new ImportCategoryDefinition("Áo croptop nữ",
+                            "women-ao-croptop", "Áo croptop nữ.", "women-ao",
+                            4),
+                    new ImportCategoryDefinition("Áo khoác nữ",
+                            "women-ao-khoac", "Áo khoác nữ.", "women-ao", 5),
 
-            new ImportCategoryDefinition("Váy liền nữ", "women-vay-lien", "Váy liền nữ.", "women-vay-dam", 1),
-            new ImportCategoryDefinition("Váy dự tiệc nữ", "women-vay-du-tiec", "Váy dự tiệc nữ.", "women-vay-dam", 2),
-            new ImportCategoryDefinition("Váy công sở nữ", "women-vay-cong-so", "Váy công sở nữ.", "women-vay-dam", 3),
-            new ImportCategoryDefinition("Váy maxi nữ", "women-vay-maxi", "Váy maxi nữ.", "women-vay-dam", 4),
+                    new ImportCategoryDefinition("Váy liền nữ",
+                            "women-vay-lien", "Váy liền nữ.", "women-vay-dam",
+                            1),
+                    new ImportCategoryDefinition("Váy dự tiệc nữ",
+                            "women-vay-du-tiec", "Váy dự tiệc nữ.",
+                            "women-vay-dam", 2),
+                    new ImportCategoryDefinition("Váy công sở nữ",
+                            "women-vay-cong-so", "Váy công sở nữ.",
+                            "women-vay-dam", 3),
+                    new ImportCategoryDefinition("Váy maxi nữ",
+                            "women-vay-maxi", "Váy maxi nữ.", "women-vay-dam",
+                            4),
 
-            new ImportCategoryDefinition("Quần jeans nữ", "women-quan-jeans", "Quần jeans nữ.", "women-quan", 1),
-            new ImportCategoryDefinition("Quần short nữ", "women-quan-short", "Quần short nữ.", "women-quan", 2),
-            new ImportCategoryDefinition("Quần tây nữ", "women-quan-tay", "Quần tây nữ.", "women-quan", 3),
-            new ImportCategoryDefinition("Quần legging nữ", "women-quan-legging", "Quần legging nữ.", "women-quan", 4),
+                    new ImportCategoryDefinition("Quần jeans nữ",
+                            "women-quan-jeans", "Quần jeans nữ.", "women-quan",
+                            1),
+                    new ImportCategoryDefinition("Quần short nữ",
+                            "women-quan-short", "Quần short nữ.", "women-quan",
+                            2),
+                    new ImportCategoryDefinition("Quần tây nữ",
+                            "women-quan-tay", "Quần tây nữ.", "women-quan", 3),
+                    new ImportCategoryDefinition("Quần legging nữ",
+                            "women-quan-legging", "Quần legging nữ.",
+                            "women-quan", 4),
 
-            new ImportCategoryDefinition("Áo thể thao nữ", "women-ao-the-thao", "Áo thể thao nữ.", "women-do-the-thao", 1),
-            new ImportCategoryDefinition("Quần thể thao nữ", "women-quan-the-thao", "Quần thể thao nữ.", "women-do-the-thao", 2),
-            new ImportCategoryDefinition("Set thể thao nữ", "women-set-the-thao", "Set thể thao nữ.", "women-do-the-thao", 3),
+                    new ImportCategoryDefinition("Áo thể thao nữ",
+                            "women-ao-the-thao", "Áo thể thao nữ.",
+                            "women-do-the-thao", 1),
+                    new ImportCategoryDefinition("Quần thể thao nữ",
+                            "women-quan-the-thao", "Quần thể thao nữ.",
+                            "women-do-the-thao", 2),
+                    new ImportCategoryDefinition("Set thể thao nữ",
+                            "women-set-the-thao", "Set thể thao nữ.",
+                            "women-do-the-thao", 3),
 
-            new ImportCategoryDefinition("Áo mặc nhà nữ", "women-ao-mac-nha", "Áo mặc nhà nữ.", "women-do-mac-nha", 1),
-            new ImportCategoryDefinition("Quần mặc nhà nữ", "women-quan-mac-nha", "Quần mặc nhà nữ.", "women-do-mac-nha", 2),
-            new ImportCategoryDefinition("Bộ mặc nhà nữ", "women-bo-mac-nha", "Bộ mặc nhà nữ.", "women-do-mac-nha", 3),
+                    new ImportCategoryDefinition("Áo mặc nhà nữ",
+                            "women-ao-mac-nha", "Áo mặc nhà nữ.",
+                            "women-do-mac-nha", 1),
+                    new ImportCategoryDefinition("Quần mặc nhà nữ",
+                            "women-quan-mac-nha", "Quần mặc nhà nữ.",
+                            "women-do-mac-nha", 2),
+                    new ImportCategoryDefinition("Bộ mặc nhà nữ",
+                            "women-bo-mac-nha", "Bộ mặc nhà nữ.",
+                            "women-do-mac-nha", 3),
 
-            new ImportCategoryDefinition("Túi xách", "tui-xach", "Túi xách.", "accessories-tui-va-vi", 1),
-            new ImportCategoryDefinition("Túi đeo chéo", "tui-deo-cheo", "Túi đeo chéo.", "accessories-tui-va-vi", 2),
-            new ImportCategoryDefinition("Balo", "balo", "Balo.", "accessories-tui-va-vi", 3),
-            new ImportCategoryDefinition("Ví", "vi", "Ví.", "accessories-tui-va-vi", 4),
+                    new ImportCategoryDefinition("Túi xách", "tui-xach",
+                            "Túi xách.", "accessories-tui-va-vi", 1),
+                    new ImportCategoryDefinition("Túi đeo chéo", "tui-deo-cheo",
+                            "Túi đeo chéo.", "accessories-tui-va-vi", 2),
+                    new ImportCategoryDefinition("Balo", "balo", "Balo.",
+                            "accessories-tui-va-vi", 3),
+                    new ImportCategoryDefinition("Ví", "vi", "Ví.",
+                            "accessories-tui-va-vi", 4),
 
-            new ImportCategoryDefinition("Nón mũ", "non-mu", "Nón mũ.", "accessories-phu-kien-thoi-trang", 1),
-            new ImportCategoryDefinition("Thắt lưng", "that-lung", "Thắt lưng.", "accessories-phu-kien-thoi-trang", 2),
-            new ImportCategoryDefinition("Khăn", "khan", "Khăn.", "accessories-phu-kien-thoi-trang", 3),
-            new ImportCategoryDefinition("Tất", "tat", "Tất.", "accessories-phu-kien-thoi-trang", 4),
+                    new ImportCategoryDefinition("Nón mũ", "non-mu", "Nón mũ.",
+                            "accessories-phu-kien-thoi-trang", 1),
+                    new ImportCategoryDefinition("Thắt lưng", "that-lung",
+                            "Thắt lưng.", "accessories-phu-kien-thoi-trang", 2),
+                    new ImportCategoryDefinition("Khăn", "khan", "Khăn.",
+                            "accessories-phu-kien-thoi-trang", 3),
+                    new ImportCategoryDefinition("Tất", "tat", "Tất.",
+                            "accessories-phu-kien-thoi-trang", 4),
 
-            new ImportCategoryDefinition("Kính mắt", "kinh-mat", "Kính mắt.", "accessories-phu-kien-khac", 1),
-            new ImportCategoryDefinition("Đồng hồ", "dong-ho", "Đồng hồ.", "accessories-phu-kien-khac", 2),
-            new ImportCategoryDefinition("Trang sức", "trang-suc", "Trang sức.", "accessories-phu-kien-khac", 3)
-    );
+                    new ImportCategoryDefinition("Kính mắt", "kinh-mat",
+                            "Kính mắt.", "accessories-phu-kien-khac", 1),
+                    new ImportCategoryDefinition("Đồng hồ", "dong-ho",
+                            "Đồng hồ.", "accessories-phu-kien-khac", 2),
+                    new ImportCategoryDefinition("Trang sức", "trang-suc",
+                            "Trang sức.", "accessories-phu-kien-khac", 3));
     private static final AtomicBoolean EXECUTED = new AtomicBoolean(false);
 
     private final GapSeedProperties properties;
@@ -161,8 +252,7 @@ public class GapProductImportRunner implements ApplicationRunner {
             StoreRepository storeRepository,
             CategoryRepository categoryRepository,
             FlashSaleCampaignRepository flashSaleCampaignRepository,
-            FlashSaleItemRepository flashSaleItemRepository
-    ) {
+            FlashSaleItemRepository flashSaleItemRepository) {
         this(
                 properties,
                 productService,
@@ -173,8 +263,7 @@ public class GapProductImportRunner implements ApplicationRunner {
                 flashSaleCampaignRepository,
                 flashSaleItemRepository,
                 new GapCategoryMapper(),
-                new GapCoverageReporter()
-        );
+                new GapCoverageReporter());
     }
 
     GapProductImportRunner(
@@ -187,8 +276,7 @@ public class GapProductImportRunner implements ApplicationRunner {
             FlashSaleCampaignRepository flashSaleCampaignRepository,
             FlashSaleItemRepository flashSaleItemRepository,
             GapCategoryMapper categoryMapper,
-            GapCoverageReporter coverageReporter
-    ) {
+            GapCoverageReporter coverageReporter) {
         this.properties = properties;
         this.productService = productService;
         this.productRepository = productRepository;
@@ -225,19 +313,22 @@ public class GapProductImportRunner implements ApplicationRunner {
             return;
         }
 
-        List<Store> approvedActiveStores = new ArrayList<>(storeRepository.findByApprovalStatusAndStatus(
-                Store.ApprovalStatus.APPROVED,
-                Store.StoreStatus.ACTIVE
-        ));
-        approvedActiveStores.sort(Comparator.comparing(store -> store.getId().toString()));
+        List<Store> approvedActiveStores = new ArrayList<>(
+                storeRepository.findByApprovalStatusAndStatus(
+                        Store.ApprovalStatus.APPROVED,
+                        Store.StoreStatus.ACTIVE));
+        approvedActiveStores
+                .sort(Comparator.comparing(store -> store.getId().toString()));
         if (approvedActiveStores.isEmpty()) {
-            log.warn("GAP import skipped because no APPROVED+ACTIVE stores were found.");
+            log.warn(
+                    "GAP import skipped because no APPROVED+ACTIVE stores were found.");
             return;
         }
 
         List<LeafCategory> leafCategories = loadLeafCategories();
         if (leafCategories.isEmpty()) {
-            log.warn("GAP import skipped because no leaf categories under men/women/accessories were found.");
+            log.warn(
+                    "GAP import skipped because no leaf categories under men/women/accessories were found.");
             return;
         }
 
@@ -261,10 +352,13 @@ public class GapProductImportRunner implements ApplicationRunner {
             return;
         }
 
-        List<Product> importedProductsBefore = List.copyOf(findExistingImportedProducts());
+        List<Product> importedProductsBefore = List
+                .copyOf(findExistingImportedProducts());
         List<Product> existingBatch = importedProductsBefore;
-        List<StyleAnalysis> sourceAnalyses = analyzeSourceRows(leafCategories, imageLinks, styleRows);
-        List<Product> publicImportedProductsBefore = List.copyOf(findPublicImportedProducts());
+        List<StyleAnalysis> sourceAnalyses = analyzeSourceRows(leafCategories,
+                imageLinks, styleRows);
+        List<Product> publicImportedProductsBefore = List
+                .copyOf(findPublicImportedProducts());
         GapCoverageReporter.CoverageSnapshot beforeSnapshot = null;
         if (properties.isReportEnabled()) {
             beforeSnapshot = captureCoverageSnapshot(
@@ -272,8 +366,7 @@ public class GapProductImportRunner implements ApplicationRunner {
                     leafCategories,
                     sourceAnalyses,
                     importedProductsBefore,
-                    publicImportedProductsBefore
-            );
+                    publicImportedProductsBefore);
             writeBeforeCoverageReport(beforeSnapshot);
         }
 
@@ -305,19 +398,24 @@ public class GapProductImportRunner implements ApplicationRunner {
         }
 
         if (candidates.isEmpty()) {
-            log.warn("GAP import skipped because no eligible candidates were found.");
+            log.warn(
+                    "GAP import skipped because no eligible candidates were found.");
             if (properties.isReportEnabled() && beforeSnapshot != null) {
-                writeAfterCoverageReport(beforeSnapshot, leafCategories, sourceAnalyses);
+                writeAfterCoverageReport(beforeSnapshot, leafCategories,
+                        sourceAnalyses);
             }
             ensureDefaultFlashSaleCampaign();
             return;
         }
 
-        List<StyleAnalysis> selected = selectCandidatesForImport(candidates, targetCount);
+        List<StyleAnalysis> selected = selectCandidatesForImport(candidates,
+                targetCount);
         if (selected.isEmpty()) {
-            log.warn("GAP import skipped because allocation returned no candidates.");
+            log.warn(
+                    "GAP import skipped because allocation returned no candidates.");
             if (properties.isReportEnabled() && beforeSnapshot != null) {
-                writeAfterCoverageReport(beforeSnapshot, leafCategories, sourceAnalyses);
+                writeAfterCoverageReport(beforeSnapshot, leafCategories,
+                        sourceAnalyses);
             }
             ensureDefaultFlashSaleCampaign();
             return;
@@ -329,24 +427,26 @@ public class GapProductImportRunner implements ApplicationRunner {
 
         for (int index = 0; index < selected.size(); index++) {
             StyleAnalysis analysis = selected.get(index);
-            Store store = approvedActiveStores.get(index % approvedActiveStores.size());
+            Store store = approvedActiveStores
+                    .get(index % approvedActiveStores.size());
             ProductRequest request = buildProductRequest(analysis);
             try {
-                Product created = productService.createForStore(request, store.getId());
+                Product created = productService.createForStore(request,
+                        store.getId());
                 applyGalleryImages(created, analysis.imageUrls());
                 if (isFeaturedCandidate(analysis.row().styleId())) {
                     created.setIsFeatured(true);
                 }
                 productRepository.save(created);
                 imported++;
-                countsByCategory.merge(analysis.preferredLeaf().id(), 1, Integer::sum);
+                countsByCategory.merge(analysis.preferredLeaf().id(), 1,
+                        Integer::sum);
             } catch (RuntimeException ex) {
                 skipped++;
                 log.warn(
                         "Skip GAP style {} due to import error: {}",
                         analysis.row().styleId(),
-                        ex.getMessage()
-                );
+                        ex.getMessage());
             }
         }
 
@@ -357,11 +457,13 @@ public class GapProductImportRunner implements ApplicationRunner {
                 skippedMissingImages,
                 targetCount,
                 approvedActiveStores.size(),
-                leafCategories.size()
-        );
-        log.info("GAP import category coverage: {} leaf categories received products.", countsByCategory.size());
+                leafCategories.size());
+        log.info(
+                "GAP import category coverage: {} leaf categories received products.",
+                countsByCategory.size());
         if (properties.isReportEnabled() && beforeSnapshot != null) {
-            writeAfterCoverageReport(beforeSnapshot, leafCategories, sourceAnalyses);
+            writeAfterCoverageReport(beforeSnapshot, leafCategories,
+                    sourceAnalyses);
         }
         ensureDefaultFlashSaleCampaign();
     }
@@ -369,7 +471,8 @@ public class GapProductImportRunner implements ApplicationRunner {
     private void runBaselineCoverageReport() {
         List<LeafCategory> leafCategories = loadReportLeafCategories();
         if (leafCategories.isEmpty()) {
-            log.warn("GAP coverage report skipped because no leaf categories under men/women/accessories were found.");
+            log.warn(
+                    "GAP coverage report skipped because no leaf categories under men/women/accessories were found.");
             return;
         }
 
@@ -389,20 +492,23 @@ public class GapProductImportRunner implements ApplicationRunner {
             imageLinks = loadImageLinks(imagesPath);
             styleRows = loadStyleRows(stylesPath);
         } catch (IOException ex) {
-            log.error("GAP coverage report failed while reading CSV files.", ex);
+            log.error("GAP coverage report failed while reading CSV files.",
+                    ex);
             return;
         }
 
-        List<Product> importedProducts = List.copyOf(findExistingImportedProducts());
-        List<Product> publicImportedProducts = List.copyOf(findPublicImportedProducts());
-        List<StyleAnalysis> sourceAnalyses = analyzeSourceRows(leafCategories, imageLinks, styleRows);
+        List<Product> importedProducts = List
+                .copyOf(findExistingImportedProducts());
+        List<Product> publicImportedProducts = List
+                .copyOf(findPublicImportedProducts());
+        List<StyleAnalysis> sourceAnalyses = analyzeSourceRows(leafCategories,
+                imageLinks, styleRows);
         GapCoverageReporter.CoverageSnapshot snapshot = captureCoverageSnapshot(
                 "before",
                 leafCategories,
                 sourceAnalyses,
                 importedProducts,
-                publicImportedProducts
-        );
+                publicImportedProducts);
         if (snapshot != null) {
             writeBeforeCoverageReport(snapshot);
         }
@@ -422,15 +528,21 @@ public class GapProductImportRunner implements ApplicationRunner {
             flashSaleCampaignRepository.deleteAll();
         }
 
-        List<Product> publicProducts = productRepository.findAllPublicProducts().stream()
+        List<Product> publicProducts = productRepository.findAllPublicProducts()
+                .stream()
                 .filter(this::hasCatalogImage)
                 .sorted(Comparator
-                        .comparing(Product::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(Product::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(product -> product.getId() != null ? product.getId().toString() : ""))
+                        .comparing(Product::getUpdatedAt,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(Product::getCreatedAt,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(product -> product.getId() != null
+                                ? product.getId().toString()
+                                : ""))
                 .toList();
         if (publicProducts.isEmpty()) {
-            log.warn("Skip Flash Sale seed because no public products with catalog images are available.");
+            log.warn(
+                    "Skip Flash Sale seed because no public products with catalog images are available.");
             return;
         }
 
@@ -456,20 +568,27 @@ public class GapProductImportRunner implements ApplicationRunner {
                 continue;
             }
 
-            ProductVariant variant = productVariantRepository.findByProductIdAndIsActiveTrue(product.getId()).stream()
-                    .filter(v -> v.getStockQuantity() != null && v.getStockQuantity() > 0)
+            ProductVariant variant = productVariantRepository
+                    .findByProductIdAndIsActiveTrue(product.getId()).stream()
+                    .filter(v -> v.getStockQuantity() != null
+                            && v.getStockQuantity() > 0)
                     .findFirst()
                     .orElse(null);
 
             int stock = variant != null
-                    ? Math.max(variant.getStockQuantity() != null ? variant.getStockQuantity() : 0, 0)
-                    : Math.max(product.getStockQuantity() != null ? product.getStockQuantity() : 0, 0);
+                    ? Math.max(variant.getStockQuantity() != null
+                            ? variant.getStockQuantity()
+                            : 0, 0)
+                    : Math.max(product.getStockQuantity() != null
+                            ? product.getStockQuantity()
+                            : 0, 0);
             if (stock <= 0) {
                 continue;
             }
 
             BigDecimal basePrice = product.getEffectivePrice();
-            if (basePrice == null || basePrice.compareTo(BigDecimal.ZERO) <= 0) {
+            if (basePrice == null
+                    || basePrice.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
             if (variant != null && variant.getPriceAdjustment() != null) {
@@ -479,7 +598,8 @@ public class GapProductImportRunner implements ApplicationRunner {
                 continue;
             }
 
-            BigDecimal flashPrice = basePrice.multiply(new BigDecimal("0.80")).setScale(0, RoundingMode.HALF_UP);
+            BigDecimal flashPrice = basePrice.multiply(new BigDecimal("0.80"))
+                    .setScale(0, RoundingMode.HALF_UP);
             if (flashPrice.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
@@ -500,11 +620,14 @@ public class GapProductImportRunner implements ApplicationRunner {
 
         if (createdItems == 0) {
             flashSaleCampaignRepository.delete(campaign);
-            log.warn("Rollback Flash Sale seed because no eligible items were created.");
+            log.warn(
+                    "Rollback Flash Sale seed because no eligible items were created.");
             return;
         }
 
-        log.info("Seeded default Flash Sale campaign with {} items for local environment.", createdItems);
+        log.info(
+                "Seeded default Flash Sale campaign with {} items for local environment.",
+                createdItems);
     }
 
     private boolean hasDisplayableFlashSaleItems() {
@@ -544,7 +667,9 @@ public class GapProductImportRunner implements ApplicationRunner {
             }
             UUID id = category.getId();
             slugById.put(id, normalizedToken(category.getSlug()));
-            UUID parentId = category.getParent() != null ? category.getParent().getId() : null;
+            UUID parentId = category.getParent() != null
+                    ? category.getParent().getId()
+                    : null;
             parentById.put(id, parentId);
             if (parentId != null) {
                 parentIds.add(parentId);
@@ -577,16 +702,17 @@ public class GapProductImportRunner implements ApplicationRunner {
     }
 
     private List<LeafCategory> loadReportLeafCategories() {
-        Map<String, ImportCategoryDefinition> definitionsBySlug = IMPORT_CATEGORY_DEFINITIONS.stream()
+        Map<String, ImportCategoryDefinition> definitionsBySlug = IMPORT_CATEGORY_DEFINITIONS
+                .stream()
                 .collect(Collectors.toMap(
                         definition -> normalizedToken(definition.slug()),
                         Function.identity(),
                         (left, right) -> left,
-                        LinkedHashMap::new
-                ));
+                        LinkedHashMap::new));
         Set<String> parentSlugs = IMPORT_CATEGORY_DEFINITIONS.stream()
                 .map(ImportCategoryDefinition::parentSlug)
-                .filter(parentSlug -> parentSlug != null && !parentSlug.isBlank())
+                .filter(parentSlug -> parentSlug != null
+                        && !parentSlug.isBlank())
                 .map(this::normalizedToken)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
@@ -596,11 +722,13 @@ public class GapProductImportRunner implements ApplicationRunner {
             if (parentSlugs.contains(slug)) {
                 continue;
             }
-            String rootSlug = resolveDefinitionRootSlug(slug, definitionsBySlug);
+            String rootSlug = resolveDefinitionRootSlug(slug,
+                    definitionsBySlug);
             if (!ALLOWED_ROOTS.contains(rootSlug)) {
                 continue;
             }
-            String parentSlug = definition.parentSlug() == null ? "" : normalizedToken(definition.parentSlug());
+            String parentSlug = definition.parentSlug() == null ? ""
+                    : normalizedToken(definition.parentSlug());
             leaves.add(new LeafCategory(null, slug, null, rootSlug));
         }
         leaves.sort(Comparator.comparing(LeafCategory::slug));
@@ -608,20 +736,22 @@ public class GapProductImportRunner implements ApplicationRunner {
     }
 
     private void ensureImportCategoryTree() {
-        List<Category> categories = new ArrayList<>(categoryRepository.findAll());
+        List<Category> categories = new ArrayList<>(
+                categoryRepository.findAll());
         Map<String, Category> categoryBySlug = categories.stream()
-                .filter(category -> category.getSlug() != null && !category.getSlug().isBlank())
+                .filter(category -> category.getSlug() != null
+                        && !category.getSlug().isBlank())
                 .collect(Collectors.toMap(
                         category -> normalizedToken(category.getSlug()),
                         category -> category,
                         (left, right) -> left,
-                        LinkedHashMap::new
-                ));
+                        LinkedHashMap::new));
 
         int created = 0;
         List<ImportCategoryDefinition> pending = new ArrayList<>();
         for (ImportCategoryDefinition definition : IMPORT_CATEGORY_DEFINITIONS) {
-            if (!categoryBySlug.containsKey(normalizedToken(definition.slug()))) {
+            if (!categoryBySlug
+                    .containsKey(normalizedToken(definition.slug()))) {
                 pending.add(definition);
             }
         }
@@ -633,7 +763,8 @@ public class GapProductImportRunner implements ApplicationRunner {
             for (ImportCategoryDefinition definition : pending) {
                 Category parent = null;
                 if (definition.parentSlug() != null) {
-                    parent = categoryBySlug.get(normalizedToken(definition.parentSlug()));
+                    parent = categoryBySlug
+                            .get(normalizedToken(definition.parentSlug()));
                     if (parent == null) {
                         remaining.add(definition);
                         continue;
@@ -660,30 +791,32 @@ public class GapProductImportRunner implements ApplicationRunner {
 
         if (!pending.isEmpty()) {
             String unresolved = pending.stream()
-                    .map(definition -> definition.slug() + "->" + definition.parentSlug())
+                    .map(definition -> definition.slug() + "->"
+                            + definition.parentSlug())
                     .limit(8)
                     .collect(Collectors.joining(", "));
             log.warn(
                     "Skipped auto-creating {} GAP import categories because parent chain is incomplete: {}",
                     pending.size(),
-                    unresolved
-            );
+                    unresolved);
         }
 
         if (created > 0) {
-            log.info("Created {} missing categories required for GAP import.", created);
+            log.info("Created {} missing categories required for GAP import.",
+                    created);
         }
     }
 
     private String resolveDefinitionRootSlug(
             String slug,
-            Map<String, ImportCategoryDefinition> definitionsBySlug
-    ) {
+            Map<String, ImportCategoryDefinition> definitionsBySlug) {
         String current = slug;
         Set<String> visited = new LinkedHashSet<>();
         while (current != null && !current.isBlank() && visited.add(current)) {
-            ImportCategoryDefinition definition = definitionsBySlug.get(current);
-            if (definition == null || definition.parentSlug() == null || definition.parentSlug().isBlank()) {
+            ImportCategoryDefinition definition = definitionsBySlug
+                    .get(current);
+            if (definition == null || definition.parentSlug() == null
+                    || definition.parentSlug().isBlank()) {
                 return current == null ? "" : current;
             }
             current = normalizedToken(definition.parentSlug());
@@ -691,7 +824,8 @@ public class GapProductImportRunner implements ApplicationRunner {
         return "";
     }
 
-    private String resolveRootSlug(UUID categoryId, Map<UUID, String> slugById, Map<UUID, UUID> parentById) {
+    private String resolveRootSlug(UUID categoryId, Map<UUID, String> slugById,
+            Map<UUID, UUID> parentById) {
         UUID current = categoryId;
         Set<UUID> visited = new HashSet<>();
         while (current != null && visited.add(current)) {
@@ -708,14 +842,15 @@ public class GapProductImportRunner implements ApplicationRunner {
     private List<StyleAnalysis> analyzeSourceRows(
             List<LeafCategory> leafCategories,
             Map<Long, List<String>> imageLinks,
-            List<StyleRow> styleRows
-    ) {
+            List<StyleRow> styleRows) {
         Map<String, LeafCategory> leafBySlug = leafCategories.stream()
-                .collect(Collectors.toMap(LeafCategory::slug, Function.identity()));
+                .collect(Collectors.toMap(LeafCategory::slug,
+                        Function.identity()));
 
         List<StyleAnalysis> analyses = new ArrayList<>(styleRows.size());
         for (StyleRow row : styleRows) {
-            if (!ALLOWED_MASTER_CATEGORIES.contains(normalizedToken(row.masterCategory()))) {
+            if (!ALLOWED_MASTER_CATEGORIES
+                    .contains(normalizedToken(row.masterCategory()))) {
                 continue;
             }
             GapCategoryMapper.MappingResult mapping = categoryMapper.map(row);
@@ -727,15 +862,16 @@ public class GapProductImportRunner implements ApplicationRunner {
                     slugForStyle(row.styleId()),
                     mapping,
                     preferredLeaf,
-                    resolveCandidateImageUrls(imageLinks.get(row.styleId()))
-            ));
+                    resolveCandidateImageUrls(imageLinks.get(row.styleId()))));
         }
         return analyses;
     }
 
-    private List<StyleAnalysis> selectCandidatesForImport(List<StyleAnalysis> candidates, int targetCount) {
+    private List<StyleAnalysis> selectCandidatesForImport(
+            List<StyleAnalysis> candidates, int targetCount) {
         return candidates.stream()
-                .sorted(Comparator.comparingLong(analysis -> analysis.row().styleId()))
+                .sorted(Comparator
+                        .comparingLong(analysis -> analysis.row().styleId()))
                 .limit(Math.max(0, targetCount))
                 .toList();
     }
@@ -745,21 +881,22 @@ public class GapProductImportRunner implements ApplicationRunner {
             List<LeafCategory> leafCategories,
             List<StyleAnalysis> sourceAnalyses,
             List<Product> importedProducts,
-            List<Product> publicImportedProducts
-    ) {
+            List<Product> publicImportedProducts) {
         return coverageReporter.captureSnapshot(
                 label,
                 leafCategories,
                 sourceAnalyses,
                 importedProducts,
-                publicImportedProducts
-        );
+                publicImportedProducts);
     }
 
-    private void writeBeforeCoverageReport(GapCoverageReporter.CoverageSnapshot snapshot) {
+    private void writeBeforeCoverageReport(
+            GapCoverageReporter.CoverageSnapshot snapshot) {
         try {
-            coverageReporter.writeBeforeReport(resolveReportOutputDir(), snapshot);
-            log.info("Wrote GAP baseline coverage report to {}", resolveReportOutputDir());
+            coverageReporter.writeBeforeReport(resolveReportOutputDir(),
+                    snapshot);
+            log.info("Wrote GAP baseline coverage report to {}",
+                    resolveReportOutputDir());
         } catch (IOException ex) {
             log.error("Failed to write GAP baseline coverage report.", ex);
         }
@@ -768,18 +905,18 @@ public class GapProductImportRunner implements ApplicationRunner {
     private void writeAfterCoverageReport(
             GapCoverageReporter.CoverageSnapshot beforeSnapshot,
             List<LeafCategory> leafCategories,
-            List<StyleAnalysis> sourceAnalyses
-    ) {
+            List<StyleAnalysis> sourceAnalyses) {
         try {
             GapCoverageReporter.CoverageSnapshot afterSnapshot = captureCoverageSnapshot(
                     "after",
                     leafCategories,
                     sourceAnalyses,
                     findExistingImportedProducts(),
-                    findPublicImportedProducts()
-            );
-            coverageReporter.writeAfterReport(resolveReportOutputDir(), beforeSnapshot, afterSnapshot);
-            log.info("Wrote GAP post-import coverage report to {}", resolveReportOutputDir());
+                    findPublicImportedProducts());
+            coverageReporter.writeAfterReport(resolveReportOutputDir(),
+                    beforeSnapshot, afterSnapshot);
+            log.info("Wrote GAP post-import coverage report to {}",
+                    resolveReportOutputDir());
         } catch (IOException ex) {
             log.error("Failed to write GAP post-import coverage report.", ex);
         }
@@ -794,7 +931,8 @@ public class GapProductImportRunner implements ApplicationRunner {
         String season = normalizedSeason(row.season());
         String color = normalizedColor(row.baseColour());
         String articleType = fallbackText(row.articleType(), "Fashion item");
-        String productName = fallbackText(row.productDisplayName(), articleType + " " + row.styleId());
+        String productName = fallbackText(row.productDisplayName(),
+                articleType + " " + row.styleId());
         String normalizedName = normalizeText(productName);
         if (normalizedName.isBlank()) {
             normalizedName = "GAP Item " + row.styleId();
@@ -806,8 +944,7 @@ public class GapProductImportRunner implements ApplicationRunner {
                 color,
                 row.colorOptions(),
                 row.colorHexOptions(),
-                row.sizeOptions()
-        );
+                row.sizeOptions());
 
         return ProductRequest.builder()
                 .name(normalizedName)
@@ -821,7 +958,9 @@ public class GapProductImportRunner implements ApplicationRunner {
                 .fit(selectFit(row))
                 .gender(resolveGender(row.gender()))
                 .status(Product.ProductStatus.ACTIVE.name())
-                .imageUrl(fallbackText(analysis.imageUrls().stream().findFirst().orElse(""), DEFAULT_IMAGE))
+                .imageUrl(fallbackText(
+                        analysis.imageUrls().stream().findFirst().orElse(""),
+                        DEFAULT_IMAGE))
                 .variants(variants)
                 .build();
     }
@@ -832,13 +971,14 @@ public class GapProductImportRunner implements ApplicationRunner {
             String color,
             List<String> crawledColors,
             Map<String, String> crawledColorHexes,
-            List<String> crawledSizes
-    ) {
+            List<String> crawledSizes) {
         int baseStock = 12 + (int) Math.floorMod(styleId, 48);
-        List<VariantColor> colors = resolveVariantColors(crawledColors, crawledColorHexes, color);
+        List<VariantColor> colors = resolveVariantColors(crawledColors,
+                crawledColorHexes, color);
         List<String> sizes = resolveVariantSizes(crawledSizes, leaf.rootSlug());
 
-        List<ProductRequest.VariantRequest> variants = new ArrayList<>(colors.size() * sizes.size());
+        List<ProductRequest.VariantRequest> variants = new ArrayList<>(
+                colors.size() * sizes.size());
         int variantIndex = 0;
         for (VariantColor variantColor : colors) {
             for (String size : sizes) {
@@ -860,14 +1000,17 @@ public class GapProductImportRunner implements ApplicationRunner {
     private List<VariantColor> resolveVariantColors(
             List<String> crawledColors,
             Map<String, String> crawledColorHexes,
-            String fallbackColor
-    ) {
+            String fallbackColor) {
         LinkedHashMap<String, String> unique = new LinkedHashMap<>();
-        Map<String, String> safeColorHexes = crawledColorHexes == null ? Map.of() : crawledColorHexes;
-        for (String candidate : crawledColors == null ? List.<String>of() : crawledColors) {
+        Map<String, String> safeColorHexes = crawledColorHexes == null
+                ? Map.of()
+                : crawledColorHexes;
+        for (String candidate : crawledColors == null ? List.<String>of()
+                : crawledColors) {
             String normalized = normalizedColor(candidate);
             if (!normalized.isBlank()) {
-                unique.putIfAbsent(normalized, normalizeColorHex(safeColorHexes.get(normalized)));
+                unique.putIfAbsent(normalized,
+                        normalizeColorHex(safeColorHexes.get(normalized)));
             }
             if (unique.size() >= MAX_COLORS_PER_PRODUCT) {
                 break;
@@ -876,7 +1019,8 @@ public class GapProductImportRunner implements ApplicationRunner {
 
         if (unique.isEmpty()) {
             String fallback = normalizedColor(fallbackColor);
-            unique.put(fallback, normalizeColorHex(safeColorHexes.get(fallback)));
+            unique.put(fallback,
+                    normalizeColorHex(safeColorHexes.get(fallback)));
         }
 
         List<VariantColor> deduplicated = new ArrayList<>();
@@ -898,14 +1042,17 @@ public class GapProductImportRunner implements ApplicationRunner {
 
         if (deduplicated.isEmpty()) {
             String fallback = normalizedColor(fallbackColor);
-            deduplicated.add(new VariantColor(fallback, normalizeColorHex(safeColorHexes.get(fallback))));
+            deduplicated.add(new VariantColor(fallback,
+                    normalizeColorHex(safeColorHexes.get(fallback))));
         }
         return List.copyOf(deduplicated);
     }
 
-    private List<String> resolveVariantSizes(List<String> crawledSizes, String rootSlug) {
+    private List<String> resolveVariantSizes(List<String> crawledSizes,
+            String rootSlug) {
         LinkedHashSet<String> unique = new LinkedHashSet<>();
-        for (String raw : crawledSizes == null ? List.<String>of() : crawledSizes) {
+        for (String raw : crawledSizes == null ? List.<String>of()
+                : crawledSizes) {
             String normalized = normalizeVariantSize(raw);
             if (normalized.isBlank()) {
                 continue;
@@ -1009,7 +1156,8 @@ public class GapProductImportRunner implements ApplicationRunner {
                 + "Season: " + season + ".";
     }
 
-    private String buildSizeAndFit(StyleRow row, String articleType, String usage) {
+    private String buildSizeAndFit(StyleRow row, String articleType,
+            String usage) {
         List<String> sizeFitLines = parseSectionList(row.sizeFitDetails());
         if (!sizeFitLines.isEmpty()) {
             return String.join("\n", sizeFitLines);
@@ -1049,23 +1197,30 @@ public class GapProductImportRunner implements ApplicationRunner {
     }
 
     private String selectMaterial(long styleId) {
-        String[] options = {"Cotton", "Polyester Blend", "Linen Blend", "Denim", "Knitted"};
+        String[] options = { "Cotton", "Polyester Blend", "Linen Blend",
+                "Denim", "Knitted" };
         return options[(int) Math.floorMod(styleId, options.length)];
     }
 
     private String selectFit(StyleRow row) {
         String sizeFit = normalizedToken(row.sizeFitDetails());
-        if (sizeFit.contains("slim")) return "Slim";
-        if (sizeFit.contains("relaxed")) return "Relaxed";
-        if (sizeFit.contains("regular")) return "Regular";
-        if (sizeFit.contains("classic")) return "Regular";
-        if (sizeFit.contains("loose")) return "Relaxed";
-        if (sizeFit.contains("straight")) return "Regular";
+        if (sizeFit.contains("slim"))
+            return "Slim";
+        if (sizeFit.contains("relaxed"))
+            return "Relaxed";
+        if (sizeFit.contains("regular"))
+            return "Regular";
+        if (sizeFit.contains("classic"))
+            return "Regular";
+        if (sizeFit.contains("loose"))
+            return "Relaxed";
+        if (sizeFit.contains("straight"))
+            return "Regular";
         return selectFitByStyleId(row.styleId());
     }
 
     private String selectFitByStyleId(long styleId) {
-        String[] options = {"Regular", "Slim", "Relaxed", "Comfort"};
+        String[] options = { "Regular", "Slim", "Relaxed", "Comfort" };
         return options[(int) Math.floorMod(styleId, options.length)];
     }
 
@@ -1088,9 +1243,11 @@ public class GapProductImportRunner implements ApplicationRunner {
         return ("gap-" + styleId).toLowerCase(Locale.ROOT);
     }
 
-    private Map<Long, List<String>> loadImageLinks(Path path) throws IOException {
+    private Map<Long, List<String>> loadImageLinks(Path path)
+            throws IOException {
         List<Map<String, String>> rows = readCsv(path);
-        Map<Long, LinkedHashSet<String>> groupedLinks = new HashMap<>(rows.size());
+        Map<Long, LinkedHashSet<String>> groupedLinks = new HashMap<>(
+                rows.size());
         for (Map<String, String> row : rows) {
             long id = parseId(fallbackText(row.get("id"), row.get("filename")));
             if (id <= 0) {
@@ -1098,14 +1255,16 @@ public class GapProductImportRunner implements ApplicationRunner {
             }
             String link = normalizeText(row.get("link"));
             if (!link.isBlank()) {
-                LinkedHashSet<String> links = groupedLinks.computeIfAbsent(id, ignored -> new LinkedHashSet<>());
+                LinkedHashSet<String> links = groupedLinks.computeIfAbsent(id,
+                        ignored -> new LinkedHashSet<>());
                 if (links.size() < MAX_IMAGES_PER_PRODUCT) {
                     links.add(link);
                 }
             }
         }
         Map<Long, List<String>> result = new HashMap<>(groupedLinks.size());
-        for (Map.Entry<Long, LinkedHashSet<String>> entry : groupedLinks.entrySet()) {
+        for (Map.Entry<Long, LinkedHashSet<String>> entry : groupedLinks
+                .entrySet()) {
             result.put(entry.getKey(), List.copyOf(entry.getValue()));
         }
         return result;
@@ -1126,24 +1285,28 @@ public class GapProductImportRunner implements ApplicationRunner {
                     normalizeText(row.get("subCategory")),
                     normalizeText(row.get("articleType")),
                     normalizeText(row.get("baseColour")),
-                    parseOptionList(fallbackText(row.get("colorOptions"), row.get("colors"))),
-                    parseColorHexMap(fallbackText(row.get("colorHexOptions"), row.get("colorHexes"))),
-                    parseOptionList(fallbackText(row.get("sizeOptions"), row.get("sizes"))),
+                    parseOptionList(fallbackText(row.get("colorOptions"),
+                            row.get("colors"))),
+                    parseColorHexMap(fallbackText(row.get("colorHexOptions"),
+                            row.get("colorHexes"))),
+                    parseOptionList(fallbackText(row.get("sizeOptions"),
+                            row.get("sizes"))),
                     normalizeText(row.get("season")),
                     normalizeText(row.get("year")),
                     normalizeText(row.get("usage")),
                     normalizeText(row.get("productDisplayName")),
-                    normalizeText(fallbackText(row.get("productDetails"), row.get("detailsText"))),
+                    normalizeText(fallbackText(row.get("productDetails"),
+                            row.get("detailsText"))),
                     normalizeText(row.get("sizeFitDetails")),
                     normalizeText(row.get("fabricDetails")),
-                    normalizeText(row.get("careDetails"))
-            ));
+                    normalizeText(row.get("careDetails"))));
         }
         return styles;
     }
 
     private List<Map<String, String>> readCsv(Path path) throws IOException {
-        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+        try (BufferedReader reader = Files.newBufferedReader(path,
+                StandardCharsets.UTF_8)) {
             String headerLine = reader.readLine();
             if (headerLine == null) {
                 return List.of();
@@ -1181,7 +1344,8 @@ public class GapProductImportRunner implements ApplicationRunner {
         for (int idx = 0; idx < line.length(); idx++) {
             char ch = line.charAt(idx);
             if (ch == '"') {
-                if (inQuotes && idx + 1 < line.length() && line.charAt(idx + 1) == '"') {
+                if (inQuotes && idx + 1 < line.length()
+                        && line.charAt(idx + 1) == '"') {
                     current.append('"');
                     idx++;
                 } else {
@@ -1213,7 +1377,8 @@ public class GapProductImportRunner implements ApplicationRunner {
     private Path resolveInputPath(String configuredPath) {
         String raw = normalizeText(configuredPath);
         if (raw.isBlank()) {
-            throw new IllegalStateException("CSV path is blank. Please configure app.seed.gap paths.");
+            throw new IllegalStateException(
+                    "CSV path is blank. Please configure app.seed.gap paths.");
         }
 
         Path direct = Path.of(raw);
@@ -1421,7 +1586,8 @@ public class GapProductImportRunner implements ApplicationRunner {
     private List<Product> findPublicImportedProducts() {
         return productRepository.findAllPublicProducts().stream()
                 .filter(product -> product.getSlug() != null)
-                .filter(product -> product.getSlug().trim().toLowerCase(Locale.ROOT).startsWith("gap-"))
+                .filter(product -> product.getSlug().trim()
+                        .toLowerCase(Locale.ROOT).startsWith("gap-"))
                 .toList();
     }
 
@@ -1440,8 +1606,7 @@ public class GapProductImportRunner implements ApplicationRunner {
         List<Path> candidates = List.of(
                 cwd.resolve(direct).normalize(),
                 cwd.resolve("..").resolve(direct).normalize(),
-                direct.toAbsolutePath().normalize()
-        );
+                direct.toAbsolutePath().normalize());
 
         for (Path candidate : candidates) {
             if (Files.exists(candidate)) {
@@ -1463,28 +1628,34 @@ public class GapProductImportRunner implements ApplicationRunner {
                 .toList();
 
         if (!productIds.isEmpty()) {
-            List<ProductVariant> variants = productVariantRepository.findByProductIdIn(productIds);
-            List<UUID> variantIds = (variants == null ? List.<ProductVariant>of() : variants).stream()
+            List<ProductVariant> variants = productVariantRepository
+                    .findByProductIdIn(productIds);
+            List<UUID> variantIds = (variants == null
+                    ? List.<ProductVariant>of()
+                    : variants).stream()
                     .map(ProductVariant::getId)
                     .filter(id -> id != null)
                     .toList();
 
-            int flashSaleItemsDeleted = flashSaleItemRepository.deleteByProductIds(productIds);
+            int flashSaleItemsDeleted = flashSaleItemRepository
+                    .deleteByProductIds(productIds);
             if (!variantIds.isEmpty()) {
-                flashSaleItemsDeleted += flashSaleItemRepository.deleteByVariantIds(variantIds);
+                flashSaleItemsDeleted += flashSaleItemRepository
+                        .deleteByVariantIds(variantIds);
             }
             if (flashSaleItemsDeleted > 0) {
                 flashSaleItemRepository.flush();
                 log.info(
                         "Removed {} flash sale items linked to existing GAP-imported products before cleanup.",
-                        flashSaleItemsDeleted
-                );
+                        flashSaleItemsDeleted);
             }
         }
 
         productRepository.deleteAll(existingBatch);
         productRepository.flush();
-        log.info("Removed {} existing GAP-imported products with slug prefix gap-.", existingBatch.size());
+        log.info(
+                "Removed {} existing GAP-imported products with slug prefix gap-.",
+                existingBatch.size());
     }
 
     private void applyGalleryImages(Product product, List<String> imageUrls) {
@@ -1502,7 +1673,9 @@ public class GapProductImportRunner implements ApplicationRunner {
         product.setImages(images);
     }
 
-    static record LeafCategory(UUID id, String slug, UUID parentId, String rootSlug) {}
+    static record LeafCategory(UUID id, String slug, UUID parentId,
+            String rootSlug) {
+    }
 
     static record StyleRow(
             long styleId,
@@ -1521,16 +1694,15 @@ public class GapProductImportRunner implements ApplicationRunner {
             String productDetails,
             String sizeFitDetails,
             String fabricDetails,
-            String careDetails
-    ) {}
+            String careDetails) {
+    }
 
     static record StyleAnalysis(
             StyleRow row,
             String productSlug,
             GapCategoryMapper.MappingResult mapping,
             LeafCategory preferredLeaf,
-            List<String> imageUrls
-    ) {
+            List<String> imageUrls) {
         boolean hasImages() {
             return imageUrls != null && !imageUrls.isEmpty();
         }
@@ -1543,15 +1715,17 @@ public class GapProductImportRunner implements ApplicationRunner {
         }
     }
 
-    private record VariantColor(String name, String hex) {}
+    private record VariantColor(String name, String hex) {
+    }
 
-    private record PricePlan(BigDecimal basePrice, BigDecimal salePrice) {}
+    private record PricePlan(BigDecimal basePrice, BigDecimal salePrice) {
+    }
 
     private record ImportCategoryDefinition(
             String name,
             String slug,
             String description,
             String parentSlug,
-            int sortOrder
-    ) {}
+            int sortOrder) {
+    }
 }

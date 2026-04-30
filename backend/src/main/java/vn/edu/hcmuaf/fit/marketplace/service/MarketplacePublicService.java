@@ -57,8 +57,7 @@ public class MarketplacePublicService {
     private static final int HOME_STORE_LIMIT = 4;
     private static final int HOME_PRODUCT_LIMIT = 8;
     private static final int DEFAULT_FLASH_SALE_ITEM_LIMIT = 24;
-    private static final String DEFAULT_PRODUCT_IMAGE =
-            "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=672&h=990&fit=crop&fm=webp&q=80&auto=format";
+    private static final String DEFAULT_PRODUCT_IMAGE = "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=672&h=990&fit=crop&fm=webp&q=80&auto=format";
     private static final String DEFAULT_FLASH_SALE_NAME = "Flash Sale gio vang";
     private static final String DEFAULT_FLASH_SALE_DESCRIPTION = "Campaign mac dinh cho moi truong local seed.";
     private static final String DEFAULT_FLASH_SALE_UPDATED_BY = "gap-seed";
@@ -73,8 +72,7 @@ public class MarketplacePublicService {
     private final VisionSearchClient visionSearchClient;
     private final VisionSearchProperties visionSearchProperties;
 
-    public MarketplacePublicService(
-            ProductRepository productRepository,
+    public MarketplacePublicService(ProductRepository productRepository,
             ProductVariantRepository productVariantRepository,
             StoreRepository storeRepository,
             CategoryRepository categoryRepository,
@@ -82,8 +80,7 @@ public class MarketplacePublicService {
             FlashSaleItemRepository flashSaleItemRepository,
             StorePerformanceMetricsService storePerformanceMetricsService,
             VisionSearchClient visionSearchClient,
-            VisionSearchProperties visionSearchProperties
-    ) {
+            VisionSearchProperties visionSearchProperties) {
         this.productRepository = productRepository;
         this.productVariantRepository = productVariantRepository;
         this.storeRepository = storeRepository;
@@ -97,89 +94,98 @@ public class MarketplacePublicService {
 
     @Transactional(readOnly = true)
     public MarketplaceHomeResponse getMarketplaceHome() {
-        List<Store> featuredStores = storeRepository.findTopPublicStores(PageRequest.of(0, HOME_STORE_LIMIT));
+        List<Store> featuredStores = storeRepository
+                .findTopPublicStores(PageRequest.of(0, HOME_STORE_LIMIT));
 
-        List<Product> featuredPool = productRepository.findPublicFeaturedMarketplaceProducts(
-                PageRequest.of(0, 40, Sort.by(Sort.Direction.DESC, "createdAt"))
-        ).getContent();
-        List<Product> newestPool = productRepository.findPublicMarketplaceProducts(
-                PageRequest.of(0, 60, Sort.by(Sort.Direction.DESC, "createdAt"))
-        ).getContent();
-        List<Product> trendingPool = productRepository.findPublicMarketplaceProducts(
-                PageRequest.of(0, 60, Sort.by(
-                        Sort.Order.desc("viewCount"),
-                        Sort.Order.desc("updatedAt"),
-                        Sort.Order.desc("createdAt")
-                ))
-        ).getContent();
+        List<Product> featuredPool = productRepository
+                .findPublicFeaturedMarketplaceProducts(PageRequest.of(0, 40,
+                        Sort.by(Sort.Direction.DESC, "createdAt")))
+                .getContent();
+        List<Product> newestPool = productRepository
+                .findPublicMarketplaceProducts(PageRequest.of(0, 60,
+                        Sort.by(Sort.Direction.DESC, "createdAt")))
+                .getContent();
+        List<Product> trendingPool = productRepository
+                .findPublicMarketplaceProducts(PageRequest.of(0, 60,
+                        Sort.by(Sort.Order.desc("viewCount"),
+                                Sort.Order.desc("updatedAt"),
+                                Sort.Order.desc("createdAt"))))
+                .getContent();
 
         List<Product> featuredProducts = buildDistinctInStockProductList(
                 List.of(featuredPool, newestPool),
-                HOME_PRODUCT_LIMIT
-        );
+                HOME_PRODUCT_LIMIT);
         List<Product> trendingProducts = buildDistinctInStockProductList(
                 List.of(trendingPool, newestPool),
-                HOME_PRODUCT_LIMIT
-        );
+                HOME_PRODUCT_LIMIT);
 
-        Map<UUID, Store> storesById = loadStoresByProductOwnership(featuredProducts, trendingProducts, featuredStores);
+        Map<UUID, Store> storesById = loadStoresByProductOwnership(
+                featuredProducts, trendingProducts, featuredStores);
 
         return MarketplaceHomeResponse.builder()
                 .featuredStores(featuredStores.stream()
-                        .map(this::toStoreCardResponse)
-                        .toList())
+                        .map(this::toStoreCardResponse).toList())
                 .featuredProducts(featuredProducts.stream()
-                        .map(product -> toProductCardResponse(product, storesById.get(product.getStoreId())))
+                        .map(product -> toProductCardResponse(product,
+                                storesById.get(product.getStoreId())))
                         .toList())
                 .trendingProducts(trendingProducts.stream()
-                        .map(product -> toProductCardResponse(product, storesById.get(product.getStoreId())))
+                        .map(product -> toProductCardResponse(product,
+                                storesById.get(product.getStoreId())))
                         .toList())
-                .generatedAt(LocalDateTime.now())
-                .build();
+                .generatedAt(LocalDateTime.now()).build();
     }
 
     @Transactional(readOnly = true)
-    public Page<MarketplaceProductCardResponse> searchProducts(String keyword, Pageable pageable) {
+    public Page<MarketplaceProductCardResponse> searchProducts(String keyword,
+            Pageable pageable) {
         return searchProducts(keyword, null, pageable);
     }
 
     @Transactional(readOnly = true)
-    public Page<MarketplaceProductCardResponse> searchProducts(String keyword, String categorySlug, Pageable pageable) {
+    public Page<MarketplaceProductCardResponse> searchProducts(String keyword,
+            String categorySlug, Pageable pageable) {
         Pageable resolved = resolveProductSearchPageable(pageable);
         String normalizedKeyword = normalizeKeyword(keyword);
         String normalizedCategorySlug = normalizeCategorySlug(categorySlug);
 
         Page<Product> productPage;
         if (!hasText(normalizedCategorySlug)) {
-            productPage = productRepository.searchPublicMarketplaceProducts(normalizedKeyword, resolved);
+            productPage = productRepository.searchPublicMarketplaceProducts(
+                    normalizedKeyword, resolved);
         } else {
-            List<UUID> scopedCategoryIds = resolveCategoryScopeIds(normalizedCategorySlug);
+            List<UUID> scopedCategoryIds = resolveCategoryScopeIds(
+                    normalizedCategorySlug);
             if (scopedCategoryIds.isEmpty()) {
                 return new PageImpl<>(List.of(), resolved, 0);
             }
-            productPage = productRepository.searchPublicMarketplaceProductsByCategoryIds(
-                    normalizedKeyword,
-                    scopedCategoryIds,
-                    resolved
-            );
+            productPage = productRepository
+                    .searchPublicMarketplaceProductsByCategoryIds(
+                            normalizedKeyword,
+                            scopedCategoryIds, resolved);
         }
 
-        Map<UUID, Store> storesById = loadStoresByProductOwnership(productPage.getContent());
+        Map<UUID, Store> storesById = loadStoresByProductOwnership(
+                productPage.getContent());
 
-        List<MarketplaceProductCardResponse> rows = productPage.getContent().stream()
-                .map(product -> toProductCardResponse(product, storesById.get(product.getStoreId())))
+        List<MarketplaceProductCardResponse> rows = productPage.getContent()
+                .stream()
+                .map(product -> toProductCardResponse(product,
+                        storesById.get(product.getStoreId())))
                 .toList();
 
         return new PageImpl<>(rows, resolved, productPage.getTotalElements());
     }
 
     @Transactional(readOnly = true)
-    public Page<MarketplaceStoreCardResponse> searchStores(String keyword, Pageable pageable) {
+    public Page<MarketplaceStoreCardResponse> searchStores(String keyword,
+            Pageable pageable) {
         Pageable resolved = resolveStoreSearchPageable(pageable);
-        Page<Store> storePage = storeRepository.searchPublicStores(normalizeKeyword(keyword), resolved);
+        Page<Store> storePage = storeRepository
+                .searchPublicStores(normalizeKeyword(keyword), resolved);
 
-        List<MarketplaceStoreCardResponse> rows = storePage.getContent().stream()
-                .map(this::toStoreCardResponse)
+        List<MarketplaceStoreCardResponse> rows = storePage.getContent()
+                .stream().map(this::toStoreCardResponse)
                 .toList();
 
         return new PageImpl<>(rows, resolved, storePage.getTotalElements());
@@ -187,52 +193,45 @@ public class MarketplacePublicService {
 
     @Transactional(readOnly = true)
     public MarketplaceImageSearchResponse searchProductsByImage(
-            MultipartFile file,
-            int limit,
-            String categorySlug,
-            String storeSlug
-    ) {
+            MultipartFile file, int limit, String categorySlug,
+            String storeSlug) {
         validateImageSearchFile(file);
-        int resolvedLimit = Math.min(Math.max(limit, 1), Math.max(1, visionSearchProperties.getMaxCandidates()));
+        int resolvedLimit = Math.min(Math.max(limit, 1),
+                Math.max(1, visionSearchProperties.getMaxCandidates()));
         String normalizedCategorySlug = normalizeScopeSlug(categorySlug);
         String normalizedStoreSlug = normalizeScopeSlug(storeSlug);
 
-        VisionSearchClient.VisionSearchResult rawResult = visionSearchClient.searchImage(
-                file,
-                resolvedLimit,
-                normalizedCategorySlug,
-                normalizedStoreSlug
-        );
+        VisionSearchClient.VisionSearchResult rawResult = visionSearchClient
+                .searchImage(file, resolvedLimit,
+                        normalizedCategorySlug, normalizedStoreSlug);
         List<UUID> rankedIds = rawResult.candidates().stream()
                 .map(VisionSearchClient.VisionCandidate::backendProductId)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+                .filter(Objects::nonNull).distinct().toList();
 
         if (rankedIds.isEmpty()) {
-            return MarketplaceImageSearchResponse.builder()
-                    .items(List.of())
-                    .totalCandidates(0)
-                    .mode("image")
+            return MarketplaceImageSearchResponse.builder().items(List.of())
+                    .totalCandidates(0).mode("image")
                     .indexVersion(rawResult.indexVersion())
                     .inferredCategory(rawResult.inferredCategory())
                     .inferredCategoryScore(rawResult.inferredCategoryScore())
                     .categoryFilterApplied(rawResult.categoryFilterApplied())
-                    .matches(List.of())
-                    .build();
+                    .matches(List.of()).build();
         }
 
-        List<Product> products = productRepository.findPublicMarketplaceProductsByIds(rankedIds);
+        List<Product> products = productRepository
+                .findPublicMarketplaceProductsByIds(rankedIds);
         Map<UUID, Product> productsById = products.stream()
-                .filter(product -> product.getId() != null)
-                .collect(Collectors.toMap(Product::getId, product -> product, (left, right) -> left, LinkedHashMap::new));
+                .filter(product -> product.getId() != null).collect(
+                        Collectors.toMap(Product::getId, product -> product,
+                                (left, right) -> left, LinkedHashMap::new));
         Map<UUID, Store> storesById = loadStoresByProductOwnership(products);
 
         LinkedHashSet<UUID> seen = new LinkedHashSet<>();
         List<MarketplaceProductCardResponse> items = new ArrayList<>();
         List<MarketplaceImageSearchResponse.ImageSearchMatch> matches = new ArrayList<>();
 
-        for (VisionSearchClient.VisionCandidate candidate : rawResult.candidates()) {
+        for (VisionSearchClient.VisionCandidate candidate : rawResult
+                .candidates()) {
             UUID productId = candidate.backendProductId();
             if (productId == null || !seen.add(productId)) {
                 continue;
@@ -243,31 +242,27 @@ public class MarketplacePublicService {
                 continue;
             }
 
-            items.add(toProductCardResponse(product, storesById.get(product.getStoreId())));
-            matches.add(MarketplaceImageSearchResponse.ImageSearchMatch.builder()
-                    .productId(productId)
-                    .rank(items.size())
-                    .score(candidate.score())
+            items.add(toProductCardResponse(product,
+                    storesById.get(product.getStoreId())));
+            matches.add(MarketplaceImageSearchResponse.ImageSearchMatch
+                    .builder().productId(productId)
+                    .rank(items.size()).score(candidate.score())
                     .matchedImageUrl(candidate.matchedImageUrl())
                     .matchedImageIndex(candidate.matchedImageIndex())
-                    .isPrimary(candidate.isPrimary())
-                    .build());
+                    .isPrimary(candidate.isPrimary()).build());
 
             if (items.size() >= resolvedLimit) {
                 break;
             }
         }
 
-        return MarketplaceImageSearchResponse.builder()
-                .items(items)
+        return MarketplaceImageSearchResponse.builder().items(items)
                 .totalCandidates(rawResult.totalCandidates())
-                .mode("image")
-                .indexVersion(rawResult.indexVersion())
+                .mode("image").indexVersion(rawResult.indexVersion())
                 .inferredCategory(rawResult.inferredCategory())
                 .inferredCategoryScore(rawResult.inferredCategoryScore())
                 .categoryFilterApplied(rawResult.categoryFilterApplied())
-                .matches(matches)
-                .build();
+                .matches(matches).build();
     }
 
     @Transactional(readOnly = true)
@@ -276,50 +271,54 @@ public class MarketplacePublicService {
     }
 
     @Transactional(readOnly = true)
-    public VisionCatalogPageResponse exportVisionCatalog(Pageable pageable, LocalDateTime updatedSince) {
+    public VisionCatalogPageResponse exportVisionCatalog(Pageable pageable,
+            LocalDateTime updatedSince) {
         Pageable resolved = resolveVisionCatalogPageable(pageable);
         Page<Product> productPage = updatedSince == null
                 ? productRepository.findPublicMarketplaceProducts(resolved)
-                : productRepository.findPublicMarketplaceProductsUpdatedSince(updatedSince, resolved);
-        Map<UUID, Store> storesById = loadStoresByProductOwnership(productPage.getContent());
+                : productRepository.findPublicMarketplaceProductsUpdatedSince(
+                        updatedSince, resolved);
+        Map<UUID, Store> storesById = loadStoresByProductOwnership(
+                productPage.getContent());
 
         List<VisionCatalogItemResponse> rows = productPage.getContent().stream()
-                .flatMap(product -> mapVisionCatalogRows(product, storesById.get(product.getStoreId())).stream())
+                .flatMap(product -> mapVisionCatalogRows(product,
+                        storesById.get(product.getStoreId())).stream())
                 .toList();
 
-        return VisionCatalogPageResponse.builder()
-                .items(rows)
+        return VisionCatalogPageResponse.builder().items(rows)
                 .totalProducts(productPage.getTotalElements())
-                .page(productPage.getNumber())
-                .size(productPage.getSize())
+                .page(productPage.getNumber()).size(productPage.getSize())
                 .totalPages(productPage.getTotalPages())
-                .generatedAt(LocalDateTime.now())
-                .build();
+                .generatedAt(LocalDateTime.now()).build();
     }
 
     @Transactional(readOnly = true)
-    public List<UUID> exportVisionDeactivatedProductIds(LocalDateTime updatedSince) {
+    public List<UUID> exportVisionDeactivatedProductIds(
+            LocalDateTime updatedSince) {
         if (updatedSince == null) {
             return List.of();
         }
-        return productRepository.findVisionDeactivatedProductIdsUpdatedSince(updatedSince);
+        return productRepository
+                .findVisionDeactivatedProductIdsUpdatedSince(updatedSince);
     }
 
     @Transactional
     public MarketplaceFlashSaleResponse getActiveFlashSale() {
         LocalDateTime now = LocalDateTime.now();
-        FlashSaleCampaign campaign = flashSaleCampaignRepository.findFirstActiveAt(now).orElse(null);
+        FlashSaleCampaign campaign = flashSaleCampaignRepository
+                .findFirstActiveAt(now).orElse(null);
         if (campaign == null || campaign.getId() == null) {
-            return MarketplaceFlashSaleResponse.builder()
-                    .serverTime(now)
-                    .items(List.of())
-                    .build();
+            return MarketplaceFlashSaleResponse.builder().serverTime(now)
+                    .items(List.of()).build();
         }
 
-        List<MarketplaceFlashSaleItemResponse> items = resolveDisplayableFlashSaleItems(campaign, now);
+        List<MarketplaceFlashSaleItemResponse> items = resolveDisplayableFlashSaleItems(
+                campaign, now);
 
         if (items.isEmpty() && isLocalDefaultFlashSaleCampaign(campaign)) {
-            FlashSaleCampaign rebuiltCampaign = rebuildLocalDefaultFlashSaleCampaign(campaign, now);
+            FlashSaleCampaign rebuiltCampaign = rebuildLocalDefaultFlashSaleCampaign(
+                    campaign, now);
             if (rebuiltCampaign != null && rebuiltCampaign.getId() != null) {
                 campaign = rebuiltCampaign;
                 items = resolveDisplayableFlashSaleItems(campaign, now);
@@ -327,53 +326,47 @@ public class MarketplacePublicService {
         }
 
         return MarketplaceFlashSaleResponse.builder()
-                .campaignId(campaign.getId())
-                .campaignName(campaign.getName())
-                .startAt(campaign.getStartAt())
-                .endAt(campaign.getEndAt())
-                .serverTime(now)
-                .items(items)
-                .build();
+                .campaignId(campaign.getId()).campaignName(campaign.getName())
+                .startAt(campaign.getStartAt()).endAt(campaign.getEndAt())
+                .serverTime(now).items(items).build();
     }
 
     private List<MarketplaceFlashSaleItemResponse> resolveDisplayableFlashSaleItems(
             FlashSaleCampaign campaign,
-            LocalDateTime now
-    ) {
+            LocalDateTime now) {
         if (campaign == null || campaign.getId() == null) {
             return List.of();
         }
 
-        List<FlashSaleItem> rawItems = flashSaleItemRepository.findPublicActiveByCampaignId(
-                campaign.getId(),
-                FlashSaleCampaign.CampaignStatus.RUNNING,
-                FlashSaleItem.ItemStatus.ACTIVE,
-                now
-        );
+        List<FlashSaleItem> rawItems = flashSaleItemRepository
+                .findPublicActiveByCampaignId(campaign.getId(),
+                        FlashSaleCampaign.CampaignStatus.RUNNING,
+                        FlashSaleItem.ItemStatus.ACTIVE, now);
         if (rawItems.isEmpty()) {
             return List.of();
         }
 
-        Set<UUID> storeIds = rawItems.stream()
-                .map(FlashSaleItem::getProduct)
+        Set<UUID> storeIds = rawItems.stream().map(FlashSaleItem::getProduct)
                 .filter(Objects::nonNull)
-                .map(Product::getStoreId)
-                .filter(Objects::nonNull)
+                .map(Product::getStoreId).filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        Map<UUID, Store> storesById = storeIds.isEmpty()
-                ? Map.of()
+        Map<UUID, Store> storesById = storeIds.isEmpty() ? Map.of()
                 : storeRepository.findAllById(storeIds).stream()
-                .collect(Collectors.toMap(Store::getId, store -> store, (left, right) -> right, HashMap::new));
+                        .collect(Collectors.toMap(Store::getId, store -> store,
+                                (left, right) -> right, HashMap::new));
 
-        return rawItems.stream()
-                .filter(this::hasDisplayableFlashSaleProduct)
-                .map(item -> toFlashSaleItemResponse(item, storesById.get(item.getProduct() != null ? item.getProduct().getStoreId() : null)))
-                .filter(Objects::nonNull)
-                .toList();
+        return rawItems.stream().filter(this::hasDisplayableFlashSaleProduct)
+                .map(item -> toFlashSaleItemResponse(item,
+                        storesById.get(item.getProduct() != null
+                                ? item.getProduct().getStoreId()
+                                : null)))
+                .filter(Objects::nonNull).toList();
     }
 
-    private FlashSaleCampaign rebuildLocalDefaultFlashSaleCampaign(FlashSaleCampaign currentCampaign, LocalDateTime now) {
+    private FlashSaleCampaign rebuildLocalDefaultFlashSaleCampaign(
+            FlashSaleCampaign currentCampaign,
+            LocalDateTime now) {
         if (currentCampaign == null || currentCampaign.getId() == null) {
             return null;
         }
@@ -381,26 +374,29 @@ public class MarketplacePublicService {
         flashSaleCampaignRepository.delete(currentCampaign);
         flashSaleCampaignRepository.flush();
 
-        List<Product> publicProducts = productRepository.findAllPublicProducts().stream()
-                .filter(this::hasCatalogImage)
+        List<Product> publicProducts = productRepository.findAllPublicProducts()
+                .stream().filter(this::hasCatalogImage)
                 .sorted(Comparator
-                        .comparing(Product::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(Product::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(product -> product.getId() != null ? product.getId().toString() : ""))
+                        .comparing(Product::getUpdatedAt,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(Product::getCreatedAt,
+                                Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(product -> product.getId() != null
+                                ? product.getId().toString()
+                                : ""))
                 .toList();
         if (publicProducts.isEmpty()) {
             return null;
         }
 
-        FlashSaleCampaign campaign = flashSaleCampaignRepository.save(FlashSaleCampaign.builder()
-                .name(DEFAULT_FLASH_SALE_NAME)
-                .description(DEFAULT_FLASH_SALE_DESCRIPTION)
-                .scope(FlashSaleCampaign.CampaignScope.PLATFORM)
-                .status(FlashSaleCampaign.CampaignStatus.RUNNING)
-                .startAt(now.minusHours(1))
-                .endAt(now.plusDays(3))
-                .updatedBy(DEFAULT_FLASH_SALE_UPDATED_BY)
-                .build());
+        FlashSaleCampaign campaign = flashSaleCampaignRepository
+                .save(FlashSaleCampaign.builder()
+                        .name(DEFAULT_FLASH_SALE_NAME)
+                        .description(DEFAULT_FLASH_SALE_DESCRIPTION)
+                        .scope(FlashSaleCampaign.CampaignScope.PLATFORM)
+                        .status(FlashSaleCampaign.CampaignStatus.RUNNING)
+                        .startAt(now.minusHours(1)).endAt(now.plusDays(3))
+                        .updatedBy(DEFAULT_FLASH_SALE_UPDATED_BY).build());
 
         int createdItems = 0;
         int sortOrder = 0;
@@ -412,10 +408,11 @@ public class MarketplacePublicService {
                 continue;
             }
 
-            ProductVariant variant = productVariantRepository.findByProductIdAndIsActiveTrue(product.getId()).stream()
-                    .filter(v -> v.getStockQuantity() != null && v.getStockQuantity() > 0)
-                    .findFirst()
-                    .orElse(null);
+            ProductVariant variant = productVariantRepository
+                    .findByProductIdAndIsActiveTrue(product.getId()).stream()
+                    .filter(v -> v.getStockQuantity() != null
+                            && v.getStockQuantity() > 0)
+                    .findFirst().orElse(null);
 
             int stock = variant != null
                     ? Math.max(defaultInteger(variant.getStockQuantity()), 0)
@@ -425,7 +422,8 @@ public class MarketplacePublicService {
             }
 
             BigDecimal basePrice = resolveEffectivePrice(product);
-            if (basePrice == null || basePrice.compareTo(BigDecimal.ZERO) <= 0) {
+            if (basePrice == null
+                    || basePrice.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
             if (variant != null && variant.getPriceAdjustment() != null) {
@@ -435,21 +433,18 @@ public class MarketplacePublicService {
                 continue;
             }
 
-            BigDecimal flashPrice = basePrice.multiply(new BigDecimal("0.80")).setScale(0, RoundingMode.HALF_UP);
+            BigDecimal flashPrice = basePrice.multiply(new BigDecimal("0.80"))
+                    .setScale(0, RoundingMode.HALF_UP);
             if (flashPrice.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
 
             flashSaleItemRepository.save(FlashSaleItem.builder()
-                    .campaign(campaign)
-                    .product(product)
-                    .variant(variant)
+                    .campaign(campaign).product(product).variant(variant)
                     .flashPrice(flashPrice)
-                    .quota(Math.max(20, Math.min(120, stock)))
-                    .soldCount(0)
+                    .quota(Math.max(20, Math.min(120, stock))).soldCount(0)
                     .status(FlashSaleItem.ItemStatus.ACTIVE)
-                    .sortOrder(sortOrder++)
-                    .build());
+                    .sortOrder(sortOrder++).build());
             createdItems++;
         }
 
@@ -462,22 +457,28 @@ public class MarketplacePublicService {
         return campaign;
     }
 
-    private boolean isLocalDefaultFlashSaleCampaign(FlashSaleCampaign campaign) {
+    private boolean isLocalDefaultFlashSaleCampaign(
+            FlashSaleCampaign campaign) {
         if (campaign == null) {
             return false;
         }
-        return DEFAULT_FLASH_SALE_UPDATED_BY.equalsIgnoreCase(String.valueOf(campaign.getUpdatedBy()).trim())
+        return DEFAULT_FLASH_SALE_UPDATED_BY.equalsIgnoreCase(
+                String.valueOf(campaign.getUpdatedBy()).trim())
                 && DEFAULT_FLASH_SALE_NAME.equals(campaign.getName())
-                && DEFAULT_FLASH_SALE_DESCRIPTION.equals(campaign.getDescription());
+                && DEFAULT_FLASH_SALE_DESCRIPTION
+                        .equals(campaign.getDescription());
     }
 
     private Pageable resolveProductSearchPageable(Pageable pageable) {
         if (pageable == null) {
-            return PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "createdAt"));
+            return PageRequest.of(0, 20,
+                    Sort.by(Sort.Direction.DESC, "createdAt"));
         }
 
         if (pageable.getSort().isUnsorted()) {
-            return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+            return PageRequest.of(pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by(Sort.Direction.DESC, "createdAt"));
         }
 
         return pageable;
@@ -485,23 +486,18 @@ public class MarketplacePublicService {
 
     private Pageable resolveStoreSearchPageable(Pageable pageable) {
         if (pageable == null) {
-            return PageRequest.of(0, 20, Sort.by(
-                    Sort.Order.desc("rating"),
-                    Sort.Order.desc("totalOrders"),
-                    Sort.Order.desc("createdAt")
-            ));
+            return PageRequest.of(0, 20,
+                    Sort.by(Sort.Order.desc("rating"),
+                            Sort.Order.desc("totalOrders"),
+                            Sort.Order.desc("createdAt")));
         }
 
         if (pageable.getSort().isUnsorted()) {
-            return PageRequest.of(
-                    pageable.getPageNumber(),
+            return PageRequest.of(pageable.getPageNumber(),
                     pageable.getPageSize(),
-                    Sort.by(
-                            Sort.Order.desc("rating"),
+                    Sort.by(Sort.Order.desc("rating"),
                             Sort.Order.desc("totalOrders"),
-                            Sort.Order.desc("createdAt")
-                    )
-            );
+                            Sort.Order.desc("createdAt")));
         }
 
         return pageable;
@@ -509,14 +505,13 @@ public class MarketplacePublicService {
 
     private Pageable resolveVisionCatalogPageable(Pageable pageable) {
         if (pageable == null) {
-            return PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "updatedAt"));
+            return PageRequest.of(0, 100,
+                    Sort.by(Sort.Direction.DESC, "updatedAt"));
         }
         if (pageable.getSort().isUnsorted()) {
-            return PageRequest.of(
-                    pageable.getPageNumber(),
+            return PageRequest.of(pageable.getPageNumber(),
                     pageable.getPageSize(),
-                    Sort.by(Sort.Direction.DESC, "updatedAt")
-            );
+                    Sort.by(Sort.Direction.DESC, "updatedAt"));
         }
         return pageable;
     }
@@ -557,11 +552,14 @@ public class MarketplacePublicService {
             if (category == null || category.getId() == null) {
                 continue;
             }
-            UUID parentId = category.getParent() != null ? category.getParent().getId() : null;
+            UUID parentId = category.getParent() != null
+                    ? category.getParent().getId()
+                    : null;
             if (parentId == null) {
                 continue;
             }
-            childIdsByParentId.computeIfAbsent(parentId, ignored -> new ArrayList<>())
+            childIdsByParentId
+                    .computeIfAbsent(parentId, ignored -> new ArrayList<>())
                     .add(category.getId());
         }
 
@@ -574,7 +572,8 @@ public class MarketplacePublicService {
             if (!scopeIds.add(current)) {
                 continue;
             }
-            for (UUID childId : childIdsByParentId.getOrDefault(current, List.of())) {
+            for (UUID childId : childIdsByParentId.getOrDefault(current,
+                    List.of())) {
                 if (childId != null) {
                     stack.push(childId);
                 }
@@ -584,7 +583,8 @@ public class MarketplacePublicService {
         return new ArrayList<>(scopeIds);
     }
 
-    private List<Product> buildDistinctInStockProductList(List<List<Product>> pools, int limit) {
+    private List<Product> buildDistinctInStockProductList(
+            List<List<Product>> pools, int limit) {
         LinkedHashMap<UUID, Product> byId = new LinkedHashMap<>();
 
         for (List<Product> pool : pools) {
@@ -592,7 +592,8 @@ public class MarketplacePublicService {
                 continue;
             }
             for (Product product : pool) {
-                if (product == null || product.getId() == null || product.getStoreId() == null) {
+                if (product == null || product.getId() == null
+                        || product.getStoreId() == null) {
                     continue;
                 }
                 if (!hasAvailableStock(product)) {
@@ -611,12 +612,11 @@ public class MarketplacePublicService {
         return new ArrayList<>(byId.values());
     }
 
-    private Map<UUID, Store> loadStoresByProductOwnership(List<Product>... productGroups) {
+    private Map<UUID, Store> loadStoresByProductOwnership(
+            List<Product>... productGroups) {
         Set<UUID> storeIds = java.util.Arrays.stream(productGroups)
-                .filter(Objects::nonNull)
-                .flatMap(List::stream)
-                .map(Product::getStoreId)
-                .filter(Objects::nonNull)
+                .filter(Objects::nonNull).flatMap(List::stream)
+                .map(Product::getStoreId).filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
         if (storeIds.isEmpty()) {
@@ -624,15 +624,16 @@ public class MarketplacePublicService {
         }
 
         return storeRepository.findAllById(storeIds).stream()
-                .collect(Collectors.toMap(Store::getId, store -> store, (left, right) -> right, HashMap::new));
+                .collect(Collectors.toMap(Store::getId, store -> store,
+                        (left, right) -> right, HashMap::new));
     }
 
     private Map<UUID, Store> loadStoresByProductOwnership(
             List<Product> featuredProducts,
-            List<Product> trendingProducts,
-            List<Store> featuredStores
-    ) {
-        Map<UUID, Store> storesById = new HashMap<>(loadStoresByProductOwnership(featuredProducts, trendingProducts));
+            List<Product> trendingProducts, List<Store> featuredStores) {
+        Map<UUID, Store> storesById = new HashMap<>(
+                loadStoresByProductOwnership(featuredProducts,
+                        trendingProducts));
         if (featuredStores == null || featuredStores.isEmpty()) {
             return storesById;
         }
@@ -647,56 +648,62 @@ public class MarketplacePublicService {
     }
 
     private MarketplaceStoreCardResponse toStoreCardResponse(Store store) {
-        StorePerformanceMetricsService.StorePerformanceMetrics performanceMetrics =
-                storePerformanceMetricsService.resolve(store.getId());
-        return MarketplaceStoreCardResponse.builder()
-                .id(store.getId())
+        StorePerformanceMetricsService.StorePerformanceMetrics performanceMetrics = storePerformanceMetricsService
+                .resolve(store.getId());
+        return MarketplaceStoreCardResponse.builder().id(store.getId())
                 .storeCode(resolveStoreCode(store))
-                .name(store.getName())
-                .slug(store.getSlug())
+                .name(store.getName()).slug(store.getSlug())
                 .logo(store.getLogo())
                 .rating(defaultDouble(store.getRating()))
                 .totalOrders(performanceMetrics.totalOrders())
-                .liveProductCount(Math.toIntExact(productRepository.countActiveByStoreId(store.getId())))
+                .liveProductCount(Math.toIntExact(
+                        productRepository.countActiveByStoreId(store.getId())))
                 .build();
     }
 
-    private MarketplaceProductCardResponse toProductCardResponse(Product product, Store store) {
+    private MarketplaceProductCardResponse toProductCardResponse(
+            Product product, Store store) {
         BigDecimal effectivePrice = resolveEffectivePrice(product);
         BigDecimal originalPrice = resolveOriginalPrice(product);
 
-        return MarketplaceProductCardResponse.builder()
-                .id(product.getId())
+        return MarketplaceProductCardResponse.builder().id(product.getId())
                 .slug(product.getSlug())
                 .productCode(resolveProductCode(product))
                 .name(product.getName())
-                .category(product.getCategory() != null ? product.getCategory().getName() : null)
-                .categorySlug(product.getCategory() != null ? product.getCategory().getSlug() : null)
-                .image(resolvePrimaryImage(product))
-                .price(effectivePrice)
+                .category(product.getCategory() != null
+                        ? product.getCategory().getName()
+                        : null)
+                .categorySlug(product.getCategory() != null
+                        ? product.getCategory().getSlug()
+                        : null)
+                .image(resolvePrimaryImage(product)).price(effectivePrice)
                 .priceAmount(formatMoneyAmount(effectivePrice))
                 .originalPrice(originalPrice)
                 .originalPriceAmount(formatMoneyAmount(originalPrice))
-                .badge(Boolean.TRUE.equals(product.getIsFeatured()) ? "FEATURED" : null)
+                .badge(Boolean.TRUE.equals(product.getIsFeatured()) ? "FEATURED"
+                        : null)
                 .material(product.getMaterial())
                 .fit(product.getFit())
-                .gender(product.getGender() != null ? product.getGender().name() : null)
+                .gender(product.getGender() != null ? product.getGender().name()
+                        : null)
                 .colors(resolveColors(product))
                 .stock(resolveTotalStock(product))
                 .storeId(store != null ? store.getId() : product.getStoreId())
                 .storeName(store != null ? store.getName() : null)
                 .storeSlug(store != null ? store.getSlug() : null)
                 .storeLogo(store != null ? store.getLogo() : null)
-                .storeRating(store != null ? defaultDouble(store.getRating()) : 0.0)
+                .storeRating(
+                        store != null ? defaultDouble(store.getRating()) : 0.0)
                 .officialStore(store != null && isOfficialStore(store))
                 .sizes(resolveSizes(product))
                 .variants(resolveVariants(product))
-                .createdAt(product.getCreatedAt())
-                .build();
+                .createdAt(product.getCreatedAt()).build();
     }
 
-    private List<VisionCatalogItemResponse> mapVisionCatalogRows(Product product, Store store) {
-        if (product == null || product.getId() == null || product.getStoreId() == null || store == null) {
+    private List<VisionCatalogItemResponse> mapVisionCatalogRows(
+            Product product, Store store) {
+        if (product == null || product.getId() == null
+                || product.getStoreId() == null || store == null) {
             return List.of();
         }
 
@@ -705,28 +712,35 @@ public class MarketplacePublicService {
             return List.of();
         }
 
-        return images.stream()
-                .filter(Objects::nonNull)
+        return images.stream().filter(Objects::nonNull)
                 .filter(image -> hasText(image.getUrl()))
-                .sorted(Comparator
-                        .comparing((ProductImage image) -> image.getSortOrder() == null ? Integer.MAX_VALUE : image.getSortOrder())
-                        .thenComparing(image -> !Boolean.TRUE.equals(image.getIsPrimary())))
+                .sorted(Comparator.comparing(
+                        (ProductImage image) -> image.getSortOrder() == null
+                                ? Integer.MAX_VALUE
+                                : image.getSortOrder())
+                        .thenComparing(image -> !Boolean.TRUE
+                                .equals(image.getIsPrimary())))
                 .map(image -> VisionCatalogItemResponse.builder()
                         .backendProductId(product.getId())
                         .productSlug(product.getSlug())
                         .storeId(product.getStoreId())
                         .storeSlug(store.getSlug())
-                        .categorySlug(product.getCategory() != null ? product.getCategory().getSlug() : null)
+                        .categorySlug(product.getCategory() != null
+                                ? product.getCategory().getSlug()
+                                : null)
                         .imageUrl(image.getUrl().trim())
-                        .imageIndex(image.getSortOrder() == null ? 0 : image.getSortOrder())
+                        .imageIndex(image.getSortOrder() == null ? 0
+                                : image.getSortOrder())
                         .isPrimary(Boolean.TRUE.equals(image.getIsPrimary()))
                         .availableStock(resolveTotalStock(product))
-                        .sourceUpdatedAt(resolveVisionSourceUpdatedAt(product, image))
+                        .sourceUpdatedAt(
+                                resolveVisionSourceUpdatedAt(product, image))
                         .build())
                 .toList();
     }
 
-    private LocalDateTime resolveVisionSourceUpdatedAt(Product product, ProductImage image) {
+    private LocalDateTime resolveVisionSourceUpdatedAt(Product product,
+            ProductImage image) {
         LocalDateTime latest = null;
         latest = newestDate(latest, product.getUpdatedAt());
         latest = newestDate(latest, product.getCreatedAt());
@@ -762,15 +776,14 @@ public class MarketplacePublicService {
     private int resolveTotalStock(Product product) {
         List<ProductVariant> variants = product.getVariants();
         if (variants == null || variants.isEmpty()) {
-            return product.getStockQuantity() == null ? 0 : Math.max(0, product.getStockQuantity());
+            return product.getStockQuantity() == null ? 0
+                    : Math.max(0, product.getStockQuantity());
         }
 
         return variants.stream()
                 .filter(variant -> !Boolean.FALSE.equals(variant.getIsActive()))
-                .map(ProductVariant::getStockQuantity)
-                .filter(Objects::nonNull)
-                .mapToInt(Integer::intValue)
-                .sum();
+                .map(ProductVariant::getStockQuantity).filter(Objects::nonNull)
+                .mapToInt(Integer::intValue).sum();
     }
 
     private List<String> resolveColors(Product product) {
@@ -792,8 +805,7 @@ public class MarketplacePublicService {
             String colorHex = hasText(variant.getColorHex())
                     ? variant.getColorHex().trim().toLowerCase(Locale.ROOT)
                     : "";
-            String swatchKey = !colorHex.isBlank()
-                    ? "hex:" + colorHex
+            String swatchKey = !colorHex.isBlank() ? "hex:" + colorHex
                     : "name:" + normalizedColor.toLowerCase(Locale.ROOT);
             colorsBySwatchKey.putIfAbsent(swatchKey, normalizedColor);
         }
@@ -809,14 +821,12 @@ public class MarketplacePublicService {
 
         return variants.stream()
                 .filter(variant -> !Boolean.FALSE.equals(variant.getIsActive()))
-                .map(ProductVariant::getSize)
-                .filter(this::hasText)
-                .map(String::trim)
-                .distinct()
-                .toList();
+                .map(ProductVariant::getSize).filter(this::hasText)
+                .map(String::trim).distinct().toList();
     }
 
-    private List<MarketplaceProductCardResponse.VariantOption> resolveVariants(Product product) {
+    private List<MarketplaceProductCardResponse.VariantOption> resolveVariants(
+            Product product) {
         List<ProductVariant> variants = product.getVariants();
         if (variants == null || variants.isEmpty()) {
             return List.of();
@@ -825,19 +835,27 @@ public class MarketplacePublicService {
         return variants.stream()
                 .filter(variant -> !Boolean.FALSE.equals(variant.getIsActive()))
                 .filter(variant -> hasText(variant.getSize()))
-                .map(variant -> MarketplaceProductCardResponse.VariantOption.builder()
-                        .id(variant.getId())
+                .map(variant -> MarketplaceProductCardResponse.VariantOption
+                        .builder().id(variant.getId())
                         .sku(variant.getSku())
-                        .color(hasText(variant.getColor()) ? variant.getColor().trim() : "")
-                        .colorHex(hasText(variant.getColorHex()) ? variant.getColorHex().trim().toLowerCase(Locale.ROOT) : null)
+                        .color(hasText(variant.getColor())
+                                ? variant.getColor().trim()
+                                : "")
+                        .colorHex(hasText(variant.getColorHex())
+                                ? variant.getColorHex().trim()
+                                        .toLowerCase(Locale.ROOT)
+                                : null)
                         .size(variant.getSize().trim())
-                        .stockQuantity(variant.getStockQuantity() == null ? 0 : Math.max(0, variant.getStockQuantity()))
+                        .stockQuantity(variant.getStockQuantity() == null ? 0
+                                : Math.max(0, variant.getStockQuantity()))
                         .build())
                 .toList();
     }
 
-    private MarketplaceFlashSaleItemResponse toFlashSaleItemResponse(FlashSaleItem item, Store store) {
-        if (item == null || item.getProduct() == null || item.getProduct().getId() == null) {
+    private MarketplaceFlashSaleItemResponse toFlashSaleItemResponse(
+            FlashSaleItem item, Store store) {
+        if (item == null || item.getProduct() == null
+                || item.getProduct().getId() == null) {
             return null;
         }
         Product product = item.getProduct();
@@ -857,32 +875,29 @@ public class MarketplacePublicService {
         }
 
         BigDecimal originalPrice = resolveUnitPriceForFlash(product, variant);
-        BigDecimal flashPrice = item.getFlashPrice() == null ? BigDecimal.ZERO : item.getFlashPrice();
+        BigDecimal flashPrice = item.getFlashPrice() == null ? BigDecimal.ZERO
+                : item.getFlashPrice();
         if (flashPrice.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
         }
 
         return MarketplaceFlashSaleItemResponse.builder()
-                .flashSaleItemId(item.getId())
-                .productId(product.getId())
+                .flashSaleItemId(item.getId()).productId(product.getId())
                 .productSlug(product.getSlug())
                 .productCode(resolveProductCode(product))
                 .variantId(variant != null ? variant.getId() : null)
                 .name(product.getName())
-                .image(resolvePrimaryImage(product))
-                .flashPrice(flashPrice)
+                .image(resolvePrimaryImage(product)).flashPrice(flashPrice)
                 .flashPriceAmount(formatMoneyAmount(flashPrice))
                 .originalPrice(originalPrice)
                 .originalPriceAmount(formatMoneyAmount(originalPrice))
-                .soldCount(soldCount)
-                .quota(quota)
+                .soldCount(soldCount).quota(quota)
                 .storeId(store != null ? store.getId() : product.getStoreId())
                 .storeName(store != null ? store.getName() : null)
                 .storeSlug(store != null ? store.getSlug() : null)
                 .officialStore(store != null && isOfficialStore(store))
                 .colors(resolveColors(product))
-                .sizes(resolveSizes(product))
-                .variants(resolveVariants(product))
+                .sizes(resolveSizes(product)).variants(resolveVariants(product))
                 .build();
     }
 
@@ -898,10 +913,8 @@ public class MarketplacePublicService {
         if (images == null || images.isEmpty()) {
             return false;
         }
-        return images.stream()
-                .filter(Objects::nonNull)
-                .map(ProductImage::getUrl)
-                .anyMatch(this::hasText);
+        return images.stream().filter(Objects::nonNull)
+                .map(ProductImage::getUrl).anyMatch(this::hasText);
     }
 
     private String resolvePrimaryImage(Product product) {
@@ -910,14 +923,15 @@ public class MarketplacePublicService {
             return DEFAULT_PRODUCT_IMAGE;
         }
 
-        return images.stream()
-                .filter(Objects::nonNull)
+        return images.stream().filter(Objects::nonNull)
                 .sorted(Comparator
-                        .comparing((ProductImage image) -> !Boolean.TRUE.equals(image.getIsPrimary()))
-                        .thenComparing(image -> image.getSortOrder() == null ? Integer.MAX_VALUE : image.getSortOrder()))
-                .map(ProductImage::getUrl)
-                .filter(this::hasText)
-                .findFirst()
+                        .comparing((ProductImage image) -> !Boolean.TRUE
+                                .equals(image.getIsPrimary()))
+                        .thenComparing(
+                                image -> image.getSortOrder() == null
+                                        ? Integer.MAX_VALUE
+                                        : image.getSortOrder()))
+                .map(ProductImage::getUrl).filter(this::hasText).findFirst()
                 .orElse(DEFAULT_PRODUCT_IMAGE);
     }
 
@@ -932,22 +946,25 @@ public class MarketplacePublicService {
         return BigDecimal.ZERO;
     }
 
-    private BigDecimal resolveUnitPriceForFlash(Product product, ProductVariant variant) {
-        BigDecimal unitPrice = variant != null ? variant.getPrice() : resolveEffectivePrice(product);
+    private BigDecimal resolveUnitPriceForFlash(Product product,
+            ProductVariant variant) {
+        BigDecimal unitPrice = variant != null ? variant.getPrice()
+                : resolveEffectivePrice(product);
         return unitPrice == null ? BigDecimal.ZERO : unitPrice;
     }
 
     private BigDecimal resolveOriginalPrice(Product product) {
-        if (product.getSalePrice() != null
-                && product.getBasePrice() != null
-                && product.getBasePrice().compareTo(product.getSalePrice()) > 0) {
+        if (product.getSalePrice() != null && product.getBasePrice() != null
+                && product.getBasePrice()
+                        .compareTo(product.getSalePrice()) > 0) {
             return product.getBasePrice();
         }
         return null;
     }
 
     private String formatMoneyAmount(BigDecimal amount) {
-        return amount == null ? null : amount.stripTrailingZeros().toPlainString();
+        return amount == null ? null
+                : amount.stripTrailingZeros().toPlainString();
     }
 
     private String resolveProductCode(Product product) {
@@ -961,7 +978,8 @@ public class MarketplacePublicService {
         if (store == null || store.getId() == null) {
             return "";
         }
-        String raw = store.getId().toString().replace("-", "").toUpperCase(Locale.ROOT);
+        String raw = store.getId().toString().replace("-", "")
+                .toUpperCase(Locale.ROOT);
         return "SHOP-" + raw.substring(0, Math.min(8, raw.length()));
     }
 
@@ -969,19 +987,22 @@ public class MarketplacePublicService {
         return false;
     }
 
-    private boolean hasPublicAvailability(Product product, ProductVariant variant) {
+    private boolean hasPublicAvailability(Product product,
+            ProductVariant variant) {
         if (product.getStoreId() == null) {
             return false;
         }
         if (product.getStatus() != Product.ProductStatus.ACTIVE) {
             return false;
         }
-        if (product.getApprovalStatus() != null && product.getApprovalStatus() != Product.ApprovalStatus.APPROVED) {
+        if (product.getApprovalStatus() != null && product
+                .getApprovalStatus() != Product.ApprovalStatus.APPROVED) {
             return false;
         }
 
         if (variant != null) {
-            return !Boolean.FALSE.equals(variant.getIsActive()) && defaultInteger(variant.getStockQuantity()) > 0;
+            return !Boolean.FALSE.equals(variant.getIsActive())
+                    && defaultInteger(variant.getStockQuantity()) > 0;
         }
         return resolveTotalStock(product) > 0;
     }
@@ -1008,14 +1029,19 @@ public class MarketplacePublicService {
 
     private void validateImageSearchFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image file is required");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Image file is required");
         }
-        if (file.getSize() > Math.max(1L, visionSearchProperties.getMaxUploadSizeBytes())) {
-            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Image file is too large");
+        if (file.getSize() > Math.max(1L,
+                visionSearchProperties.getMaxUploadSizeBytes())) {
+            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE,
+                    "Image file is too large");
         }
         String contentType = file.getContentType();
-        if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Uploaded file must be an image");
+        if (contentType == null
+                || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Uploaded file must be an image");
         }
     }
 }

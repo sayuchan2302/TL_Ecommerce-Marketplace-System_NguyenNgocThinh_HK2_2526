@@ -1,10 +1,20 @@
 HELP.md
+
+# Build outputs
 target/
+build/
+*.class
+
+# Maven wrapper
 .mvn/wrapper/maven-wrapper.jar
+
+# Keep source-scoped build directories when explicitly needed
 !**/src/main/**/target/
 !**/src/test/**/target/
+!**/src/main/**/build/
+!**/src/test/**/build/
 
-### STS ###
+# Eclipse / STS
 .apt_generated
 .classpath
 .factorypath
@@ -13,21 +23,23 @@ target/
 .springBeans
 .sts4-cache
 
-### IntelliJ IDEA ###
-.idea
+# IntelliJ IDEA
+.idea/
 *.iws
 *.iml
 *.ipr
 
-### NetBeans ###
+# NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### VS Code ###
+# VS Code
 .vscode/
+
+# OS and cache files
+.DS_Store
+__pycache__/
+*.pyc

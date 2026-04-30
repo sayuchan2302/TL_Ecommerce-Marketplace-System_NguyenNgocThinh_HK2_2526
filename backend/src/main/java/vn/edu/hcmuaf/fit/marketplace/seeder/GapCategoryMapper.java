@@ -47,29 +47,18 @@ final class GapCategoryMapper {
         }
         fallbackPath.add("gender:no_match");
 
-        return new MappingResult(
-                "",
-                MappingConfidence.SOURCE_GAP_FALLBACK,
+        return new MappingResult("", MappingConfidence.SOURCE_GAP_FALLBACK,
                 "source_gap:no_supported_gap_evidence",
-                List.of(),
-                List.copyOf(fallbackPath),
-                Set.copyOf(rawCandidateSlugs)
-        );
+                List.of(), List.copyOf(fallbackPath),
+                Set.copyOf(rawCandidateSlugs));
     }
 
-    private MappingResult toResult(
-            RuleMatch match,
+    private MappingResult toResult(RuleMatch match,
             LinkedHashSet<String> rawCandidateSlugs,
-            List<String> fallbackPath
-    ) {
-        return new MappingResult(
-                match.slug(),
-                match.confidence(),
-                match.rule(),
+            List<String> fallbackPath) {
+        return new MappingResult(match.slug(), match.confidence(), match.rule(),
                 List.copyOf(match.sourceFieldsUsed()),
-                List.copyOf(fallbackPath),
-                Set.copyOf(rawCandidateSlugs)
-        );
+                List.copyOf(fallbackPath), Set.copyOf(rawCandidateSlugs));
     }
 
     private RuleMatch matchArticleType(GapProductImportRunner.StyleRow row) {
@@ -79,195 +68,135 @@ final class GapCategoryMapper {
         boolean male = isMale(row.gender());
 
         if ("accessories".equals(normalizedToken(row.masterCategory()))) {
-            return matchAccessoryText(
-                    article,
-                    "article_type",
-                    MappingConfidence.STRONG_MATCH,
-                    false
-            );
+            return matchAccessoryText(article, "article_type",
+                    MappingConfidence.STRONG_MATCH, false);
         }
 
         String descriptiveText = apparelEvidenceText(row);
         if (containsAnyToken(descriptiveText, "polo")) {
-            return match(
-                    male ? "men-ao-polo" : "women-ao-kieu",
+            return match(male ? "men-ao-polo" : "women-ao-kieu",
                     "article_type:polo_refinement",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType",
-                    "productDisplayName"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType",
+                    "productDisplayName");
         }
         if (containsAnyToken(descriptiveText, "khaki", "khakis")) {
-            return match(
-                    female ? "women-quan-tay" : "men-quan-kaki",
+            return match(female ? "women-quan-tay" : "men-quan-kaki",
                     "article_type:khaki_refinement",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType",
-                    "productDisplayName"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType",
+                    "productDisplayName");
         }
         if (containsAnyToken(descriptiveText, "jogger", "joggers")) {
-            return match(
-                    female ? "women-quan-legging" : "men-quan-jogger",
+            return match(female ? "women-quan-legging" : "men-quan-jogger",
                     "article_type:jogger_refinement",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType",
-                    "productDisplayName"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType",
+                    "productDisplayName");
         }
         if (containsAnyToken(descriptiveText, "crop", "cropped", "croptop")) {
-            return match(
-                    female ? "women-ao-croptop" : "men-ao-thun",
+            return match(female ? "women-ao-croptop" : "men-ao-thun",
                     "article_type:crop_refinement",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType",
-                    "productDisplayName"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType",
+                    "productDisplayName");
         }
 
-        if (containsAnyToken(article, "hoodie", "hoodies", "sweatshirt", "sweatshirts")) {
-            return match(
-                    female ? "women-ao-khoac" : "men-ao-hoodie",
+        if (containsAnyToken(article, "hoodie", "hoodies", "sweatshirt",
+                "sweatshirts")) {
+            return match(female ? "women-ao-khoac" : "men-ao-hoodie",
                     "article_type:hoodie_or_sweatshirt",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType");
         }
-        if (containsAnyToken(article, "tshirt", "tshirts", "t shirt", "t shirts", "tee", "tees")) {
-            return match(
-                    female ? "women-ao-thun" : "men-ao-thun",
+        if (containsAnyToken(article, "tshirt", "tshirts", "t shirt",
+                "t shirts", "tee", "tees")) {
+            return match(female ? "women-ao-thun" : "men-ao-thun",
                     "article_type:tshirt",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType");
         }
         if (containsAnyToken(article, "shirt", "shirts")) {
-            return match(
-                    female ? "women-ao-so-mi" : "men-ao-so-mi",
+            return match(female ? "women-ao-so-mi" : "men-ao-so-mi",
                     "article_type:shirt",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType");
         }
-        if (containsAnyToken(article, "sweater", "sweaters", "pullover", "pullovers", "cardigan", "cardigans")) {
-            return match(
-                    female ? "women-ao-khoac" : "men-ao-len",
+        if (containsAnyToken(article, "sweater", "sweaters", "pullover",
+                "pullovers", "cardigan", "cardigans")) {
+            return match(female ? "women-ao-khoac" : "men-ao-len",
                     "article_type:sweater_family",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType");
         }
-        if (containsAnyToken(article, "jacket", "jackets", "coat", "coats", "blazer", "blazers")) {
-            return match(
-                    female ? "women-ao-khoac" : "men-ao-len",
+        if (containsAnyToken(article, "jacket", "jackets", "coat", "coats",
+                "blazer", "blazers")) {
+            return match(female ? "women-ao-khoac" : "men-ao-len",
                     "article_type:jacket_or_coat",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType");
         }
-        if (containsAnyToken(article, "dress", "dresses", "gown", "gowns", "skirt", "skirts")) {
-            return match(
-                    mapFemaleDressByUsage(usage),
-                    "article_type:dress_family",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+        if (containsAnyToken(article, "dress", "dresses", "gown", "gowns",
+                "skirt", "skirts")) {
+            return match(mapFemaleDressByUsage(usage),
+                    "article_type:dress_family", MappingConfidence.STRONG_MATCH,
+                    "articleType");
         }
         if (containsAnyToken(article, "jean", "jeans", "jeggings")) {
-            return match(
-                    female ? "women-quan-jeans" : "men-quan-jeans",
+            return match(female ? "women-quan-jeans" : "men-quan-jeans",
                     "article_type:jeans",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType");
         }
         if (containsAnyToken(article, "legging", "leggings", "tights")) {
-            return match(
-                    female ? "women-quan-legging" : "men-quan-jogger",
+            return match(female ? "women-quan-legging" : "men-quan-jogger",
                     "article_type:leggings",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType");
         }
         if (containsAnyToken(article, "short", "shorts", "capri", "capris")) {
-            return match(
-                    female ? "women-quan-short" : "men-quan-short",
+            return match(female ? "women-quan-short" : "men-quan-short",
                     "article_type:shorts",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType");
         }
-        if (containsAnyToken(article, "trouser", "trousers", "pant", "pants", "chino", "chinos")) {
+        if (containsAnyToken(article, "trouser", "trousers", "pant", "pants",
+                "chino", "chinos")) {
             if (containsAnyToken(usage, "sports")) {
                 return match(
                         female ? "women-quan-the-thao" : "men-quan-the-thao",
                         "article_type:sports_pants",
-                        MappingConfidence.HEURISTIC_FALLBACK,
-                        "articleType",
-                        "usage"
-                );
+                        MappingConfidence.HEURISTIC_FALLBACK, "articleType",
+                        "usage");
             }
-            return match(
-                    female ? "women-quan-tay" : "men-quan-tay",
+            return match(female ? "women-quan-tay" : "men-quan-tay",
                     "article_type:trousers",
-                    MappingConfidence.STRONG_MATCH,
-                    "articleType"
-            );
+                    MappingConfidence.STRONG_MATCH, "articleType");
         }
-        if (containsAnyToken(article, "top", "tops", "camisole", "camisoles", "vest", "vests", "tank", "tanks")) {
+        if (containsAnyToken(article, "top", "tops", "camisole", "camisoles",
+                "vest", "vests", "tank", "tanks")) {
             if (female) {
                 RuleMatch womenTopMatch = matchWomenTopwearRefinement(
-                        descriptiveText,
-                        "article_type"
-                );
+                        descriptiveText, "article_type");
                 if (womenTopMatch != null) {
                     return womenTopMatch;
                 }
-                return match(
-                        "women-ao-kieu",
-                        "article_type:tops",
-                        MappingConfidence.HEURISTIC_FALLBACK,
-                        "articleType"
-                );
+                return match("women-ao-kieu", "article_type:tops",
+                        MappingConfidence.HEURISTIC_FALLBACK, "articleType");
             }
-            return match(
-                    "men-ao-thun",
-                    "article_type:tops",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "articleType"
-            );
+            return match("men-ao-thun", "article_type:tops",
+                    MappingConfidence.HEURISTIC_FALLBACK, "articleType");
         }
-        if (containsAnyToken(article, "tracksuit", "sports bra", "sports bras", "jersey", "jerseys", "training")) {
+        if (containsAnyToken(article, "tracksuit", "sports bra", "sports bras",
+                "jersey", "jerseys", "training")) {
             if (containsAnyToken(article, "set", "tracksuit")) {
-                return match(
-                        female ? "women-set-the-thao" : "men-set-the-thao",
+                return match(female ? "women-set-the-thao" : "men-set-the-thao",
                         "article_type:sports_set",
-                        MappingConfidence.HEURISTIC_FALLBACK,
-                        "articleType"
-                );
+                        MappingConfidence.HEURISTIC_FALLBACK, "articleType");
             }
             if (containsAnyToken(article, "pant", "pants", "short", "shorts")) {
                 return match(
                         female ? "women-quan-the-thao" : "men-quan-the-thao",
                         "article_type:sports_bottom",
-                        MappingConfidence.HEURISTIC_FALLBACK,
-                        "articleType"
-                );
+                        MappingConfidence.HEURISTIC_FALLBACK, "articleType");
             }
-            return match(
-                    female ? "women-ao-the-thao" : "men-ao-the-thao",
+            return match(female ? "women-ao-the-thao" : "men-ao-the-thao",
                     "article_type:sports_top",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "articleType"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "articleType");
         }
-        if (containsAnyToken(article, "night", "sleep", "lounge", "pyjama", "pyjamas", "robe", "robes", "innerwear")) {
-            return match(
-                    female ? "women-bo-mac-nha" : "men-bo-mac-nha",
+        if (containsAnyToken(article, "night", "sleep", "lounge", "pyjama",
+                "pyjamas", "robe", "robes", "innerwear")) {
+            return match(female ? "women-bo-mac-nha" : "men-bo-mac-nha",
                     "article_type:loungewear",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "articleType"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "articleType");
         }
         return null;
     }
@@ -280,16 +209,20 @@ final class GapCategoryMapper {
 
         if ("accessories".equals(normalizedToken(row.masterCategory()))) {
             if (containsAnyToken(subCategory, "eyewear")) {
-                return match("kinh-mat", "sub_category:eyewear", MappingConfidence.STRONG_MATCH, "subCategory");
+                return match("kinh-mat", "sub_category:eyewear",
+                        MappingConfidence.STRONG_MATCH, "subCategory");
             }
             if (containsAnyToken(subCategory, "socks")) {
-                return match("tat", "sub_category:socks", MappingConfidence.STRONG_MATCH, "subCategory");
+                return match("tat", "sub_category:socks",
+                        MappingConfidence.STRONG_MATCH, "subCategory");
             }
             if (containsAnyToken(subCategory, "headwear", "caps")) {
-                return match("non-mu", "sub_category:headwear", MappingConfidence.STRONG_MATCH, "subCategory");
+                return match("non-mu", "sub_category:headwear",
+                        MappingConfidence.STRONG_MATCH, "subCategory");
             }
             if (containsAnyToken(subCategory, "bags")) {
-                return match("tui-xach", "sub_category:bags", MappingConfidence.HEURISTIC_FALLBACK, "subCategory");
+                return match("tui-xach", "sub_category:bags",
+                        MappingConfidence.HEURISTIC_FALLBACK, "subCategory");
             }
             return null;
         }
@@ -298,144 +231,93 @@ final class GapCategoryMapper {
         if (containsAnyToken(subCategory, "topwear")) {
             if (female) {
                 RuleMatch womenTopMatch = matchWomenTopwearRefinement(
-                        descriptiveText,
-                        "sub_category"
-                );
+                        descriptiveText, "sub_category");
                 if (womenTopMatch != null) {
                     return womenTopMatch;
                 }
             }
-            return match(
-                    female ? "women-ao-kieu" : "men-ao-thun",
+            return match(female ? "women-ao-kieu" : "men-ao-thun",
                     "sub_category:topwear",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "subCategory"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "subCategory");
         }
         if (containsAnyToken(subCategory, "bottomwear")) {
             if (containsAnyToken(descriptiveText, "khaki", "khakis")) {
-                return match(
-                        female ? "women-quan-tay" : "men-quan-kaki",
+                return match(female ? "women-quan-tay" : "men-quan-kaki",
                         "sub_category:bottomwear_khaki_refinement",
-                        MappingConfidence.STRONG_MATCH,
-                        "subCategory",
-                        "productDisplayName"
-                );
+                        MappingConfidence.STRONG_MATCH, "subCategory",
+                        "productDisplayName");
             }
             if (containsAnyToken(descriptiveText, "jogger", "joggers")) {
-                return match(
-                        female ? "women-quan-legging" : "men-quan-jogger",
+                return match(female ? "women-quan-legging" : "men-quan-jogger",
                         "sub_category:bottomwear_jogger_refinement",
-                        MappingConfidence.STRONG_MATCH,
-                        "subCategory",
-                        "productDisplayName"
-                );
+                        MappingConfidence.STRONG_MATCH, "subCategory",
+                        "productDisplayName");
             }
             if (containsAnyToken(descriptiveText, "short", "shorts")) {
-                return match(
-                        female ? "women-quan-short" : "men-quan-short",
+                return match(female ? "women-quan-short" : "men-quan-short",
                         "sub_category:bottomwear_short_refinement",
-                        MappingConfidence.STRONG_MATCH,
-                        "subCategory",
-                        "productDisplayName"
-                );
+                        MappingConfidence.STRONG_MATCH, "subCategory",
+                        "productDisplayName");
             }
             if (containsAnyToken(descriptiveText, "jean", "jeans", "denim")) {
-                return match(
-                        female ? "women-quan-jeans" : "men-quan-jeans",
+                return match(female ? "women-quan-jeans" : "men-quan-jeans",
                         "sub_category:bottomwear_denim_refinement",
-                        MappingConfidence.STRONG_MATCH,
-                        "subCategory",
-                        "productDisplayName"
-                );
+                        MappingConfidence.STRONG_MATCH, "subCategory",
+                        "productDisplayName");
             }
-            return match(
-                    female ? "women-quan-tay" : "men-quan-tay",
+            return match(female ? "women-quan-tay" : "men-quan-tay",
                     "sub_category:bottomwear",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "subCategory"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "subCategory");
         }
         if (containsAnyToken(subCategory, "dress")) {
-            return match(
-                    mapFemaleDressByUsage(usage),
-                    "sub_category:dress",
+            return match(mapFemaleDressByUsage(usage), "sub_category:dress",
                     MappingConfidence.HEURISTIC_FALLBACK,
-                    "subCategory",
-                    "usage"
-            );
+                    "subCategory", "usage");
         }
-        if (containsAnyToken(subCategory, "innerwear", "sleepwear", "loungewear")) {
-            return match(
-                    female ? "women-bo-mac-nha" : "men-bo-mac-nha",
+        if (containsAnyToken(subCategory, "innerwear", "sleepwear",
+                "loungewear")) {
+            return match(female ? "women-bo-mac-nha" : "men-bo-mac-nha",
                     "sub_category:loungewear",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "subCategory"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "subCategory");
         }
         if (containsAnyToken(subCategory, "sports")) {
-            return match(
-                    female ? "women-set-the-thao" : "men-set-the-thao",
+            return match(female ? "women-set-the-thao" : "men-set-the-thao",
                     "sub_category:sports",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "subCategory"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "subCategory");
         }
         return null;
     }
 
-    private RuleMatch matchWomenTopwearRefinement(String descriptiveText, String rulePrefix) {
-        if (containsAnyToken(descriptiveText, "crop", "cropped", "croptop", "corset", "bustier")) {
-            return match(
-                    "women-ao-croptop",
+    private RuleMatch matchWomenTopwearRefinement(String descriptiveText,
+            String rulePrefix) {
+        if (containsAnyToken(descriptiveText, "crop", "cropped", "croptop",
+                "corset", "bustier")) {
+            return match("women-ao-croptop",
                     rulePrefix + ":women_top_crop_family",
                     MappingConfidence.STRONG_MATCH,
-                    ruleSourceField(rulePrefix),
-                    "productDisplayName"
-            );
+                    ruleSourceField(rulePrefix), "productDisplayName");
         }
-        if (containsAnyToken(
-                descriptiveText,
-                "shirt",
-                "shirts",
-                "button down",
-                "buttondown",
-                "button up",
-                "buttonup",
-                "button front",
-                "shirt jacket"
-        )) {
-            return match(
-                    "women-ao-so-mi",
+        if (containsAnyToken(descriptiveText, "shirt", "shirts", "button down",
+                "buttondown", "button up", "buttonup",
+                "button front", "shirt jacket")) {
+            return match("women-ao-so-mi",
                     rulePrefix + ":women_top_shirt_family",
                     MappingConfidence.STRONG_MATCH,
-                    ruleSourceField(rulePrefix),
-                    "productDisplayName"
-            );
+                    ruleSourceField(rulePrefix), "productDisplayName");
         }
-        if (containsAnyToken(
-                descriptiveText,
-                "blouse",
-                "blouses",
-                "cami",
-                "camisole",
-                "camisoles",
-                "tank",
-                "tanks",
-                "peplum"
-        )) {
-            return match(
-                    "women-ao-kieu",
+        if (containsAnyToken(descriptiveText, "blouse", "blouses", "cami",
+                "camisole", "camisoles", "tank", "tanks",
+                "peplum")) {
+            return match("women-ao-kieu",
                     rulePrefix + ":women_top_fashion_family",
                     MappingConfidence.STRONG_MATCH,
-                    ruleSourceField(rulePrefix),
-                    "productDisplayName"
-            );
+                    ruleSourceField(rulePrefix), "productDisplayName");
         }
         return null;
     }
 
-    private RuleMatch matchDescriptiveText(GapProductImportRunner.StyleRow row) {
+    private RuleMatch matchDescriptiveText(
+            GapProductImportRunner.StyleRow row) {
         if (!"accessories".equals(normalizedToken(row.masterCategory()))) {
             return null;
         }
@@ -445,12 +327,8 @@ final class GapCategoryMapper {
             return null;
         }
 
-        return matchAccessoryText(
-                descriptiveText,
-                "descriptive_text",
-                MappingConfidence.STRONG_MATCH,
-                true
-        );
+        return matchAccessoryText(descriptiveText, "descriptive_text",
+                MappingConfidence.STRONG_MATCH, true);
     }
 
     private RuleMatch matchUsage(GapProductImportRunner.StyleRow row) {
@@ -465,36 +343,24 @@ final class GapCategoryMapper {
 
         boolean female = isFemale(row.gender());
         if (containsAnyToken(usage, "sports")) {
-            return match(
-                    female ? "women-ao-the-thao" : "men-ao-the-thao",
+            return match(female ? "women-ao-the-thao" : "men-ao-the-thao",
                     "usage:sports",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "usage"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "usage");
         }
         if (containsAnyToken(usage, "party")) {
-            return match(
-                    female ? "women-vay-du-tiec" : "men-quan-tay",
+            return match(female ? "women-vay-du-tiec" : "men-quan-tay",
                     "usage:party",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "usage"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "usage");
         }
         if (containsAnyToken(usage, "formal")) {
-            return match(
-                    female ? "women-vay-cong-so" : "men-quan-tay",
+            return match(female ? "women-vay-cong-so" : "men-quan-tay",
                     "usage:formal",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "usage"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "usage");
         }
         if (containsAnyToken(usage, "home")) {
-            return match(
-                    female ? "women-bo-mac-nha" : "men-bo-mac-nha",
+            return match(female ? "women-bo-mac-nha" : "men-bo-mac-nha",
                     "usage:home",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "usage"
-            );
+                    MappingConfidence.HEURISTIC_FALLBACK, "usage");
         }
         return null;
     }
@@ -505,78 +371,90 @@ final class GapCategoryMapper {
         }
 
         if (isFemale(row.gender())) {
-            return match(
-                    "women-ao-kieu",
-                    "gender_fallback:women_default",
+            return match("women-ao-kieu", "gender_fallback:women_default",
                     MappingConfidence.HEURISTIC_FALLBACK,
-                    "gender"
-            );
+                    "gender");
         }
         if (isMale(row.gender())) {
-            return match(
-                    "men-ao-thun",
-                    "gender_fallback:men_default",
-                    MappingConfidence.HEURISTIC_FALLBACK,
-                    "gender"
-            );
+            return match("men-ao-thun", "gender_fallback:men_default",
+                    MappingConfidence.HEURISTIC_FALLBACK, "gender");
         }
         return null;
     }
 
-    private RuleMatch matchAccessoryText(
-            String source,
-            String fieldName,
+    private RuleMatch matchAccessoryText(String source, String fieldName,
             MappingConfidence confidence,
-            boolean useWordAwareTokens
-    ) {
+            boolean useWordAwareTokens) {
         if (useWordAwareTokens) {
             if (containsAnyToken(source, "crossbody", "messenger", "sling")) {
-                return match("tui-deo-cheo", fieldName + ":crossbody_family", confidence, fieldName);
+                return match("tui-deo-cheo", fieldName + ":crossbody_family",
+                        confidence, fieldName);
             }
-            if (containsAnyToken(source, "handbag", "handbags", "tote", "totes", "hobo", "satchel", "satchels", "clutch", "clutches", "bag", "bags")) {
-                return match("tui-xach", fieldName + ":handbag_family", confidence, fieldName);
+            if (containsAnyToken(source, "handbag", "handbags", "tote", "totes",
+                    "hobo", "satchel", "satchels",
+                    "clutch", "clutches", "bag", "bags")) {
+                return match("tui-xach", fieldName + ":handbag_family",
+                        confidence, fieldName);
             }
             if (containsAnyToken(source, "backpack", "backpacks")) {
-                return match("balo", fieldName + ":backpack", confidence, fieldName);
+                return match("balo", fieldName + ":backpack", confidence,
+                        fieldName);
             }
             if (containsAnyToken(source, "wallet", "wallets")) {
-                return match("vi", fieldName + ":wallet", confidence, fieldName);
+                return match("vi", fieldName + ":wallet", confidence,
+                        fieldName);
             }
             if (containsAnyToken(source, "belt", "belts")) {
-                return match("that-lung", fieldName + ":belt", confidence, fieldName);
+                return match("that-lung", fieldName + ":belt", confidence,
+                        fieldName);
             }
-            if (containsAnyToken(source, "cap", "caps", "hat", "hats", "beanie", "beanies")) {
-                return match("non-mu", fieldName + ":headwear", confidence, fieldName);
+            if (containsAnyToken(source, "cap", "caps", "hat", "hats", "beanie",
+                    "beanies")) {
+                return match("non-mu", fieldName + ":headwear", confidence,
+                        fieldName);
             }
-            if (containsAnyToken(source, "scarf", "scarves", "stole", "stoles")) {
-                return match("khan", fieldName + ":scarf", confidence, fieldName);
+            if (containsAnyToken(source, "scarf", "scarves", "stole",
+                    "stoles")) {
+                return match("khan", fieldName + ":scarf", confidence,
+                        fieldName);
             }
             if (containsAnyToken(source, "sock", "socks")) {
-                return match("tat", fieldName + ":socks", confidence, fieldName);
+                return match("tat", fieldName + ":socks", confidence,
+                        fieldName);
             }
-            if (containsAnyToken(source, "sunglass", "sunglasses", "eyewear", "polarized")) {
-                return match("kinh-mat", fieldName + ":sunglasses", confidence, fieldName);
+            if (containsAnyToken(source, "sunglass", "sunglasses", "eyewear",
+                    "polarized")) {
+                return match("kinh-mat", fieldName + ":sunglasses", confidence,
+                        fieldName);
             }
             return null;
         }
 
         if (containsAnyToken(source, "crossbody", "messenger", "sling")) {
-            return match("tui-deo-cheo", fieldName + ":crossbody_family", confidence, fieldName);
+            return match("tui-deo-cheo", fieldName + ":crossbody_family",
+                    confidence, fieldName);
         }
-        if (containsAnyToken(source, "handbag", "handbags", "tote", "totes", "hobo", "satchel", "satchels", "clutch", "clutches", "bag", "bags")) {
-            return match("tui-xach", fieldName + ":handbag_family", confidence, fieldName);
+        if (containsAnyToken(source, "handbag", "handbags", "tote", "totes",
+                "hobo", "satchel", "satchels", "clutch",
+                "clutches", "bag", "bags")) {
+            return match("tui-xach", fieldName + ":handbag_family", confidence,
+                    fieldName);
         }
         if (containsAnyToken(source, "backpack", "backpacks")) {
-            return match("balo", fieldName + ":backpack", confidence, fieldName);
+            return match("balo", fieldName + ":backpack", confidence,
+                    fieldName);
         }
         if (containsAnyToken(source, "wallet", "wallets")) {
             return match("vi", fieldName + ":wallet", confidence, fieldName);
         }
         if (containsAnyToken(source, "belt", "belts")) {
-            return match("that-lung", fieldName + ":belt", confidence, fieldName);
+            return match("that-lung", fieldName + ":belt", confidence,
+                    fieldName);
         }
-        if (containsAnyToken(source, "cap", "caps", "hat", "hats", "beanie", "beanies")) {
-            return match("non-mu", fieldName + ":headwear", confidence, fieldName);
+        if (containsAnyToken(source, "cap", "caps", "hat", "hats", "beanie",
+                "beanies")) {
+            return match("non-mu", fieldName + ":headwear", confidence,
+                    fieldName);
         }
         if (containsAnyToken(source, "scarf", "scarves", "stole", "stoles")) {
             return match("khan", fieldName + ":scarf", confidence, fieldName);
@@ -584,31 +462,24 @@ final class GapCategoryMapper {
         if (containsAnyToken(source, "sock", "socks")) {
             return match("tat", fieldName + ":socks", confidence, fieldName);
         }
-        if (containsAnyToken(source, "sunglass", "sunglasses", "eyewear", "polarized")) {
-            return match("kinh-mat", fieldName + ":sunglasses", confidence, fieldName);
+        if (containsAnyToken(source, "sunglass", "sunglasses", "eyewear",
+                "polarized")) {
+            return match("kinh-mat", fieldName + ":sunglasses", confidence,
+                    fieldName);
         }
         return null;
     }
 
-    private RuleMatch match(
-            String slug,
-            String rule,
-            MappingConfidence confidence,
-            String... sourceFieldsUsed
-    ) {
-        return new RuleMatch(
-                slug,
-                rule,
-                confidence,
-                List.of(sourceFieldsUsed)
-        );
+    private RuleMatch match(String slug, String rule,
+            MappingConfidence confidence, String... sourceFieldsUsed) {
+        return new RuleMatch(slug, rule, confidence, List.of(sourceFieldsUsed));
     }
 
     private String ruleSourceField(String rulePrefix) {
         return switch (rulePrefix) {
-            case "article_type" -> "articleType";
-            case "sub_category" -> "subCategory";
-            default -> rulePrefix;
+        case "article_type" -> "articleType";
+        case "sub_category" -> "subCategory";
+        default -> rulePrefix;
         };
     }
 
@@ -626,19 +497,15 @@ final class GapCategoryMapper {
     }
 
     private String apparelEvidenceText(GapProductImportRunner.StyleRow row) {
-        return normalizeEvidenceText(String.join(" ",
-                row.articleType(),
-                row.productDisplayName(),
-                row.productDetails()
-        ));
+        return normalizeEvidenceText(
+                String.join(" ", row.articleType(), row.productDisplayName(),
+                        row.productDetails()));
     }
 
     private String descriptiveText(GapProductImportRunner.StyleRow row) {
-        return normalizeEvidenceText(String.join(" ",
-                row.articleType(),
-                row.productDisplayName(),
-                row.productDetails()
-        ));
+        return normalizeEvidenceText(
+                String.join(" ", row.articleType(), row.productDisplayName(),
+                        row.productDetails()));
     }
 
     private boolean isFemale(String gender) {
@@ -659,7 +526,8 @@ final class GapCategoryMapper {
         String paddedSource = " " + normalizedSource + " ";
         for (String token : tokens) {
             String normalizedToken = normalizeEvidenceText(token);
-            if (!normalizedToken.isBlank() && paddedSource.contains(" " + normalizedToken + " ")) {
+            if (!normalizedToken.isBlank()
+                    && paddedSource.contains(" " + normalizedToken + " ")) {
                 return true;
             }
         }
@@ -671,7 +539,8 @@ final class GapCategoryMapper {
         if (normalized.isBlank()) {
             return "";
         }
-        return normalized.replaceAll("[^\\p{Alnum}]+", " ").trim().replaceAll("\\s+", " ");
+        return normalized.replaceAll("[^\\p{Alnum}]+", " ").trim()
+                .replaceAll("\\s+", " ");
     }
 
     private String normalizedToken(String value) {
@@ -679,22 +548,15 @@ final class GapCategoryMapper {
     }
 
     enum MappingConfidence {
-        STRONG_MATCH,
-        HEURISTIC_FALLBACK,
-        SOURCE_GAP_FALLBACK
+        STRONG_MATCH, HEURISTIC_FALLBACK, SOURCE_GAP_FALLBACK
     }
 
-    record MappingResult(
-            String chosenLeafSlug,
-            MappingConfidence confidence,
+    record MappingResult(String chosenLeafSlug, MappingConfidence confidence,
             String winningRule,
-            List<String> sourceFieldsUsed,
-            List<String> fallbackPath,
-            Set<String> rawCandidateSlugs
-    ) {
+            List<String> sourceFieldsUsed, List<String> fallbackPath,
+            Set<String> rawCandidateSlugs) {
         boolean isImportable() {
-            return chosenLeafSlug != null
-                    && !chosenLeafSlug.isBlank()
+            return chosenLeafSlug != null && !chosenLeafSlug.isBlank()
                     && confidence != MappingConfidence.SOURCE_GAP_FALLBACK;
         }
 
@@ -703,11 +565,7 @@ final class GapCategoryMapper {
         }
     }
 
-    private record RuleMatch(
-            String slug,
-            String rule,
-            MappingConfidence confidence,
-            List<String> sourceFieldsUsed
-    ) {
+    private record RuleMatch(String slug, String rule,
+            MappingConfidence confidence, List<String> sourceFieldsUsed) {
     }
 }
