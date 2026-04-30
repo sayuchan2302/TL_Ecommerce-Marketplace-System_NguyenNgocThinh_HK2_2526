@@ -2,7 +2,7 @@ spring:
   config:
     import: optional:file:.env[.properties],optional:file:backend/.env[.properties]
   application:
-    name: fashionstore
+    name: fashion-marketplace
   devtools:
     restart:
       enabled: false
@@ -111,7 +111,7 @@ logging:
     file: UTF-8
   level:
     root: INFO
-    vn.edu.hcmuaf.fit.fashionstore: INFO
+    vn.edu.hcmuaf.fit.marketplace: INFO
 
 vnpay:
   tmn-code: ${VNPAY_TMN_CODE:}

@@ -6,6 +6,7 @@ interface SearchImageQueryPanelProps {
   fileName: string;
   previewUrl: string;
   totalCandidates: number;
+  isLoading?: boolean;
   inferredCategory?: string;
   inferredCategoryScore?: number;
   categoryFilterApplied?: string;
@@ -24,6 +25,7 @@ const SearchImageQueryPanel = ({
   fileName,
   previewUrl,
   totalCandidates,
+  isLoading = false,
   inferredCategory,
   inferredCategoryScore,
   categoryFilterApplied,
@@ -48,7 +50,15 @@ const SearchImageQueryPanel = ({
         <div className="search-visual-query__meta">
           <div className="search-visual-query__label">Ảnh đang dùng để tìm kiếm</div>
           <div className="search-visual-query__name">{fileName}</div>
-          <div className="search-visual-query__sub">{totalCandidates} kết quả phù hợp</div>
+          <div className="search-visual-query__sub">
+            {isLoading ? 'Đang phân tích ảnh và tìm sản phẩm phù hợp...' : `${totalCandidates} kết quả phù hợp`}
+          </div>
+          {isLoading && (
+            <div className="search-visual-query__status" role="status" aria-live="polite">
+              <span className="search-visual-query__status-spinner" aria-hidden="true" />
+              Hệ thống đang xử lý ảnh của bạn
+            </div>
+          )}
           {hasMetadata && (
             <div className="search-visual-query__metadata" aria-label="Thông tin nhận diện ảnh">
               {inferredCategory && (

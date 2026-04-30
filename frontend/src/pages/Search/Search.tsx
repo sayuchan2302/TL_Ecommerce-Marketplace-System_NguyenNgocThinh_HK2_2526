@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import FilterSidebar from '../../components/FilterSidebar/FilterSidebar';
 import ProductGrid from '../../components/ProductGrid/ProductGrid';
 import EmptySearchState from '../../components/EmptySearchState/EmptySearchState';
+import LoadingSpinner from '../../components/LoadingSpinner/LoadingSpinner';
 import SearchImageLandingHero from './components/SearchImageLandingHero';
 import SearchImageQueryPanel from './components/SearchImageQueryPanel';
 import { searchService } from '../../services/searchService';
@@ -94,6 +95,7 @@ const Search = () => {
     imageInputRef,
     pasteTargetRef,
     isImageSearchMode,
+    isImageSearchLoading,
     isAwaitingImageSearch,
     clearImageSearchState,
     triggerImagePicker,
@@ -261,13 +263,13 @@ const Search = () => {
   const hasNoResults = isAwaitingImageSearch
     ? false
     : isImageSearchMode
-    ? filteredResults.length === 0
+    ? !isImageSearchLoading && filteredResults.length === 0
     : isFlashSaleMode
       ? filteredResults.length === 0
       : scope === 'stores'
         ? storeResults.length === 0
         : filteredResults.length === 0;
-  const isLoadingResults = isSearching || isAwaitingImageSearch;
+  const isLoadingResults = isSearching || isAwaitingImageSearch || isImageSearchLoading;
 
   const headerTitle = isImageSearchPage
     ? 'Kết quả tìm kiếm bằng ảnh'
@@ -276,7 +278,9 @@ const Search = () => {
       : t.page.resultsFor(query);
   const headerCount = isImageSearchPage
     ? imageSearchSession
-      ? `(${imageSearchSession.totalCandidates || filteredResults.length} sản phẩm)`
+      ? isImageSearchLoading
+        ? '(Đang xử lý ảnh...)'
+        : `(${imageSearchSession.totalCandidates || filteredResults.length} sản phẩm)`
       : ''
     : isFlashSaleMode
       ? `(${t.page.productCount(filteredResults.length)})`
@@ -402,11 +406,12 @@ const Search = () => {
                 <span className="plp-count">{headerCount}</span>
               </div>
 
-              {isImageSearchMode && imageSearchSession && (
+              {imageSearchSession && isImageSearchPage && (
                 <SearchImageQueryPanel
                   fileName={imageSearchSession.fileName}
                   previewUrl={imageSearchSession.previewUrl}
                   totalCandidates={imageSearchSession.totalCandidates}
+                  isLoading={isImageSearchLoading || isAwaitingImageSearch}
                   inferredCategory={imageSearchSession.inferredCategory}
                   inferredCategoryScore={imageSearchSession.inferredCategoryScore}
                   categoryFilterApplied={imageSearchSession.categoryFilterApplied}
@@ -436,12 +441,20 @@ const Search = () => {
               )}
 
               {isLoadingResults ? (
-                <div className="search-loading-state">
-                  {isImageSearchPage
-                    ? 'Đang phân tích ảnh và tìm sản phẩm phù hợp...'
-                    : isFlashSaleMode
-                      ? 'Đang tải sản phẩm Flash Sale...'
-                      : 'Đang tìm kiếm...'}
+                <div className={`search-loading-state ${isImageSearchPage ? 'search-loading-state--image' : ''}`}>
+                  <LoadingSpinner
+                    size={isImageSearchPage ? 'lg' : 'md'}
+                    text={isImageSearchPage
+                      ? 'Đang phân tích ảnh và tìm sản phẩm phù hợp...'
+                      : isFlashSaleMode
+                        ? 'Đang tải sản phẩm Flash Sale...'
+                        : 'Đang tìm kiếm...'}
+                  />
+                  {isImageSearchPage && (
+                    <p className="search-loading-state__hint">
+                      Kết quả sẽ xuất hiện ngay sau khi hệ thống nhận diện xong ảnh của bạn.
+                    </p>
+                  )}
                 </div>
               ) : hasNoResults ? (
                 (scope === 'products' || isFlashSaleMode || isImageSearchPage)

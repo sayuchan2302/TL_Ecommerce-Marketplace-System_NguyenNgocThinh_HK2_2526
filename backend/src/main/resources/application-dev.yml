@@ -9,5 +9,5 @@ app:
 
 logging:
   level:
-    vn.edu.hcmuaf.fit.fashionstore: DEBUG
+    vn.edu.hcmuaf.fit.marketplace: DEBUG
     org.hibernate.SQL: DEBUG

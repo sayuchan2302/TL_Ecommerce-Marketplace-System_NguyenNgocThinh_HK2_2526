@@ -29,6 +29,8 @@ export interface SearchImageSession {
   categoryFilterApplied?: string;
 }
 
+type SearchImageStatus = 'idle' | 'loading' | 'success';
+
 interface UseSearchImageFlowOptions {
   imageSearchToken: string;
   imageCategory: string;
@@ -59,16 +61,19 @@ export const useSearchImageFlow = ({
 }: UseSearchImageFlowOptions) => {
   const [imageSearchSession, setImageSearchSession] = useState<SearchImageSession | null>(null);
   const [imageSearchError, setImageSearchError] = useState<string | null>(null);
+  const [imageSearchStatus, setImageSearchStatus] = useState<SearchImageStatus>('idle');
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const consumedImageTokenRef = useRef<string | null>(null);
   const pasteTargetRef = useRef<HTMLDivElement | null>(null);
-  const isImageSearchMode = Boolean(imageSearchSession);
+  const isImageSearchMode = imageSearchStatus !== 'idle' && Boolean(imageSearchSession);
+  const isImageSearchLoading = imageSearchStatus === 'loading';
   const isAwaitingImageSearch = Boolean(imageSearchToken)
     && !isImageSearchMode
     && pendingImageSearchSession.hasPendingFile();
 
   const clearImageSearchState = useCallback((clearResults = false) => {
     setImageSearchError(null);
+    setImageSearchStatus('idle');
     setImageSearchSession((current) => {
       if (current?.previewUrl) {
         URL.revokeObjectURL(current.previewUrl);
@@ -90,6 +95,18 @@ export const useSearchImageFlow = ({
     setIsSearching(true);
     setImageSearchError(null);
     const previewUrl = URL.createObjectURL(file);
+    setImageSearchStatus('loading');
+    setImageSearchSession((current) => {
+      if (current?.previewUrl) {
+        URL.revokeObjectURL(current.previewUrl);
+      }
+
+      return {
+        fileName: file.name,
+        previewUrl,
+        totalCandidates: 0,
+      };
+    });
 
     try {
       const response = await marketplaceService.searchProductsByImage(file, 120, {
@@ -106,11 +123,13 @@ export const useSearchImageFlow = ({
         inferredCategoryScore: response.inferredCategoryScore,
         categoryFilterApplied: response.categoryFilterApplied,
       });
+      setImageSearchStatus('success');
       return true;
     } catch (error) {
       URL.revokeObjectURL(previewUrl);
       clearSearchResults();
       setImageSearchSession(null);
+      setImageSearchStatus('idle');
       setImageSearchError(
         error instanceof ApiError
           ? error.message
@@ -214,6 +233,7 @@ export const useSearchImageFlow = ({
     imageInputRef,
     pasteTargetRef,
     isImageSearchMode,
+    isImageSearchLoading,
     isAwaitingImageSearch,
     clearImageSearchState,
     triggerImagePicker,

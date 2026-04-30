@@ -66,7 +66,8 @@ const buildPaginationTokens = (currentPage: number, totalPages: number): Paginat
 };
 
 const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPageChange = false }: ProductGridProps) => {
-  const [isLoading, setIsLoading] = useState(true);
+  const hasCustomResults = customResults !== undefined;
+  const [isLoading, setIsLoading] = useState(!hasCustomResults);
   const [catalog, setCatalog] = useState<Product[]>(() => customResults || productService.list());
   const internalView = useClientViewState({ validSortKeys: ['newest', 'bestseller', 'price-asc', 'price-desc', 'discount'] });
   const view = viewState ?? internalView;
@@ -86,9 +87,15 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
   useEffect(() => {
     let isMounted = true;
 
+    if (hasCustomResults) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
     const timer = setTimeout(() => {
       void (async () => {
-        const nextCatalog = customResults || await productService.listPublic();
+        const nextCatalog = await productService.listPublic();
         if (!isMounted) {
           return;
         }
@@ -101,7 +108,7 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [customResults]);
+  }, [hasCustomResults]);
 
   const filteredProducts = useMemo(() => {
     const source = customResults || catalog;
@@ -170,6 +177,7 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
     [hasPagination, currentPage, totalPages],
   );
   const dictionary = CLIENT_DICTIONARY.listing;
+  const showLoading = hasCustomResults ? false : isLoading;
 
   return (
     <div className="product-grid-container">
@@ -198,7 +206,7 @@ const ProductGrid = ({ customResults, viewState, itemsPerPage, scrollToTopOnPage
       </div>
 
       <div className="plp-grid">
-        {isLoading
+        {showLoading
           ? Array.from({ length: 8 }).map((_, index) => (
               <ProductCardSkeleton key={index} />
             ))
