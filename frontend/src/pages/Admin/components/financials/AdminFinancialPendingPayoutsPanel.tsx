@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { CheckCircle2, Eye, X } from 'lucide-react';
 import { AdminStateBlock } from '../../AdminStateBlocks';
+import { PanelTableFooter } from '../../../../components/Panel/PanelPrimitives';
 import type { PayoutRequest } from '../../../../services/walletService';
 import { PAGE_SIZE, formatCurrency, toStoreRef } from './adminFinancialPresentation';
 
@@ -36,7 +37,7 @@ const AdminFinancialPendingPayoutsPanel = ({
   return (
     <>
       <div className="admin-table" role="table" aria-label="Bảng yêu cầu rút tiền">
-        <div className="admin-table-row financials admin-table-head" role="row">
+        <div className="admin-table-row financials financial-payouts admin-table-head" role="row">
           <div role="columnheader">STT</div>
           <div role="columnheader">Store</div>
           <div role="columnheader">Số tiền</div>
@@ -49,7 +50,7 @@ const AdminFinancialPendingPayoutsPanel = ({
         {payouts.map((payout, index) => (
           <motion.div
             key={payout.id}
-            className="admin-table-row financials"
+            className="admin-table-row financials financial-payouts"
             role="row"
             whileHover={{ y: -1 }}
           >
@@ -87,37 +88,14 @@ const AdminFinancialPendingPayoutsPanel = ({
         ))}
       </div>
 
-      <div className="table-footer">
-        <span className="table-footer-meta">Trang {payoutPage}/{payoutTotalPages}</span>
-        <div className="pagination">
-          <button
-            className="page-btn"
-            disabled={payoutPage === 1}
-            onClick={() => onPageChange(Math.max(payoutPage - 1, 1))}
-          >
-            Trước
-          </button>
-          {Array.from({ length: Math.min(payoutTotalPages, 5) }).map((_, index) => {
-            const pageNumber = index + 1;
-            return (
-              <button
-                key={pageNumber}
-                className={`page-btn ${payoutPage === pageNumber ? 'active' : ''}`}
-                onClick={() => onPageChange(pageNumber)}
-              >
-                {pageNumber}
-              </button>
-            );
-          })}
-          <button
-            className="page-btn"
-            disabled={payoutPage === payoutTotalPages}
-            onClick={() => onPageChange(Math.min(payoutPage + 1, payoutTotalPages))}
-          >
-            Sau
-          </button>
-        </div>
-      </div>
+      <PanelTableFooter
+        meta={`Trang ${payoutPage}/${payoutTotalPages}`}
+        page={payoutPage}
+        totalPages={payoutTotalPages}
+        onPageChange={onPageChange}
+        prevLabel="Trước"
+        nextLabel="Sau"
+      />
     </>
   );
 };

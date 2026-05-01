@@ -349,6 +349,8 @@ export interface VendorSettingsData {
 }
 
 const FALLBACK_IMAGE = PLACEHOLDER_PRODUCT_IMAGE;
+let dashboardDataRequest: Promise<VendorDashboardData> | null = null;
+let analyticsDataRequest: Promise<VendorAnalyticsData> | null = null;
 
 const DEFAULT_SETTINGS: VendorSettingsData = {
   storeInfo: {
@@ -574,34 +576,44 @@ const validateSettingsBeforeSave = (payload: VendorSettingsData) => {
 
 export const vendorPortalService = {
   async getDashboardData(): Promise<VendorDashboardData> {
-    const today = isoDate(new Date());
-    const [stats, store, orders, products, todayOrdersPage, topProducts] = await Promise.all([
-      apiRequest<VendorStatsResponse>('/api/orders/my-store/stats', {}, { auth: true }),
-      storeService.getMyStore(),
-      apiRequest<BackendVendorOrderPage>('/api/vendor/orders?page=0&size=5', {}, { auth: true }),
-      apiRequest<BackendPage<BackendProduct>>('/api/products/my-store?page=0&size=1', {}, { auth: true }),
-      apiRequest<BackendVendorOrderPage>(`/api/vendor/orders?page=0&size=1&date_from=${today}&date_to=${today}`, {}, { auth: true }),
-      apiRequest<BackendTopProduct[]>(
-        '/api/orders/my-store/top-products?days=30&limit=3',
-        {},
-        { auth: true },
-      ),
-    ]);
-    const todayOrders = Number(todayOrdersPage.totalElements || 0);
+    if (dashboardDataRequest) return dashboardDataRequest;
 
-    return {
-      stats: {
-        todayOrders,
-        pendingOrders: Number(stats.pendingOrders || 0),
-        totalRevenue: Number(stats.totalRevenue || 0),
-        totalPayout: Number(stats.totalPayout || 0),
-        totalProducts: Number(products.totalElements || products.content?.length || 0),
-        rating: store.rating,
-        commissionRate: store.commissionRate ?? 5,
-      },
-      recentOrders: (orders.content || []).map(mapOrderSummary),
-      topProducts: (topProducts || []).map((item, index) => mapBackendTopProduct(item, index)),
-    };
+    dashboardDataRequest = (async () => {
+      const today = isoDate(new Date());
+      const [stats, store, orders, products, todayOrdersPage, topProducts] = await Promise.all([
+        apiRequest<VendorStatsResponse>('/api/orders/my-store/stats', {}, { auth: true }),
+        storeService.getMyStore(),
+        apiRequest<BackendVendorOrderPage>('/api/vendor/orders?page=0&size=5', {}, { auth: true }),
+        apiRequest<BackendPage<BackendProduct>>('/api/products/my-store?page=0&size=1', {}, { auth: true }),
+        apiRequest<BackendVendorOrderPage>(`/api/vendor/orders?page=0&size=1&date_from=${today}&date_to=${today}`, {}, { auth: true }),
+        apiRequest<BackendTopProduct[]>(
+          '/api/orders/my-store/top-products?days=30&limit=3',
+          {},
+          { auth: true },
+        ),
+      ]);
+      const todayOrders = Number(todayOrdersPage.totalElements || 0);
+
+      return {
+        stats: {
+          todayOrders,
+          pendingOrders: Number(stats.pendingOrders || 0),
+          totalRevenue: Number(stats.totalRevenue || 0),
+          totalPayout: Number(stats.totalPayout || 0),
+          totalProducts: Number(products.totalElements || products.content?.length || 0),
+          rating: store.rating,
+          commissionRate: store.commissionRate ?? 5,
+        },
+        recentOrders: (orders.content || []).map(mapOrderSummary),
+        topProducts: (topProducts || []).map((item, index) => mapBackendTopProduct(item, index)),
+      };
+    })();
+
+    try {
+      return await dashboardDataRequest;
+    } finally {
+      dashboardDataRequest = null;
+    }
   },
 
   async getOrders(params: {
@@ -713,79 +725,82 @@ export const vendorPortalService = {
   },
 
   async getAnalytics(): Promise<VendorAnalyticsData> {
-    const [analytics, topProducts] = await Promise.all([
-      apiRequest<BackendVendorAnalyticsResponse>(
+    if (analyticsDataRequest) return analyticsDataRequest;
+
+    analyticsDataRequest = (async () => {
+      const analytics = await apiRequest<BackendVendorAnalyticsResponse>(
         '/api/orders/my-store/analytics',
         {},
         { auth: true },
-      ),
-      apiRequest<BackendTopProduct[]>(
-        '/api/orders/my-store/top-products?days=30&limit=5',
-        {},
-        { auth: true },
-      ).catch(() => []),
-    ]);
+      );
 
-    return {
-      periods: {
-        today: {
-          revenue: analytics.today.revenue,
-          payout: analytics.today.payout,
-          commission: analytics.today.commission,
-          orders: analytics.today.orders,
-          avgOrderValue: analytics.today.avgOrderValue,
-          conversionRate: analytics.today.conversionRate,
-          previousRevenue: analytics.today.previousRevenue,
-          previousPayout: analytics.today.previousPayout,
-          previousCommission: analytics.today.previousCommission,
-          previousOrders: analytics.today.previousOrders,
+      return {
+        periods: {
+          today: {
+            revenue: analytics.today.revenue,
+            payout: analytics.today.payout,
+            commission: analytics.today.commission,
+            orders: analytics.today.orders,
+            avgOrderValue: analytics.today.avgOrderValue,
+            conversionRate: analytics.today.conversionRate,
+            previousRevenue: analytics.today.previousRevenue,
+            previousPayout: analytics.today.previousPayout,
+            previousCommission: analytics.today.previousCommission,
+            previousOrders: analytics.today.previousOrders,
+          },
+          week: {
+            revenue: analytics.week.revenue,
+            payout: analytics.week.payout,
+            commission: analytics.week.commission,
+            orders: analytics.week.orders,
+            avgOrderValue: analytics.week.avgOrderValue,
+            conversionRate: analytics.week.conversionRate,
+            previousRevenue: analytics.week.previousRevenue,
+            previousPayout: analytics.week.previousPayout,
+            previousCommission: analytics.week.previousCommission,
+            previousOrders: analytics.week.previousOrders,
+          },
+          month: {
+            revenue: analytics.month.revenue,
+            payout: analytics.month.payout,
+            commission: analytics.month.commission,
+            orders: analytics.month.orders,
+            avgOrderValue: analytics.month.avgOrderValue,
+            conversionRate: analytics.month.conversionRate,
+            previousRevenue: analytics.month.previousRevenue,
+            previousPayout: analytics.month.previousPayout,
+            previousCommission: analytics.month.previousCommission,
+            previousOrders: analytics.month.previousOrders,
+          },
+          year: {
+            revenue: analytics.year.revenue,
+            payout: analytics.year.payout,
+            commission: analytics.year.commission,
+            orders: analytics.year.orders,
+            avgOrderValue: analytics.year.avgOrderValue,
+            conversionRate: analytics.year.conversionRate,
+            previousRevenue: analytics.year.previousRevenue,
+            previousPayout: analytics.year.previousPayout,
+            previousCommission: analytics.year.previousCommission,
+            previousOrders: analytics.year.previousOrders,
+          },
         },
-        week: {
-          revenue: analytics.week.revenue,
-          payout: analytics.week.payout,
-          commission: analytics.week.commission,
-          orders: analytics.week.orders,
-          avgOrderValue: analytics.week.avgOrderValue,
-          conversionRate: analytics.week.conversionRate,
-          previousRevenue: analytics.week.previousRevenue,
-          previousPayout: analytics.week.previousPayout,
-          previousCommission: analytics.week.previousCommission,
-          previousOrders: analytics.week.previousOrders,
-        },
-        month: {
-          revenue: analytics.month.revenue,
-          payout: analytics.month.payout,
-          commission: analytics.month.commission,
-          orders: analytics.month.orders,
-          avgOrderValue: analytics.month.avgOrderValue,
-          conversionRate: analytics.month.conversionRate,
-          previousRevenue: analytics.month.previousRevenue,
-          previousPayout: analytics.month.previousPayout,
-          previousCommission: analytics.month.previousCommission,
-          previousOrders: analytics.month.previousOrders,
-        },
-        year: {
-          revenue: analytics.year.revenue,
-          payout: analytics.year.payout,
-          commission: analytics.year.commission,
-          orders: analytics.year.orders,
-          avgOrderValue: analytics.year.avgOrderValue,
-          conversionRate: analytics.year.conversionRate,
-          previousRevenue: analytics.year.previousRevenue,
-          previousPayout: analytics.year.previousPayout,
-          previousCommission: analytics.year.previousCommission,
-          previousOrders: analytics.year.previousOrders,
-        },
-      },
-      dailyData: analytics.dailyData.map((d) => ({
-        date: d.date,
-        revenue: d.revenue,
-        payout: d.payout,
-        commission: d.commission,
-        orders: d.orders,
-      })),
-      topProducts: (topProducts || []).map((item, index) => mapBackendTopProduct(item, index)),
-      commissionRate: analytics.commissionRate,
-    };
+        dailyData: analytics.dailyData.map((d) => ({
+          date: d.date,
+          revenue: d.revenue,
+          payout: d.payout,
+          commission: d.commission,
+          orders: d.orders,
+        })),
+        topProducts: [],
+        commissionRate: analytics.commissionRate,
+      };
+    })();
+
+    try {
+      return await analyticsDataRequest;
+    } finally {
+      analyticsDataRequest = null;
+    }
   },
 };

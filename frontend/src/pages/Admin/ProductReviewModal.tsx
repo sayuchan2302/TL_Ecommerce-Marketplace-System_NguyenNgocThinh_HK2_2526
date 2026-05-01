@@ -41,7 +41,13 @@ const ProductReviewModal = ({ open, product, onClose, onBlock, onUnblock, loadin
   };
 
   return (
-    <Drawer open={open} onClose={onClose} className="moderation-review-drawer">
+    <Drawer
+      open={open}
+      onClose={onClose}
+      className="moderation-review-drawer"
+      size="xl"
+      ariaLabel="Rà soát sản phẩm"
+    >
       <div className="drawer-header">
         <div>
           <p className="drawer-eyebrow">Quản trị sản phẩm</p>

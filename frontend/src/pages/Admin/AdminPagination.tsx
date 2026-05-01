@@ -69,8 +69,9 @@ export const AdminPagination = ({
       <span className="table-footer-meta">
         {c.showing(startIndex, endIndex, total, selectedNoun || '')}
       </span>
-      <div className="pagination">
+      <nav className="pagination" aria-label="Phân trang">
         <button
+          type="button"
           className="page-btn"
           onClick={onPrev}
           disabled={page === 1}
@@ -81,14 +82,17 @@ export const AdminPagination = ({
 
         {visiblePages.map((p, idx) =>
           p === 'ellipsis' ? (
-            <span key={`ellipsis-${idx}`} className="page-ellipsis">
+            <span key={`ellipsis-${idx}`} className="page-ellipsis" aria-hidden="true">
               ...
             </span>
           ) : (
             <button
+              type="button"
               key={p}
               className={`page-btn ${page === p ? 'active' : ''}`}
               onClick={() => onPageChange(p)}
+              aria-current={page === p ? 'page' : undefined}
+              aria-label={`Trang ${p}`}
             >
               {p}
             </button>
@@ -96,6 +100,7 @@ export const AdminPagination = ({
         )}
 
         <button
+          type="button"
           className="page-btn"
           onClick={onNext}
           disabled={page === totalPages}
@@ -103,7 +108,7 @@ export const AdminPagination = ({
         >
           <ChevronRight size={16} />
         </button>
-      </div>
+      </nav>
     </div>
   );
 };

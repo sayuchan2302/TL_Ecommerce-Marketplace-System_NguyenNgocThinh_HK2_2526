@@ -20,6 +20,7 @@ interface AdminLayoutProps {
   title: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
+  variant?: 'admin' | 'vendor';
   hideTopbarTitle?: boolean;
   breadcrumbs?: string[];
   navItems?: PanelNavItem[];
@@ -32,6 +33,7 @@ interface AdminLayoutProps {
   notificationsLabel?: string;
   settingsLabel?: string;
   hideSidebarCard?: boolean;
+  shellRoot?: boolean;
 }
 
 const defaultNavItems: PanelNavItem[] = adminPanelNav;
@@ -41,6 +43,7 @@ const AdminLayout = ({
   title,
   actions,
   children,
+  variant = 'admin',
   hideTopbarTitle = false,
   breadcrumbs,
   navItems = defaultNavItems,
@@ -53,6 +56,7 @@ const AdminLayout = ({
   notificationsLabel,
   settingsLabel,
   hideSidebarCard = false,
+  shellRoot = false,
 }: AdminLayoutProps) => {
   const isNested = useContext(AdminLayoutLevelContext);
   const setShellState = useContext(AdminShellContext);
@@ -98,21 +102,22 @@ const AdminLayout = ({
   };
 
   const crumbs = breadcrumbs?.length ? breadcrumbs : inferBreadcrumbs();
+  const shouldRenderNestedContent = !shellRoot && (isNested || Boolean(setShellState));
 
   useEffect(() => {
-    if (setShellState) {
+    if (!shellRoot && setShellState) {
       setShellState({ title, actions, hideTopbarTitle, breadcrumbs });
     }
-  }, [actions, breadcrumbs, hideTopbarTitle, setShellState, title]);
+  }, [actions, breadcrumbs, hideTopbarTitle, setShellState, shellRoot, title]);
 
-  if (isNested) {
+  if (shouldRenderNestedContent) {
     // When wrapped by a parent AdminLayout, only render content; shell (sidebar/header) handled by parent.
     return <>{children}</>;
   }
 
   return (
     <AdminLayoutLevelContext.Provider value={true}>
-    <div className="admin-page">
+    <div className={`admin-page ${variant === 'vendor' ? 'vendor-shell' : ''}`.trim()}>
       <aside className="admin-sidebar">
         <div className="admin-logo">
           {logoIcon || <LayoutGrid size={22} />}

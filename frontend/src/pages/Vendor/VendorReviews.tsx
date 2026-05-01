@@ -499,11 +499,12 @@ const VendorReviews = () => {
         selectedItems={selectedReplyLabels}
         selectedNoun="đánh giá"
         confirmLabel="Gửi phản hồi"
+        variant="vendor"
         onCancel={() => setConfirmReplyIds(null)}
         onConfirm={() => void submitReplies(confirmReplyIds || [])}
       />
 
-      <Drawer open={Boolean(activeReview)} onClose={() => setActiveReview(null)}>
+      <Drawer open={Boolean(activeReview)} onClose={() => setActiveReview(null)} className="vendor-drawer">
         {activeReview ? (
           <>
             <PanelDrawerHeader

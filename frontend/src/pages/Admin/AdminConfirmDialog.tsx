@@ -15,6 +15,7 @@ interface AdminConfirmDialogProps {
   confirmDisabled?: boolean;
   cancelDisabled?: boolean;
   danger?: boolean;
+  variant?: 'admin' | 'vendor';
   children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
@@ -32,6 +33,7 @@ const AdminConfirmDialog = ({
   confirmDisabled = false,
   cancelDisabled = false,
   danger = false,
+  variant = 'admin',
   children,
   onConfirm,
   onCancel,
@@ -107,7 +109,7 @@ const AdminConfirmDialog = ({
           />
           <motion.div
             ref={dialogRef}
-            className="confirm-modal"
+            className={`confirm-modal ${variant === 'vendor' ? 'vendor-confirm-modal' : ''}`.trim()}
             role="dialog"
             aria-modal="true"
             aria-label={title}

@@ -28,19 +28,6 @@ import { getOptimizedImageUrl } from '../../utils/getOptimizedImageUrl';
 
 const formatCurrency = (value: number) => `${(value || 0).toLocaleString('vi-VN')} ₫`;
 
-const formatShortDate = (isoDate: string) => {
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return isoDate;
-  return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-};
-
-const buildSparkFromTrend = (series: number[]) => {
-  if (series.length === 0) {
-    return [1, 1, 1, 1, 1, 1, 1];
-  }
-  return series.map((value) => Math.max(1, value));
-};
-
 const buildCategoryFallbackImage = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=E2E8F0&color=334155&size=160&font-size=0.45`;
 
@@ -226,15 +213,6 @@ const Admin = () => {
     loadDashboard();
   }, []);
 
-  const trendSeries = useMemo(() => {
-    const trend = dashboard?.trend || [];
-    return {
-      gmv: trend.map((point) => Number(point.gmv || 0)),
-      commission: trend.map((point) => Number(point.commission || 0)),
-      labels: trend.map((point) => formatShortDate(point.date)),
-    };
-  }, [dashboard?.trend]);
-
   const chartData = useMemo(
     () => buildChartDataByRange(dashboard?.trend || [], revenueRange),
     [dashboard?.trend, revenueRange]
@@ -261,8 +239,6 @@ const Admin = () => {
 
   const stats = useMemo(() => {
     const metrics = dashboard?.metrics;
-    const gmvSpark = buildSparkFromTrend(trendSeries.gmv);
-    const commissionSpark = buildSparkFromTrend(trendSeries.commission);
     return [
       {
         label: 'GMV đã giao thành công',
@@ -270,7 +246,6 @@ const Admin = () => {
         change: 'Live',
         icon: <DollarSign size={18} />,
         to: '/admin/financials',
-        spark: gmvSpark,
       },
       {
         label: 'Commission đã ghi nhận',
@@ -278,7 +253,6 @@ const Admin = () => {
         change: 'Live',
         icon: <WalletCards size={18} />,
         to: '/admin/financials',
-        spark: commissionSpark,
       },
       {
         label: 'Đơn hàng toàn sàn',
@@ -286,7 +260,6 @@ const Admin = () => {
         change: 'Live',
         icon: <Package size={18} />,
         to: '/admin/orders',
-        spark: gmvSpark,
       },
       {
         label: 'Tổng gian hàng',
@@ -294,7 +267,6 @@ const Admin = () => {
         change: 'Live',
         icon: <Store size={18} />,
         to: '/admin/stores',
-        spark: gmvSpark,
       },
       {
         label: 'Tổng khách hàng',
@@ -302,7 +274,6 @@ const Admin = () => {
         change: 'Live',
         icon: <Users size={18} />,
         to: '/admin/users',
-        spark: commissionSpark,
       },
       {
         label: 'Chiến dịch đang chạy',
@@ -310,20 +281,9 @@ const Admin = () => {
         change: 'Live',
         icon: <TicketPercent size={18} />,
         to: '/admin/promotions',
-        spark: commissionSpark,
       },
     ];
-  }, [dashboard?.metrics, trendSeries.commission, trendSeries.gmv]);
-
-  const quickViews = useMemo(() => {
-    const quick = dashboard?.quickViews;
-    return [
-      { label: 'Vendor onboarding chờ duyệt', count: quick?.pendingStoreApprovals || 0, to: '/admin/stores' },
-      { label: 'Danh mục cần kiểm tra', count: quick?.categoriesNeedReview || 0, to: '/admin/categories' },
-      { label: 'Đơn hàng cha cần xử lý', count: quick?.parentOrdersNeedAttention || 0, to: '/admin/orders' },
-      { label: 'Yêu cầu đổi trả chờ xử lý', count: quick?.pendingReturns || 0, to: '/admin/returns' },
-    ];
-  }, [dashboard?.quickViews]);
+  }, [dashboard?.metrics]);
 
   const governanceFeed = useMemo(() => {
     const quick = dashboard?.quickViews;
@@ -428,28 +388,7 @@ const Admin = () => {
               <span className="admin-stat-value">{item.value}</span>
               <ChevronRight size={14} />
             </Link>
-            <svg className="sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
-              <path
-                d={`M ${item.spark
-                  .map((v, i) => `${(i / (item.spark.length - 1)) * 100} ${30 - (v / Math.max(...item.spark, 1)) * 26}`)
-                  .join(' L ')}`}
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
           </motion.div>
-        ))}
-      </section>
-
-      <section className="dashboard-view-strip">
-        {quickViews.map((view) => (
-          <Link key={view.label} to={view.to} className="dashboard-view-chip">
-            <span>{view.label}</span>
-            <strong>{view.count}</strong>
-            <ChevronRight size={14} />
-          </Link>
         ))}
       </section>
 

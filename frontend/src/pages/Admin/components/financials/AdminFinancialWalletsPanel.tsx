@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { CheckCircle2, Eye } from 'lucide-react';
 import { AdminStateBlock } from '../../AdminStateBlocks';
+import { PanelTableFooter } from '../../../../components/Panel/PanelPrimitives';
 import type { VendorWallet } from '../../../../services/walletService';
 import { PAGE_SIZE, formatCurrency, toStoreRef } from './adminFinancialPresentation';
 
@@ -17,6 +18,21 @@ type Props = {
   onOpenDetail: (record: VendorWallet) => void;
   onOpenReleaseConfirm: (storeIds: string[]) => void;
 };
+
+const walletStatusMeta = (record: VendorWallet) => {
+  if (record.reservedBalance > 0) {
+    return { label: 'Chờ duyệt rút', tone: 'pending' };
+  }
+  if (record.availableBalance > 0) {
+    return { label: 'Có thể rút', tone: 'success' };
+  }
+  if (record.frozenBalance > 0) {
+    return { label: 'Tạm giữ tiền', tone: 'warning' };
+  }
+  return { label: 'Không có số dư', tone: 'neutral' };
+};
+
+const moneyClass = (value: number, tone: string) => `financial-money ${value > 0 ? tone : 'muted'}`;
 
 const AdminFinancialWalletsPanel = ({
   isLoading,
@@ -60,7 +76,7 @@ const AdminFinancialWalletsPanel = ({
   return (
     <>
       <div className="admin-table" role="table" aria-label="Bảng đối soát tài chính sàn">
-        <div className="admin-table-row financials admin-table-head" role="row">
+        <div className="admin-table-row financials financial-wallets admin-table-head" role="row">
           <div role="columnheader">
             <input
               type="checkbox"
@@ -73,96 +89,86 @@ const AdminFinancialWalletsPanel = ({
             />
           </div>
           <div role="columnheader">STT</div>
-          <div role="columnheader">Tên cửa hàng</div>
-          <div role="columnheader">Slug cửa hàng</div>
-          <div role="columnheader">Khả dụng</div>
-          <div role="columnheader">Đóng băng</div>
+          <div role="columnheader">Gian hàng</div>
+          <div role="columnheader">Tổng số dư</div>
+          <div role="columnheader">Có thể rút</div>
+          <div role="columnheader">Tạm giữ</div>
+          <div role="columnheader">Chờ duyệt rút</div>
+          <div role="columnheader">Trạng thái</div>
           <div role="columnheader">Hành động</div>
         </div>
 
-        {records.map((record, index) => (
-          <motion.div
-            key={record.id}
-            className="admin-table-row financials"
-            role="row"
-            whileHover={{ y: -1 }}
-          >
-            <div role="cell" onClick={(event) => event.stopPropagation()}>
-              <input
-                type="checkbox"
-                checked={selected.has(record.storeId)}
-                onChange={(event) => {
-                  const next = new Set(selected);
-                  if (event.target.checked) next.add(record.storeId);
-                  else next.delete(record.storeId);
-                  onSelectionChange(next);
-                }}
-              />
-            </div>
-            <div role="cell" className="admin-mono">
-              {(page - 1) * PAGE_SIZE + index + 1}
-            </div>
-            <div role="cell">
-              <div className="admin-bold">{record.storeName}</div>
-            </div>
-            <div role="cell">
-              <div className="admin-bold">{toStoreRef(record)}</div>
-            </div>
-            <div role="cell" className="admin-bold">
-              <span className={`admin-pill ${record.availableBalance > 0 ? 'success' : 'neutral'}`}>
+        {records.map((record, index) => {
+          const status = walletStatusMeta(record);
+
+          return (
+            <motion.div
+              key={record.id}
+              className="admin-table-row financials financial-wallets"
+              role="row"
+              whileHover={{ y: -1 }}
+            >
+              <div role="cell" onClick={(event) => event.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={selected.has(record.storeId)}
+                  onChange={(event) => {
+                    const next = new Set(selected);
+                    if (event.target.checked) next.add(record.storeId);
+                    else next.delete(record.storeId);
+                    onSelectionChange(next);
+                  }}
+                />
+              </div>
+              <div role="cell" className="admin-mono">
+                {(page - 1) * PAGE_SIZE + index + 1}
+              </div>
+              <div role="cell" className="financial-store-cell">
+                <div className="admin-bold">{record.storeName}</div>
+                <small className="admin-muted financial-store-ref">{toStoreRef(record)}</small>
+              </div>
+              <div role="cell" className={moneyClass(record.totalBalance, 'total')}>
+                {formatCurrency(record.totalBalance)}
+              </div>
+              <div role="cell" className={moneyClass(record.availableBalance, 'available')}>
                 {formatCurrency(record.availableBalance)}
-              </span>
-            </div>
-            <div role="cell">
-              <span className={`admin-pill ${record.frozenBalance > 0 ? 'warning' : 'neutral'}`}>
+              </div>
+              <div role="cell" className={moneyClass(record.frozenBalance, 'frozen')}>
                 {formatCurrency(record.frozenBalance)}
-              </span>
-            </div>
-            <div role="cell" className="financial-actions">
-              <button className="admin-icon-btn subtle" title="Xem chi tiết" onClick={() => onOpenDetail(record)}>
-                <Eye size={16} />
-              </button>
-              {record.availableBalance > 0 && (
-                <button
-                  className="admin-icon-btn subtle"
-                  title="Duyệt phiếu rút đang chờ"
-                  onClick={() => onOpenReleaseConfirm([record.storeId])}
-                >
-                  <CheckCircle2 size={16} />
+              </div>
+              <div role="cell" className={moneyClass(record.reservedBalance, 'reserved')}>
+                {formatCurrency(record.reservedBalance)}
+              </div>
+              <div role="cell">
+                <span className={`admin-pill ${status.tone}`}>{status.label}</span>
+              </div>
+              <div role="cell" className="financial-actions">
+                <button className="admin-icon-btn subtle" title="Xem chi tiết" onClick={() => onOpenDetail(record)}>
+                  <Eye size={16} />
                 </button>
-              )}
-            </div>
-          </motion.div>
-        ))}
+                {record.reservedBalance > 0 && (
+                  <button
+                    className="admin-icon-btn subtle"
+                    title="Duyệt phiếu rút đang chờ"
+                    onClick={() => onOpenReleaseConfirm([record.storeId])}
+                  >
+                    <CheckCircle2 size={16} />
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
 
-      <div className="table-footer">
-        <span className="table-footer-meta">Trang {page}/{totalPages}</span>
-        <div className="pagination">
-          <button className="page-btn" disabled={page === 1} onClick={() => onPageChange(Math.max(page - 1, 1))}>
-            Trước
-          </button>
-          {Array.from({ length: Math.min(totalPages, 5) }).map((_, index) => {
-            const pageNumber = index + 1;
-            return (
-              <button
-                key={pageNumber}
-                className={`page-btn ${page === pageNumber ? 'active' : ''}`}
-                onClick={() => onPageChange(pageNumber)}
-              >
-                {pageNumber}
-              </button>
-            );
-          })}
-          <button
-            className="page-btn"
-            disabled={page === totalPages}
-            onClick={() => onPageChange(Math.min(page + 1, totalPages))}
-          >
-            Sau
-          </button>
-        </div>
-      </div>
+      <PanelTableFooter
+        meta={`Trang ${page}/${totalPages}`}
+        page={page}
+        totalPages={totalPages}
+        onPageChange={onPageChange}
+        prevLabel="Trước"
+        nextLabel="Sau"
+      />
     </>
   );
 };

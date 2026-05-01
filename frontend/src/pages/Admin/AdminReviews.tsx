@@ -11,6 +11,7 @@ import {
   PanelDrawerFooter,
   PanelDrawerHeader,
   PanelDrawerSection,
+  PanelTableFooter,
   PanelTabs,
 } from '../../components/Panel/PanelPrimitives';
 import { ADMIN_VIEW_KEYS } from './adminListView';
@@ -119,8 +120,6 @@ const AdminReviews = () => {
     totalPages,
     startIndex,
     endIndex,
-    next,
-    prev,
   } = useAdminListState<Review>({
     items: filteredByStatus,
     pageSize: 8,
@@ -340,34 +339,25 @@ const AdminReviews = () => {
                 ))}
               </div>
 
-              <div className="table-footer">
-                <span className="table-footer-meta">
-                  Hiển thị {startIndex}-{endIndex} của {filteredItems.length} đánh giá
-                </span>
-                <div className="pagination">
-                  <button className="page-btn" onClick={prev} disabled={page === 1}>
-                    Trước
-                  </button>
-                  {Array.from({ length: totalPages }).map((_, index) => (
-                    <button
-                      key={index + 1}
-                      className={`page-btn ${page === index + 1 ? 'active' : ''}`}
-                      onClick={() => setPage(index + 1)}
-                    >
-                      {index + 1}
-                    </button>
-                  ))}
-                  <button className="page-btn" onClick={next} disabled={page === totalPages}>
-                    Tiếp
-                  </button>
-                </div>
-              </div>
+              <PanelTableFooter
+                meta={`Hiển thị ${startIndex}-${endIndex} của ${filteredItems.length} đánh giá`}
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                prevLabel="Trước"
+                nextLabel="Tiếp"
+              />
             </>
           )}
         </div>
       </section>
 
-      <Drawer open={Boolean(drawerReview)} onClose={() => setDrawerReview(null)}>
+      <Drawer
+        open={Boolean(drawerReview)}
+        onClose={() => setDrawerReview(null)}
+        size="lg"
+        ariaLabel="Chi tiết đánh giá"
+      >
         {drawerReview ? (
           <>
             <PanelDrawerHeader

@@ -1,17 +1,77 @@
 .admin-table-row.financials {
+  min-width: 1120px;
+}
+
+.admin-table-row.financial-wallets {
   grid-template-columns:
     38px
     44px
-    minmax(140px, 1.1fr)
-    minmax(180px, 1.4fr)
-    minmax(100px, 0.8fr)
-    minmax(100px, 0.8fr)
-    minmax(130px, 1fr);
+    minmax(190px, 1.45fr)
+    minmax(120px, 0.9fr)
+    minmax(120px, 0.9fr)
+    minmax(120px, 0.9fr)
+    minmax(130px, 0.95fr)
+    minmax(130px, 0.95fr)
+    minmax(108px, 0.75fr);
+}
+
+.admin-table-row.financial-payouts {
+  grid-template-columns:
+    44px
+    minmax(220px, 1.5fr)
+    minmax(130px, 0.9fr)
+    minmax(150px, 1fr)
+    minmax(130px, 0.9fr)
+    minmax(160px, 1fr)
+    minmax(116px, 0.8fr);
+  min-width: 1010px;
 }
 
 .admin-table-row.financials > [role='cell'],
 .admin-table-row.financials > [role='columnheader'] {
   min-width: 0;
+}
+
+.financial-store-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.financial-store-cell .admin-bold,
+.financial-store-ref {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.financial-store-ref {
+  display: block;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+}
+
+.financial-money {
+  color: var(--co-admin-text);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.financial-money.available {
+  color: #15803d;
+}
+
+.financial-money.frozen {
+  color: #c2410c;
+}
+
+.financial-money.reserved {
+  color: #0f766e;
+}
+
+.financial-money.muted {
+  color: var(--co-gray-500);
 }
 
 .financial-actions {
@@ -22,8 +82,8 @@
 }
 
 .financial-drawer {
-  width: 42vw;
-  max-width: 620px;
+  width: min(680px, 100vw);
+  max-width: 680px;
 }
 
 .financial-drawer-hero {
@@ -81,15 +141,6 @@
 
 @media (max-width: 1280px) {
   .admin-table-row.financials {
-    grid-template-columns:
-      40px
-      minmax(165px, 1.2fr)
-      minmax(200px, 1.5fr)
-      minmax(112px, 0.95fr)
-      minmax(112px, 0.95fr)
-      minmax(138px, 1.1fr)
-      minmax(128px, 0.95fr)
-      minmax(104px, 0.78fr);
     font-size: 13px;
   }
 }

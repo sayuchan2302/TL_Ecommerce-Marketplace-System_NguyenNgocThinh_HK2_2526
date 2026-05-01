@@ -1,7 +1,7 @@
 import './Vendor.css';
 import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Eye, ShieldCheck, Truck, XCircle, PackageCheck } from 'lucide-react';
+import { AlertTriangle, Check, Eye, Truck, XCircle, PackageCheck } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import {
@@ -497,6 +497,10 @@ const VendorOrders = () => {
                   const statusTone = getVendorOrderStatusTone(order.status);
                   const statusLabel = getVendorOrderStatusLabel(order.status);
                   const isSelected = selected.has(order.id);
+                  const productVariantLine = [order.productMeta, order.productExtra]
+                    .map((value) => value?.trim())
+                    .filter(Boolean)
+                    .join(' · ');
 
                   return (
                     <motion.div
@@ -528,9 +532,14 @@ const VendorOrders = () => {
                           decoding="async"
                         />
                         <div className="order-product-copy">
-                          <p className="admin-bold order-product-name">{order.productName}</p>
-                          <p className="admin-muted order-product-meta">{order.productMeta}</p>
-                          {order.productExtra ? <p className="order-product-extra">{order.productExtra}</p> : null}
+                          <p className="admin-bold order-product-name" title={order.productName || 'Sản phẩm'}>
+                            {order.productName || 'Sản phẩm'}
+                          </p>
+                          {productVariantLine ? (
+                            <p className="admin-muted order-product-meta" title={productVariantLine}>
+                              {productVariantLine}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                       <div className="admin-bold">{formatCurrency(order.total)}</div>
@@ -552,7 +561,7 @@ const VendorOrders = () => {
                             onClick={() => askStatusUpdate([order.id], 'CONFIRMED')}
                             disabled={updating}
                           >
-                            <ShieldCheck size={16} />
+                            <Check size={16} />
                           </button>
                         )}
                         {order.status === 'confirmed' && (
@@ -638,6 +647,7 @@ const VendorOrders = () => {
         description={pendingAction?.description || ''}
         selectedItems={pendingAction?.selectedItems}
         confirmLabel={pendingAction?.confirmLabel || 'Xác nhận'}
+        variant="vendor"
         onCancel={() => setPendingAction(null)}
         onConfirm={() => void confirmPendingAction()}
       >

@@ -428,6 +428,8 @@ const AdminReturns = () => {
           setDrawerNote('');
         }}
         className="returns-drawer"
+        size="lg"
+        ariaLabel="Chi tiết yêu cầu hoàn trả"
       >
         {drawerItem ? (
           <>

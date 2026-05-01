@@ -19,7 +19,7 @@ import {
   type FulfillmentStatus,
   type PaymentStatus,
 } from './orderWorkflow';
-import { PanelStatsGrid, PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelStatsGrid, PanelTableFooter, PanelTabs } from '../../components/Panel/PanelPrimitives';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import {
   resolveDetailRouteKey,
@@ -380,28 +380,14 @@ const AdminOrders = () => {
           )}
 
           {!isLoading && filteredOrders.length > 0 && (
-            <div className="table-footer">
-              <span className="table-footer-meta">
-                {c.showing(startIndex, endIndex, filteredOrders.length, 'đơn hàng')}
-              </span>
-              <div className="pagination">
-                <button className="page-btn" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
-                  {c.previous}
-                </button>
-                {Array.from({ length: totalPages }).map((_, index) => (
-                  <button
-                    key={index + 1}
-                    className={`page-btn ${page === index + 1 ? 'active' : ''}`}
-                    onClick={() => setPage(index + 1)}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-                <button className="page-btn" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                  {c.next}
-                </button>
-              </div>
-            </div>
+            <PanelTableFooter
+              meta={c.showing(startIndex, endIndex, filteredOrders.length, 'đơn hàng')}
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              prevLabel={c.previous}
+              nextLabel={c.next}
+            />
           )}
         </div>
       </section>

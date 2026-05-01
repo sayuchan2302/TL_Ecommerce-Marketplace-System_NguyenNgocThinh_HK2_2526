@@ -623,11 +623,12 @@ const VendorPromotions = () => {
         selectedNoun="voucher"
         confirmLabel={deleteState?.confirmLabel || 'Xóa'}
         danger
+        variant="vendor"
         onCancel={() => setDeleteState(null)}
         onConfirm={() => void confirmDelete()}
       />
 
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} className="vendor-drawer">
         <PanelDrawerHeader
           eyebrow="Voucher shop"
           title={voucherForm.id ? 'Cập nhật voucher' : 'Tạo voucher mới'}

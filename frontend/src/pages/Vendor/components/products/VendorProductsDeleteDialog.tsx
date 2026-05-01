@@ -20,6 +20,7 @@ const VendorProductsDeleteDialog = ({
     selectedNoun="sản phẩm"
     confirmLabel={state?.confirmLabel || 'Xóa'}
     danger
+    variant="vendor"
     onCancel={onCancel}
     onConfirm={() => void onConfirm()}
   />

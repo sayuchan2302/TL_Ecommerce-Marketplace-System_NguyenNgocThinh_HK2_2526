@@ -1,6 +1,10 @@
 import type { ChangeEvent, RefObject } from 'react';
-import { X } from 'lucide-react';
 import Drawer from '../../../../components/Drawer/Drawer';
+import {
+  PanelDrawerFooter,
+  PanelDrawerHeader,
+  PanelDrawerSection,
+} from '../../../../components/Panel/PanelPrimitives';
 import { MAX_PRODUCT_IMAGES } from '../../vendorProducts.constants';
 import type { ProductFormErrors, ProductFormState, VariantRowFormState } from '../../vendorProducts.types';
 import type { VendorProductCategory } from '../../../../services/vendorProductService';
@@ -62,19 +66,16 @@ const VendorProductDrawer = ({
   onSave,
 }: VendorProductDrawerProps) => (
   <Drawer open={open} onClose={onClose} className="vendor-product-drawer">
-    <div className="drawer-header vendor-product-drawer-header">
-      <div>
-        <p className="drawer-eyebrow">{form.id ? 'Chỉnh sửa sản phẩm' : 'Tạo sản phẩm mới'}</p>
-        <h3>{form.name || 'Sản phẩm mới'}</h3>
-      </div>
-      <button className="admin-icon-btn" onClick={onClose} aria-label="Đóng biểu mẫu sản phẩm">
-        <X size={16} />
-      </button>
-    </div>
+    <PanelDrawerHeader
+      eyebrow={form.id ? 'Chỉnh sửa sản phẩm' : 'Tạo sản phẩm mới'}
+      title={form.name || 'Sản phẩm mới'}
+      subtitle="Thông tin hiển thị, danh mục, ảnh và biến thể bán hàng của SKU."
+      onClose={onClose}
+      closeLabel="Đóng biểu mẫu sản phẩm"
+    />
 
     <div className="drawer-body">
-      <section className="drawer-section">
-        <h4>Thông tin sản phẩm</h4>
+      <PanelDrawerSection title="Thông tin sản phẩm">
         <div className="form-grid">
           <VendorProductBasicsSection form={form} nameError={formErrors.name} onFormChange={onFormChange} />
           <VendorProductCategorySection
@@ -99,7 +100,7 @@ const VendorProductDrawer = ({
             onRemoveImage={onRemoveProductImage}
           />
         </div>
-      </section>
+      </PanelDrawerSection>
 
       <VendorProductVariantsSection
         variantRows={variantRows}
@@ -115,7 +116,7 @@ const VendorProductDrawer = ({
       <VendorProductDescriptionSection form={form} onFormChange={onFormChange} />
     </div>
 
-    <div className="drawer-footer">
+    <PanelDrawerFooter>
       <button className="admin-ghost-btn" onClick={onClose} disabled={saving}>Hủy</button>
       <button
         className="admin-primary-btn vendor-admin-primary"
@@ -124,7 +125,7 @@ const VendorProductDrawer = ({
       >
         {saving ? 'Đang lưu...' : form.id ? 'Lưu cập nhật' : 'Tạo sản phẩm'}
       </button>
-    </div>
+    </PanelDrawerFooter>
   </Drawer>
 );
 

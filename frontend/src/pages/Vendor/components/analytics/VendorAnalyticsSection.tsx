@@ -1,5 +1,5 @@
 import { AlertCircle, LoaderCircle, RotateCcw, TrendingUp } from 'lucide-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import {
   Area,
   AreaChart,
@@ -40,6 +40,17 @@ interface VendorAnalyticsSectionProps {
   onRetry: () => void;
 }
 
+const VENDOR_CHART_COLORS = {
+  revenue: '#16a34a',
+  payout: '#f97316',
+  neutral: '#94a3b8',
+};
+
+const VENDOR_CHART_ANIMATION = {
+  duration: 520,
+  easing: 'ease-out' as const,
+};
+
 const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: AnalyticsTooltipEntry[] }) => {
   if (!active || !payload?.length) return null;
 
@@ -54,7 +65,7 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Analyt
         </div>
       ))}
       <div className="analytics-tooltip-row">
-        <span className="analytics-tooltip-dot" style={{ backgroundColor: '#94a3b8' }} />
+        <span className="analytics-tooltip-dot" style={{ backgroundColor: VENDOR_CHART_COLORS.neutral }} />
         <span className="analytics-tooltip-label">Đơn hàng:</span>
         <span className="analytics-tooltip-value">{payload[0].payload.orders}</span>
       </div>
@@ -86,12 +97,13 @@ const VendorAnalyticsSection = ({
           <h2>Biểu đồ doanh thu</h2>
           <span className="analytics-muted">{chartMeta.description}</span>
         </div>
-        <div className="segmented-control" role="tablist" aria-label="Khoảng thời gian thống kê">
+        <div className="admin-chart-range-controls vendor-chart-range-controls" role="tablist" aria-label="Khoảng thời gian thống kê">
           {(['week', 'month', 'year'] as VendorAnalyticsPeriod[]).map((period) => (
             <button
               key={period}
               type="button"
-              className={`segmented-btn ${activePeriod === period ? 'active' : ''}`}
+              role="tab"
+              className={`admin-chart-range-btn vendor-chart-range-btn ${activePeriod === period ? 'active' : ''}`}
               aria-selected={activePeriod === period}
               onClick={() => onPeriodChange(period)}
             >
@@ -128,12 +140,12 @@ const VendorAnalyticsSection = ({
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="vendorRevenueGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                <stop offset="5%" stopColor={VENDOR_CHART_COLORS.revenue} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={VENDOR_CHART_COLORS.revenue} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="vendorPayoutGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                <stop offset="5%" stopColor={VENDOR_CHART_COLORS.payout} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={VENDOR_CHART_COLORS.payout} stopOpacity={0} />
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -141,6 +153,8 @@ const VendorAnalyticsSection = ({
               dataKey="dateLabel"
               axisLine={false}
               tickLine={false}
+              minTickGap={24}
+              tickMargin={8}
               tick={{ fontSize: 12, fill: '#94a3b8' }}
             />
             <YAxis
@@ -155,24 +169,31 @@ const VendorAnalyticsSection = ({
               align="right"
               iconType="circle"
               formatter={(value: string) => (
-                <span style={{ fontSize: 13, color: '#64748b' }}>{value}</span>
+                <span className="analytics-legend-label">{value}</span>
               )}
             />
             <Area
               type="monotone"
               dataKey="revenue"
               name="Doanh thu gộp"
-              stroke="#3b82f6"
+              stroke={VENDOR_CHART_COLORS.revenue}
               strokeWidth={2}
               fill="url(#vendorRevenueGradient)"
+              animationDuration={VENDOR_CHART_ANIMATION.duration}
+              animationEasing={VENDOR_CHART_ANIMATION.easing}
+              isAnimationActive
             />
             <Area
               type="monotone"
               dataKey="payout"
               name="Thực nhận"
-              stroke="#10b981"
+              stroke={VENDOR_CHART_COLORS.payout}
               strokeWidth={2}
               fill="url(#vendorPayoutGradient)"
+              animationBegin={80}
+              animationDuration={VENDOR_CHART_ANIMATION.duration}
+              animationEasing={VENDOR_CHART_ANIMATION.easing}
+              isAnimationActive
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -181,4 +202,4 @@ const VendorAnalyticsSection = ({
   );
 };
 
-export default VendorAnalyticsSection;
+export default memo(VendorAnalyticsSection);

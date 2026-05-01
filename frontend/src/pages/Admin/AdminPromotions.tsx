@@ -9,7 +9,7 @@ import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
-import { PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelTableFooter, PanelTabs } from '../../components/Panel/PanelPrimitives';
 import Drawer from '../../components/Drawer/Drawer';
 import {
   adminPromotionService,
@@ -251,8 +251,6 @@ const AdminPromotions = () => {
     totalPages,
     startIndex,
     endIndex,
-    next,
-    prev,
     setPage,
   } = useAdminListState<PromotionTableRow>({
     items: tableRows,
@@ -533,18 +531,14 @@ const AdminPromotions = () => {
             </div>
           )}
           {!isLoading && filteredItems.length > 0 && (
-            <div className="table-footer">
-              <span className="table-footer-meta">Hiển thị {startIndex}-{endIndex} của {filteredItems.length} chiến dịch</span>
-              <div className="pagination">
-                <button className="page-btn" onClick={prev} disabled={page === 1}>Trước</button>
-                {Array.from({ length: totalPages }).map((_, idx) => (
-                  <button key={idx + 1} className={`page-btn ${page === idx + 1 ? 'active' : ''}`} onClick={() => setPage(idx + 1)}>
-                    {idx + 1}
-                  </button>
-                ))}
-                <button className="page-btn" onClick={next} disabled={page === totalPages}>Tiếp</button>
-              </div>
-            </div>
+            <PanelTableFooter
+              meta={`Hiển thị ${startIndex}-${endIndex} của ${filteredItems.length} chiến dịch`}
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              prevLabel="Trước"
+              nextLabel="Tiếp"
+            />
           )}
         </div>
       </section>
@@ -560,7 +554,13 @@ const AdminPromotions = () => {
         onConfirm={() => void deleteSelected()}
       />
 
-      <Drawer open={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} className="promo-drawer">
+      <Drawer
+        open={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        className="promo-drawer"
+        size="md"
+        ariaLabel="Tạo hoặc cập nhật chiến dịch"
+      >
         <div className="drawer-header">
           <div>
             <p className="drawer-eyebrow">Chiến dịch nền tảng</p>

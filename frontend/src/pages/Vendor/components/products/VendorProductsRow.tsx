@@ -55,7 +55,7 @@ const VendorProductsRow = ({
     </div>
     <div role="cell" className="admin-bold">{formatCurrency(product.price)}</div>
     <div role="cell">
-      <span className={`badge ${product.stock === 0 ? 'red' : product.stock < 10 ? 'amber' : 'blue'}`}>
+      <span className={`badge ${product.stock === 0 ? 'red' : product.stock < 10 ? 'amber' : 'green'}`}>
         {product.stock} sản phẩm
       </span>
     </div>

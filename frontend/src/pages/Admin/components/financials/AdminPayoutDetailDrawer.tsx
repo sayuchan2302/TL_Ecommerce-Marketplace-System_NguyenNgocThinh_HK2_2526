@@ -20,7 +20,13 @@ const AdminPayoutDetailDrawer = ({
   onReject,
   onApprove,
 }: Props) => (
-  <Drawer open={Boolean(payout)} onClose={onClose} className="financial-drawer">
+  <Drawer
+    open={Boolean(payout)}
+    onClose={onClose}
+    className="financial-drawer"
+    size="lg"
+    ariaLabel="Chi tiết yêu cầu rút tiền"
+  >
     {payout ? (
       <>
         <div className="drawer-header">

@@ -70,16 +70,9 @@
   border-radius: 16px;
 }
 
-.store-status-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-start;
-}
-
 .store-drawer {
-  width: min(560px, 100vw);
-  max-width: 560px;
+  width: min(680px, 100vw);
+  max-width: 680px;
   background: #f8fafc;
   border-left: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: -18px 0 42px rgba(15, 23, 42, 0.18);
@@ -199,10 +192,10 @@
 }
 
 .store-commission-panel {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 18px;
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) auto;
+  align-items: center;
+  gap: 16px;
   padding: 14px;
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 14px;
@@ -210,33 +203,38 @@
 }
 
 .store-commission-title {
-  margin-bottom: 4px;
-}
-
-.store-commission-note {
   margin: 0;
-  max-width: 320px;
-  line-height: 1.6;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
 .store-commission-controls {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
-  margin-left: auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
 }
 
 .store-commission-input {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 148px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.store-commission-input span {
+  white-space: nowrap;
 }
 
 .store-commission-input .admin-input {
-  width: 148px;
+  width: 120px;
   padding: 10px 12px;
+}
+
+.store-commission-controls .admin-primary-btn {
+  min-height: 44px;
+  white-space: nowrap;
 }
 
 .store-signal-grid {
@@ -286,7 +284,7 @@
 
 @media (max-width: 1080px) {
   .store-drawer {
-    width: min(520px, 100vw);
+    width: 100%;
     max-width: 100%;
   }
 
@@ -304,6 +302,7 @@
   }
 
   .store-commission-panel {
+    grid-template-columns: 1fr;
     align-items: stretch;
   }
 
@@ -337,6 +336,12 @@
   .store-commission-controls {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .store-commission-input {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .store-commission-input,

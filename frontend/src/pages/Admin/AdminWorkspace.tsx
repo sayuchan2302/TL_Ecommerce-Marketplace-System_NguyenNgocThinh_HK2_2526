@@ -113,6 +113,7 @@ const AdminWorkspace = () => {
         actions={shellState.actions}
         hideTopbarTitle={shellState.hideTopbarTitle}
         breadcrumbs={shellState.breadcrumbs}
+        shellRoot
       >
         <AdminMountedContext.Provider value={isMounted}>
           <div className="admin-route-transition">

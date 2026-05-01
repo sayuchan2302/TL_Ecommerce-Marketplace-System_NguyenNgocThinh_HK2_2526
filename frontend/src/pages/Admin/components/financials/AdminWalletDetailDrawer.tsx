@@ -10,7 +10,7 @@ type Props = {
 };
 
 const AdminWalletDetailDrawer = ({ record, onClose, onOpenReleaseConfirm }: Props) => (
-  <Drawer open={Boolean(record)} onClose={onClose} className="financial-drawer">
+  <Drawer open={Boolean(record)} onClose={onClose} className="financial-drawer" size="lg" ariaLabel="Chi tiết ví shop">
     {record ? (
       <>
         <div className="drawer-header">
@@ -34,8 +34,16 @@ const AdminWalletDetailDrawer = ({ record, onClose, onOpenReleaseConfirm }: Prop
                 <div className="admin-bold">Store: {toStoreRef(record)}</div>
                 <div className="admin-muted">{record.storeName}</div>
               </div>
-              <span className={`admin-pill ${record.availableBalance > 0 ? 'success' : 'neutral'}`}>
-                {record.availableBalance > 0 ? 'Khả dụng' : 'Trống'}
+              <span
+                className={`admin-pill ${
+                  record.reservedBalance > 0 ? 'pending' : record.availableBalance > 0 ? 'success' : 'neutral'
+                }`}
+              >
+                {record.reservedBalance > 0
+                  ? 'Chờ duyệt rút'
+                  : record.availableBalance > 0
+                    ? 'Có thể rút'
+                    : 'Trống'}
               </span>
             </div>
           </section>
@@ -52,6 +60,10 @@ const AdminWalletDetailDrawer = ({ record, onClose, onOpenReleaseConfirm }: Prop
                 <strong style={{ color: '#d97706' }}>{formatCurrency(record.frozenBalance)}</strong>
               </div>
               <div className="financial-signal-card">
+                <span className="admin-muted small">Chờ duyệt rút</span>
+                <strong style={{ color: '#0f766e' }}>{formatCurrency(record.reservedBalance)}</strong>
+              </div>
+              <div className="financial-signal-card">
                 <span className="admin-muted small">Tổng</span>
                 <strong>{formatCurrency(record.totalBalance)}</strong>
               </div>
@@ -65,7 +77,7 @@ const AdminWalletDetailDrawer = ({ record, onClose, onOpenReleaseConfirm }: Prop
 
         <div className="drawer-footer">
           <button className="admin-ghost-btn" onClick={onClose}>Đóng</button>
-          {record.availableBalance > 0 && (
+          {record.reservedBalance > 0 && (
             <button className="admin-primary-btn" onClick={() => onOpenReleaseConfirm([record.storeId])}>
               <ArrowUpRight size={14} />
               Duyệt phiếu rút

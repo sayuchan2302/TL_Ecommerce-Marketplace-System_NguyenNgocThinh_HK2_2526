@@ -2,6 +2,44 @@ import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Search, X } from 'lucide-react';
 
+type PaginationEntry = number | 'ellipsis';
+
+const getVisiblePageEntries = (page: number, totalPages: number): PaginationEntry[] => {
+  const safeTotalPages = Math.max(1, totalPages);
+  const safePage = Math.min(Math.max(1, page), safeTotalPages);
+
+  if (safeTotalPages <= 7) {
+    return Array.from({ length: safeTotalPages }, (_, index) => index + 1);
+  }
+
+  const pages: PaginationEntry[] = [1];
+  let start = Math.max(2, safePage - 1);
+  let end = Math.min(safeTotalPages - 1, safePage + 1);
+
+  if (safePage <= 3) {
+    start = 2;
+    end = 4;
+  } else if (safePage >= safeTotalPages - 2) {
+    start = safeTotalPages - 3;
+    end = safeTotalPages - 1;
+  }
+
+  if (start > 2) {
+    pages.push('ellipsis');
+  }
+
+  for (let pageNum = start; pageNum <= end; pageNum++) {
+    pages.push(pageNum);
+  }
+
+  if (end < safeTotalPages - 1) {
+    pages.push('ellipsis');
+  }
+
+  pages.push(safeTotalPages);
+  return pages;
+};
+
 export interface PanelStatItem {
   key: string;
   label: string;
@@ -129,70 +167,45 @@ export const PanelTableFooter = ({
 }: PanelTableFooterProps) => {
   const safeTotalPages = Math.max(1, totalPages);
   const safePage = Math.min(Math.max(1, page), safeTotalPages);
-
-  const getVisiblePages = (): Array<number | 'ellipsis'> => {
-    if (safeTotalPages <= 7) {
-      return Array.from({ length: safeTotalPages }, (_, index) => index + 1);
-    }
-
-    const pages: Array<number | 'ellipsis'> = [1];
-    let start = Math.max(2, safePage - 1);
-    let end = Math.min(safeTotalPages - 1, safePage + 1);
-
-    if (safePage <= 3) {
-      start = 2;
-      end = 4;
-    } else if (safePage >= safeTotalPages - 2) {
-      start = safeTotalPages - 3;
-      end = safeTotalPages - 1;
-    }
-
-    if (start > 2) {
-      pages.push('ellipsis');
-    }
-
-    for (let pageNum = start; pageNum <= end; pageNum++) {
-      pages.push(pageNum);
-    }
-
-    if (end < safeTotalPages - 1) {
-      pages.push('ellipsis');
-    }
-
-    pages.push(safeTotalPages);
-    return pages;
-  };
-
-  const visiblePages = getVisiblePages();
+  const visiblePages = getVisiblePageEntries(safePage, safeTotalPages);
 
   return (
     <div className="table-footer">
       <span className="table-footer-meta">{meta}</span>
-      <div className="pagination">
-        <button className="page-btn" onClick={() => onPageChange(Math.max(safePage - 1, 1))} disabled={safePage === 1}>
+      <nav className="pagination" aria-label="Phân trang">
+        <button
+          type="button"
+          className="page-btn"
+          onClick={() => onPageChange(Math.max(safePage - 1, 1))}
+          disabled={safePage === 1}
+        >
           {prevLabel}
         </button>
         {visiblePages.map((entry, index) =>
           entry === 'ellipsis' ? (
-            <span key={`ellipsis-${index}`} className="page-ellipsis">...</span>
+            <span key={`ellipsis-${index}`} className="page-ellipsis" aria-hidden="true">...</span>
           ) : (
             <button
+              type="button"
               key={entry}
               className={`page-btn ${safePage === entry ? `active ${activePageClassName}`.trim() : ''}`}
               onClick={() => onPageChange(entry)}
+              aria-current={safePage === entry ? 'page' : undefined}
+              aria-label={`Trang ${entry}`}
             >
               {entry}
             </button>
           )
         )}
         <button
+          type="button"
           className="page-btn"
           onClick={() => onPageChange(Math.min(safePage + 1, safeTotalPages))}
           disabled={safePage === safeTotalPages}
         >
           {nextLabel}
         </button>
-      </div>
+      </nav>
     </div>
   );
 };
@@ -235,11 +248,16 @@ export const PanelSearchField = ({ placeholder, value, onChange }: PanelSearchFi
 interface PanelDrawerSectionProps {
   title: ReactNode;
   children: ReactNode;
+  description?: ReactNode;
+  className?: string;
 }
 
-export const PanelDrawerSection = ({ title, children }: PanelDrawerSectionProps) => (
-  <section className="drawer-section">
-    <h4>{title}</h4>
+export const PanelDrawerSection = ({ title, children, description, className = '' }: PanelDrawerSectionProps) => (
+  <section className={['drawer-section', className].filter(Boolean).join(' ')}>
+    <div className="drawer-section-head">
+      <h4>{title}</h4>
+      {description ? <p className="drawer-section-description">{description}</p> : null}
+    </div>
     {children}
   </section>
 );
@@ -247,32 +265,43 @@ export const PanelDrawerSection = ({ title, children }: PanelDrawerSectionProps)
 interface PanelDrawerHeaderProps {
   eyebrow?: ReactNode;
   title: ReactNode;
+  subtitle?: ReactNode;
   onClose: () => void;
   closeLabel?: string;
+  titleId?: string;
+  actions?: ReactNode;
 }
 
 export const PanelDrawerHeader = ({
   eyebrow,
   title,
+  subtitle,
   onClose,
   closeLabel = 'Đóng',
+  titleId,
+  actions,
 }: PanelDrawerHeaderProps) => (
   <div className="drawer-header">
-    <div>
+    <div className="drawer-header-copy">
       {eyebrow ? <p className="drawer-eyebrow">{eyebrow}</p> : null}
-      <h3>{title}</h3>
+      <h3 id={titleId}>{title}</h3>
+      {subtitle ? <p className="drawer-subtitle">{subtitle}</p> : null}
     </div>
-    <button className="admin-icon-btn" onClick={onClose} aria-label={closeLabel}>
-      <X size={16} />
-    </button>
+    <div className="drawer-header-actions">
+      {actions}
+      <button className="admin-icon-btn" onClick={onClose} aria-label={closeLabel}>
+        <X size={16} />
+      </button>
+    </div>
   </div>
 );
 
 interface PanelDrawerFooterProps {
   children: ReactNode;
+  align?: 'end' | 'between';
 }
 
-export const PanelDrawerFooter = ({ children }: PanelDrawerFooterProps) => (
-  <div className="drawer-footer">{children}</div>
+export const PanelDrawerFooter = ({ children, align = 'end' }: PanelDrawerFooterProps) => (
+  <div className={`drawer-footer ${align === 'between' ? 'between' : ''}`.trim()}>{children}</div>
 );
 

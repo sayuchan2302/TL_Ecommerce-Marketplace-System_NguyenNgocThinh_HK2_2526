@@ -328,7 +328,17 @@ const VendorReturnDashboard = () => {
                   <div role="columnheader">Hành động</div>
                 </div>
 
-                {rows.map((item, index) => (
+                {rows.map((item, index) => {
+                  const firstReturnItem = item.items[0];
+                  const productName = firstReturnItem?.productName || 'Sản phẩm hoàn trả';
+                  const productImage = firstReturnItem?.imageUrl || '/images/placeholder-product.svg';
+                  const variantName = firstReturnItem?.variantName?.trim() || 'Chưa có biến thể';
+                  const totalQuantity = item.items.reduce((sum, returnItem) => sum + returnItem.quantity, 0);
+                  const reasonText = reasonLabel[item.reason] || item.reason;
+                  const productMeta = `${variantName} · ${totalQuantity} x ${reasonText}`;
+                  const extraItemCount = Math.max(0, item.items.length - 1);
+
+                  return (
                     <motion.div key={item.id} className="admin-table-row vendor-returns" role="row" whileHover={{ y: -1 }}>
                       <div role="cell" className="vendor-return-checkbox-cell">
                         <input
@@ -349,12 +359,24 @@ const VendorReturnDashboard = () => {
                         <small className="admin-muted returns-ellipsis">{item.customerEmail || 'Chưa có email'}</small>
                       </div>
                       <div role="cell" className="returns-product-cell">
-                        <span className="returns-ellipsis">
-                          {item.items.map((i) => i.productName).join(', ')}
-                        </span>
-                        <small className="admin-muted returns-ellipsis">
-                          {item.items.reduce((sum, i) => sum + i.quantity, 0)} x {reasonLabel[item.reason] || item.reason}
-                        </small>
+                        <img
+                          src={productImage}
+                          alt={productName}
+                          className="returns-product-thumb"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        <div className="returns-product-copy">
+                          <strong className="returns-product-name returns-ellipsis" title={productName}>
+                            {productName}
+                          </strong>
+                          <small className="admin-muted returns-product-meta returns-ellipsis" title={productMeta}>
+                            {productMeta}
+                          </small>
+                          {extraItemCount > 0 ? (
+                            <small className="returns-product-extra">+{extraItemCount} sản phẩm khác</small>
+                          ) : null}
+                        </div>
                       </div>
                       <div role="cell">
                         <span className={statusConfig[item.status].className}>{statusConfig[item.status].label}</span>
@@ -408,7 +430,8 @@ const VendorReturnDashboard = () => {
                         </button>
                       </div>
                     </motion.div>
-                  ))}
+                  );
+                })}
               </div>
 
               <PanelTableFooter

@@ -104,6 +104,7 @@ const VendorWorkspace = () => {
         actions={shellState.actions}
         hideTopbarTitle={shellState.hideTopbarTitle}
         breadcrumbs={shellState.breadcrumbs}
+        shellRoot
       >
         <div className="admin-route-transition">
           <RouteLoader fallback={<PageFallback />}>

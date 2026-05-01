@@ -1,6 +1,7 @@
 import { Store } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import AdminLayout, { type PanelNavItem } from '../Admin/AdminLayout';
+import './Vendor.css';
 import { VENDOR_DICTIONARY } from './vendorDictionary';
 import { vendorPanelNav } from '../../config/panelNavigation';
 import { storeService } from '../../services/storeService';
@@ -11,6 +12,7 @@ interface VendorLayoutProps {
   children: ReactNode;
   hideTopbarTitle?: boolean;
   breadcrumbs?: string[];
+  shellRoot?: boolean;
 }
 
 const t = VENDOR_DICTIONARY.layout;
@@ -19,7 +21,7 @@ let vendorStoreNameMemoryCache = '';
 
 const vendorNavItems: PanelNavItem[] = vendorPanelNav;
 
-const VendorLayout = ({ title, actions, children, hideTopbarTitle = false, breadcrumbs }: VendorLayoutProps) => {
+const VendorLayout = ({ title, actions, children, hideTopbarTitle = false, breadcrumbs, shellRoot = false }: VendorLayoutProps) => {
   const getInitialStoreName = () => {
     if (vendorStoreNameMemoryCache) return vendorStoreNameMemoryCache;
     if (typeof window === 'undefined') return '';
@@ -69,6 +71,7 @@ const VendorLayout = ({ title, actions, children, hideTopbarTitle = false, bread
     <AdminLayout
       title={title}
       actions={actions}
+      variant="vendor"
       hideTopbarTitle={hideTopbarTitle}
       hideSidebarCard
       breadcrumbs={normalizedBreadcrumbs}
@@ -81,6 +84,7 @@ const VendorLayout = ({ title, actions, children, hideTopbarTitle = false, bread
       searchPlaceholder={t.searchPlaceholder}
       notificationsLabel={t.notifications}
       settingsLabel={t.settings}
+      shellRoot={shellRoot}
     >
       {children}
     </AdminLayout>

@@ -185,6 +185,11 @@ const AdminContent = () => {
         {(editingItem || isCreating) && (
           <motion.div
             className="drawer"
+            data-size="md"
+            role="dialog"
+            aria-modal="true"
+            aria-label={editingItem ? t.form.edit : t.form.addNew}
+            tabIndex={-1}
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -195,7 +200,9 @@ const AdminContent = () => {
                 <p className="drawer-eyebrow">{activeTab === 'faq' ? t.tabs.faq : t.tabs.policy}</p>
                 <h3>{editingItem ? t.form.edit : t.form.addNew}</h3>
               </div>
-              <button className="admin-icon-btn" onClick={closeForm}><X size={18} /></button>
+              <button className="admin-icon-btn" onClick={closeForm} aria-label={ADMIN_DICTIONARY.actionTitles.close}>
+                <X size={18} />
+              </button>
             </div>
             <div className="drawer-body">
               <section className="drawer-section">

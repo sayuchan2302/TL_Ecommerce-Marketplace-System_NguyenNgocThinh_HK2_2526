@@ -129,9 +129,9 @@ const AdminFinancials = () => {
   };
 
   const openReleaseConfirm = (storeIds: string[]) => {
-    const items = records.filter((record) => storeIds.includes(record.storeId) && record.availableBalance > 0);
+    const items = records.filter((record) => storeIds.includes(record.storeId) && record.reservedBalance > 0);
     if (items.length === 0) {
-      addToast('Không có shop nào có số dư khả dụng để tạo phiếu rút tiền.', 'info');
+      addToast('Không có shop nào có phiếu rút tiền đang chờ duyệt.', 'info');
       return;
     }
 

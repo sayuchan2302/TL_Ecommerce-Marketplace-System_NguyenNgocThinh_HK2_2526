@@ -65,8 +65,8 @@
 }
 
 .user-drawer {
-  width: 42vw;
-  max-width: 640px;
+  width: min(680px, 100vw);
+  max-width: 680px;
 }
 
 .user-drawer-hero {

@@ -15,7 +15,7 @@ import {
   TicketPercent,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { startTransition, useEffect, useRef, useState } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import VendorLayout from './VendorLayout';
 import { getVendorOrderStatusLabel, getVendorOrderStatusTone } from './vendorOrderPresentation';
 import { formatCurrency } from '../../services/commissionService';
@@ -63,9 +63,8 @@ const VendorDashboard = () => {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [runningVoucherCount, setRunningVoucherCount] = useState(0);
   const [wallet, setWallet] = useState<VendorWallet | null>(null);
-  const [dashboardReady, setDashboardReady] = useState(false);
   const [analytics, setAnalytics] = useState<VendorAnalyticsData>(emptyVendorAnalytics);
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [analyticsError, setAnalyticsError] = useState('');
   const [analyticsPeriod, setAnalyticsPeriod] = useState<VendorAnalyticsPeriod>('week');
   const [analyticsReloadKey, setAnalyticsReloadKey] = useState(0);
@@ -75,11 +74,10 @@ const VendorDashboard = () => {
 
     const load = async () => {
       setLoading(true);
-      setDashboardReady(false);
       try {
         setLoadError('');
-        const next = await vendorPortalService.getDashboardData();
-        const [voucherResult, walletData] = await Promise.all([
+        const [next, voucherResult, walletData] = await Promise.all([
+          vendorPortalService.getDashboardData(),
           vendorVoucherService.list({ status: 'running', page: 1, size: 1 }),
           walletService.getMyWallet(),
         ]);
@@ -88,7 +86,6 @@ const VendorDashboard = () => {
           setData(next);
           setRunningVoucherCount(voucherResult.counts.running);
           setWallet(walletData);
-          setDashboardReady(true);
         });
       } catch (err: unknown) {
         if (!active) return;
@@ -97,7 +94,6 @@ const VendorDashboard = () => {
         setData(initialData);
         setRunningVoucherCount(0);
         setWallet(null);
-        setDashboardReady(false);
         addToast(message, 'error');
       } finally {
         if (active) {
@@ -113,13 +109,6 @@ const VendorDashboard = () => {
   }, [addToast, reloadKey]);
 
   useEffect(() => {
-    if (!dashboardReady) {
-      setAnalyticsLoading(false);
-      setAnalyticsError('');
-      setAnalytics(emptyVendorAnalytics);
-      return;
-    }
-
     let active = true;
 
     const loadAnalytics = async () => {
@@ -130,16 +119,16 @@ const VendorDashboard = () => {
         if (!active) return;
         startTransition(() => {
           setAnalytics(next);
+          setAnalyticsLoading(false);
         });
       } catch (err: unknown) {
         if (!active) return;
         const message = getUiErrorMessage(err, 'Không tải được biểu đồ doanh thu');
-        setAnalyticsError(message);
-        setAnalytics(emptyVendorAnalytics);
-      } finally {
-        if (active) {
+        startTransition(() => {
+          setAnalyticsError(message);
+          setAnalytics(emptyVendorAnalytics);
           setAnalyticsLoading(false);
-        }
+        });
       }
     };
 
@@ -148,7 +137,11 @@ const VendorDashboard = () => {
     return () => {
       active = false;
     };
-  }, [dashboardReady, analyticsReloadKey]);
+  }, [analyticsReloadKey]);
+
+  const handleAnalyticsRetry = useCallback(() => {
+    setAnalyticsReloadKey((key) => key + 1);
+  }, []);
 
   useEffect(() => {
     if (location.hash !== '#analytics') return;
@@ -162,7 +155,7 @@ const VendorDashboard = () => {
     return () => {
       window.cancelAnimationFrame(rafId);
     };
-  }, [location.hash, dashboardReady, analyticsLoading]);
+  }, [location.hash, analyticsLoading]);
 
   const stats = data.stats;
   const topSaleBase = Math.max(...data.topProducts.map((product) => product.sales), 1);
@@ -286,10 +279,9 @@ const VendorDashboard = () => {
             <Link
               to={item.to}
               className="vendor-stat-link"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
             >
               <span className="vendor-stat-value">{item.value}</span>
-              <ChevronRight size={14} style={{ color: '#94a3b8' }} />
+              <ChevronRight size={14} />
             </Link>
           </motion.div>
         ))}
@@ -307,10 +299,10 @@ const VendorDashboard = () => {
           <VendorAnalyticsSection
             activePeriod={analyticsPeriod}
             analytics={analytics}
-            loading={loading || analyticsLoading || !dashboardReady}
+            loading={analyticsLoading}
             error={analyticsError}
             onPeriodChange={setAnalyticsPeriod}
-            onRetry={() => setAnalyticsReloadKey((key) => key + 1)}
+            onRetry={handleAnalyticsRetry}
           />
         </motion.section>
       ) : null}
@@ -325,11 +317,11 @@ const VendorDashboard = () => {
         <h3>Số dư ví: hoa hồng {stats.commissionRate}%</h3>
         <div className="commission-row">
           <span className="label">Khả dụng (rút được)</span>
-          <span className="value" style={{ color: '#0d9488' }}>{formatCurrency(wallet?.availableBalance ?? 0)}</span>
+          <span className="value positive">{formatCurrency(wallet?.availableBalance ?? 0)}</span>
         </div>
         <div className="commission-row">
           <span className="label">Đóng băng (chờ 7 ngày)</span>
-          <span className="value" style={{ color: '#d97706' }}>{formatCurrency(wallet?.frozenBalance ?? 0)}</span>
+          <span className="value warning">{formatCurrency(wallet?.frozenBalance ?? 0)}</span>
         </div>
         <div className="commission-divider" />
         <div className="commission-row total">
@@ -402,11 +394,11 @@ const VendorDashboard = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.18, delay: 0.22 + idx * 0.03 }}
                 >
-                  <div role="cell" style={{ fontWeight: 700 }}>{toDisplayOrderCode(order.code)}</div>
+                  <div role="cell" className="admin-bold">{toDisplayOrderCode(order.code)}</div>
                   <div role="cell">{order.customer}</div>
-                  <div role="cell" style={{ fontWeight: 700 }}>{formatCurrency(order.total)}</div>
-                  <div role="cell" style={{ color: '#d97706', fontSize: 13 }}>-{formatCurrency(order.commissionFee)}</div>
-                  <div role="cell" style={{ color: '#0d9488', fontWeight: 700 }}>{formatCurrency(order.vendorPayout)}</div>
+                  <div role="cell" className="admin-bold">{formatCurrency(order.total)}</div>
+                  <div role="cell" className="vendor-dashboard-money warning">-{formatCurrency(order.commissionFee)}</div>
+                  <div role="cell" className="vendor-dashboard-money positive">{formatCurrency(order.vendorPayout)}</div>
                   <div role="cell">
                     <span className={`vendor-pill ${getVendorOrderStatusTone(order.status)}`}>
                       {getVendorOrderStatusLabel(order.status)}
@@ -415,8 +407,7 @@ const VendorDashboard = () => {
                   <div role="cell" className="vendor-actions">
                     {order.status === 'pending' && (
                       <button
-                        className="vendor-primary-btn"
-                        style={{ padding: '6px 12px', fontSize: 12 }}
+                        className="vendor-primary-btn compact"
                         onClick={() => void handleConfirmOrder(order)}
                         disabled={updatingId === order.id}
                       >

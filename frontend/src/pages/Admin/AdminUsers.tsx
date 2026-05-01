@@ -21,7 +21,7 @@ import {
 import AdminLayout from './AdminLayout';
 import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminStateBlock } from './AdminStateBlocks';
-import { PanelStatsGrid, PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelStatsGrid, PanelTableFooter, PanelTabs } from '../../components/Panel/PanelPrimitives';
 import { useToast } from '../../contexts/ToastContext';
 import { adminUserService, type AdminUserRecord, type AdminUserRole, type AdminUserStatus } from '../../services/adminUserService';
 import { getUiErrorMessage } from '../../utils/errorMessage';
@@ -499,37 +499,14 @@ const AdminUsers = () => {
                 })}
               </div>
 
-              <div className="table-footer">
-                <span className="table-footer-meta">
-                  Hiển thị {(safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, filteredUsers.length)} trên{' '}
-                  {filteredUsers.length} tài khoản
-                </span>
-                <div className="pagination">
-                  <button
-                    className="page-btn"
-                    disabled={safePage === 1}
-                    onClick={() => setPage((current) => Math.max(current - 1, 1))}
-                  >
-                    Trước
-                  </button>
-                  {Array.from({ length: totalPages }).map((_, index) => (
-                    <button
-                      key={index + 1}
-                      className={`page-btn ${safePage === index + 1 ? 'active' : ''}`}
-                      onClick={() => setPage(index + 1)}
-                    >
-                      {index + 1}
-                    </button>
-                  ))}
-                  <button
-                    className="page-btn"
-                    disabled={safePage === totalPages}
-                    onClick={() => setPage((current) => Math.min(current + 1, totalPages))}
-                  >
-                    Sau
-                  </button>
-                </div>
-              </div>
+              <PanelTableFooter
+                meta={`Hiển thị ${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, filteredUsers.length)} trên ${filteredUsers.length} tài khoản`}
+                page={safePage}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                prevLabel="Trước"
+                nextLabel="Sau"
+              />
             </>
           )}
         </div>
@@ -554,7 +531,13 @@ const AdminUsers = () => {
         }}
       />
 
-      <Drawer open={Boolean(detailUser)} onClose={() => setDetailUser(null)} className="user-drawer">
+      <Drawer
+        open={Boolean(detailUser)}
+        onClose={() => setDetailUser(null)}
+        className="user-drawer"
+        size="lg"
+        ariaLabel="Hồ sơ người dùng"
+      >
         {detailUser ? (
           <>
             <div className="drawer-header">

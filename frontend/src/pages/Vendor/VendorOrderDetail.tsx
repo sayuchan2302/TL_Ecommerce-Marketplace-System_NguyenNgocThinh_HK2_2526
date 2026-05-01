@@ -259,52 +259,46 @@ const VendorOrderDetail = () => {
                 <div className="od-summary-row"><span>Tạm tính</span><strong>{formatCurrency(order.subtotal)}</strong></div>
                 <div className="od-summary-row"><span>Phí vận chuyển</span><strong>{order.shippingFee === 0 ? 'Miễn phí' : formatCurrency(order.shippingFee)}</strong></div>
                 {order.discount > 0 && (
-                  <div className="od-summary-row" style={{ alignItems: 'center' }}>
-                    <span style={{ display: 'flex', alignItems: 'center' }}>
+                  <div className="od-summary-row od-summary-discount">
+                    <span className="od-summary-discount-label">
                       Voucher giảm giá
-                      <span style={{ fontSize: 11, color: '#059669', background: '#d1fae5', padding: '2px 6px', borderRadius: 4, marginLeft: 8, fontWeight: 500 }}>Sàn tài trợ</span>
+                      <span className="vendor-sponsor-badge">Sàn tài trợ</span>
                     </span>
-                    <strong style={{ color: '#059669' }}>-{formatCurrency(order.discount)}</strong>
+                    <strong className="vendor-money-positive">-{formatCurrency(order.discount)}</strong>
                   </div>
                 )}
                 <div className="od-summary-row od-total"><span>Khách thanh toán</span><strong>{formatCurrency(order.total)}</strong></div>
               </div>
 
-              <div className="od-commission-card" style={{
-                marginTop: 12,
-                padding: 14,
-                background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
-                border: '1px solid #bbf7d0',
-                borderRadius: 12,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <Store size={16} style={{ color: '#16a34a' }} />
-                  <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#16a34a' }}>
+              <div className="od-commission-card vendor-reconciliation-card">
+                <div className="vendor-reconciliation-head">
+                  <Store size={16} />
+                  <h3>
                     Đối soát shop
                   </h3>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span style={{ color: '#475569' }}>Khách thanh toán</span>
-                    <strong style={{ color: '#334155' }}>{formatCurrency(order.total)}</strong>
+                <div className="vendor-reconciliation-lines">
+                  <div className="vendor-reconciliation-row">
+                    <span>Khách thanh toán</span>
+                    <strong>{formatCurrency(order.total)}</strong>
                   </div>
                   {order.discount > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                      <span style={{ color: '#475569' }}>Sàn hoàn lại Voucher</span>
-                      <strong style={{ color: '#16a34a' }}>+{formatCurrency(order.discount)}</strong>
+                    <div className="vendor-reconciliation-row">
+                      <span>Sàn hoàn lại Voucher</span>
+                      <strong className="vendor-money-positive">+{formatCurrency(order.discount)}</strong>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                    <span style={{ color: '#475569', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div className="vendor-reconciliation-row">
+                    <span className="vendor-reconciliation-label-icon">
                       <Percent size={12} />
                       Phí sàn {order.commissionRateApplied != null ? `(${order.commissionRateApplied}%)` : ''}
                     </span>
-                    <strong style={{ color: '#d97706' }}>-{formatCurrency(order.commissionFee)}</strong>
+                    <strong className="vendor-money-warning">-{formatCurrency(order.commissionFee)}</strong>
                   </div>
-                  <div style={{ height: 1, background: '#bbf7d0', margin: '4px 0' }} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
-                    <span style={{ color: '#475569', fontWeight: 600 }}>Thực nhận</span>
-                    <strong style={{ color: '#16a34a', fontSize: 16 }}>{formatCurrency(order.vendorPayout)}</strong>
+                  <div className="vendor-reconciliation-divider" />
+                  <div className="vendor-reconciliation-row total">
+                    <span>Thực nhận</span>
+                    <strong>{formatCurrency(order.vendorPayout)}</strong>
                   </div>
                 </div>
               </div>
@@ -396,7 +390,7 @@ const VendorOrderDetail = () => {
               </div>
               <div className="od-timeline">
                 {order.timeline.length === 0 ? (
-                  <p className="admin-muted" style={{ padding: '8px 0' }}>Chưa có cập nhật vận hành.</p>
+                  <p className="admin-muted vendor-timeline-empty">Chưa có cập nhật vận hành.</p>
                 ) : (
                   order.timeline.map((log, idx) => (
                     <div key={idx} className="od-timeline-item">

@@ -504,7 +504,14 @@ const AdminProducts = () => {
       {showDrawer && (
         <Portal>
           <div className="drawer-overlay" onClick={closeDrawer} />
-          <div className="drawer">
+          <div
+            className="drawer"
+            data-size="lg"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t.drawer.title}
+            tabIndex={-1}
+          >
             <div className="drawer-header">
               <div>
                 <p className="drawer-eyebrow">{t.drawer.title}</p>
