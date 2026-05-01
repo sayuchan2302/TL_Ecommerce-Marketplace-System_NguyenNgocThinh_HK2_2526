@@ -1,12 +1,31 @@
 import './Admin.css';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Save, RefreshCcw, UploadCloud, MessageSquare, FileText, Plus, Trash2, Pencil } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import {
+  AlertTriangle,
+  Bot,
+  CheckCircle2,
+  ClipboardCheck,
+  FileText,
+  GitBranch,
+  MessageSquare,
+  Pencil,
+  PlayCircle,
+  Plus,
+  RefreshCcw,
+  Save,
+  Search,
+  Send,
+  Trash2,
+  UploadCloud,
+  type LucideIcon,
+} from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { useAdminToast } from './useAdminToast';
 import {
   adminBotScenarioService,
   type BotScenarioActionKey,
   type BotScenarioPayload,
+  type BotScenarioQuickAction,
   type BotScenarioSnapshot,
 } from '../../services/adminBotScenarioService';
 import { contentService, type ContentPage } from '../../services/contentService';
@@ -18,19 +37,100 @@ type FaqFormState = {
   keywordsText: string;
 };
 
+type BotAdminTab = 'flows' | 'test' | 'faq';
+type PromptFieldKey = Exclude<keyof BotScenarioPayload, 'quickActions'>;
+type DraftSimulatorStep = 'menu' | 'awaitOrderCode' | 'awaitOrderPhone' | 'awaitHeight' | 'awaitWeight' | 'faqQuestion';
+
+type DraftSimulatorMessage = {
+  id: string;
+  role: 'bot' | 'user';
+  text: string;
+  actions?: BotScenarioQuickAction[];
+};
+
+type PromptField = {
+  key: PromptFieldKey;
+  label: string;
+  helper: string;
+  rows?: number;
+};
+
+type ConversationFlow = {
+  id: string;
+  title: string;
+  description: string;
+  actionKey: BotScenarioActionKey;
+  icon: LucideIcon;
+  fields: PromptField[];
+};
+
 const QUICK_ACTION_ORDER: BotScenarioActionKey[] = ['ORDER_LOOKUP', 'SIZE_ADVICE', 'PRODUCT_FAQ'];
 
 const QUICK_ACTION_LABEL: Record<BotScenarioActionKey, string> = {
-  ORDER_LOOKUP: 'Tra cứu đơn',
+  ORDER_LOOKUP: 'Tra cứu đơn hàng',
   SIZE_ADVICE: 'Tư vấn size',
   PRODUCT_FAQ: 'Hỏi đáp sản phẩm',
 };
+
+const BOT_ADMIN_TABS: Array<{ id: BotAdminTab; label: string; icon: LucideIcon }> = [
+  { id: 'flows', label: 'Luồng hội thoại', icon: GitBranch },
+  { id: 'test', label: 'Test Draft', icon: PlayCircle },
+  { id: 'faq', label: 'FAQ / Knowledge', icon: FileText },
+];
+
+const FLOW_GROUPS: ConversationFlow[] = [
+  {
+    id: 'order',
+    title: 'Tra cứu đơn hàng',
+    description: 'Luồng hỏi mã đơn, xác thực 4 số cuối số điện thoại và trả trạng thái đơn.',
+    actionKey: 'ORDER_LOOKUP',
+    icon: ClipboardCheck,
+    fields: [
+      { key: 'askOrderCodePrompt', label: 'Hỏi mã đơn', helper: 'Bot gửi sau khi khách chọn tra cứu đơn hàng.' },
+      { key: 'askOrderPhonePrompt', label: 'Hỏi 4 số cuối SĐT', helper: 'Dùng để xác thực đơn trước khi trả kết quả.' },
+      { key: 'orderPhoneInvalidPrompt', label: 'Thông báo sai SĐT', helper: 'Hiển thị khi khách nhập không đủ 4 chữ số.' },
+      { key: 'orderLookupContinuePrompt', label: 'Hỏi tiếp sau tra cứu', helper: 'Bot đưa khách quay lại menu chính.' },
+    ],
+  },
+  {
+    id: 'size',
+    title: 'Tư vấn size',
+    description: 'Luồng hỏi chiều cao, cân nặng và gợi ý size theo logic hiện tại của backend.',
+    actionKey: 'SIZE_ADVICE',
+    icon: Bot,
+    fields: [
+      { key: 'askHeightPrompt', label: 'Hỏi chiều cao', helper: 'Chiều cao hợp lệ trong runtime: 120-230cm.' },
+      { key: 'invalidHeightPrompt', label: 'Chiều cao không hợp lệ', helper: 'Hiển thị khi khách nhập ngoài khoảng hoặc không phải số.' },
+      { key: 'askWeightPrompt', label: 'Hỏi cân nặng', helper: 'Cân nặng hợp lệ trong runtime: 30-200kg.' },
+      { key: 'invalidWeightPrompt', label: 'Cân nặng không hợp lệ', helper: 'Hiển thị khi khách nhập ngoài khoảng hoặc không phải số.' },
+      { key: 'sizeAdviceContinuePrompt', label: 'Hỏi tiếp sau tư vấn', helper: 'Bot đưa khách quay lại menu chính.' },
+    ],
+  },
+  {
+    id: 'productFaq',
+    title: 'Hỏi đáp sản phẩm',
+    description: 'Luồng trả lời theo FAQ/keyword và sau đó mời khách chọn tiếp menu.',
+    actionKey: 'PRODUCT_FAQ',
+    icon: MessageSquare,
+    fields: [
+      { key: 'productFaqContinuePrompt', label: 'Hỏi tiếp sau FAQ', helper: 'Bot gửi sau khi trả lời FAQ hoặc fallback.' },
+    ],
+  },
+];
+
+const REQUIRED_PROMPT_FIELDS: Array<{ key: PromptFieldKey; label: string }> = [
+  { key: 'welcomePrompt', label: 'Lời chào' },
+  { key: 'unknownPrompt', label: 'Tin nhắn không hiểu' },
+  ...FLOW_GROUPS.flatMap((flow) => flow.fields.map((field) => ({ key: field.key, label: `${flow.title}: ${field.label}` }))),
+];
 
 const emptyFaqForm: FaqFormState = {
   title: '',
   body: '',
   keywordsText: '',
 };
+
+const createMessageId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
 const parseKeywords = (input: string) =>
   input
@@ -40,12 +140,104 @@ const parseKeywords = (input: string) =>
 
 const formatKeywords = (keywords?: string[]) => (keywords || []).join(', ');
 
+const normalizeSearch = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+const digitsOnly = (value: string) => value.replace(/\D+/g, '');
+
+const parsePositiveInt = (value: string) => {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
 const sortQuickActions = (payload: BotScenarioPayload): BotScenarioPayload => {
   const byKey = new Map(payload.quickActions.map((item) => [item.key, item]));
   return {
     ...payload,
-    quickActions: QUICK_ACTION_ORDER.map((key) => byKey.get(key)).filter(Boolean) as BotScenarioPayload['quickActions'],
+    quickActions: QUICK_ACTION_ORDER.map((key) => byKey.get(key) ?? { key, label: QUICK_ACTION_LABEL[key] }),
   };
+};
+
+const getActionLabel = (payload: BotScenarioPayload, key: BotScenarioActionKey) =>
+  payload.quickActions.find((item) => item.key === key)?.label || QUICK_ACTION_LABEL[key];
+
+const createBotMessage = (text: string, actions?: BotScenarioQuickAction[]): DraftSimulatorMessage => ({
+  id: createMessageId(),
+  role: 'bot',
+  text,
+  actions,
+});
+
+const createUserMessage = (text: string): DraftSimulatorMessage => ({
+  id: createMessageId(),
+  role: 'user',
+  text,
+});
+
+const createMenuMessage = (prompt: string, payload: BotScenarioPayload) =>
+  createBotMessage(prompt, payload.quickActions.filter((action) => action.label.trim()));
+
+const recommendSize = (heightCm: number, weightKg: number) => {
+  if (heightCm < 160 || weightKg < 52) return 'S';
+  if (heightCm < 168 || weightKg < 60) return 'M';
+  if (heightCm < 176 || weightKg < 70) return 'L';
+  if (heightCm < 184 || weightKg < 80) return 'XL';
+  return 'XXL';
+};
+
+const findFaqMatch = (query: string, items: ContentPage[]) => {
+  const normalizedQuery = normalizeSearch(query);
+  if (!normalizedQuery) return undefined;
+
+  return items.find((item) => {
+    const keywords = item.keywords || [];
+    const keywordMatched = keywords.some((keyword) => {
+      const normalizedKeyword = normalizeSearch(keyword);
+      return normalizedKeyword && (normalizedQuery.includes(normalizedKeyword) || normalizedKeyword.includes(normalizedQuery));
+    });
+
+    if (keywordMatched) return true;
+
+    const normalizedTitle = normalizeSearch(item.title);
+    return normalizedTitle.includes(normalizedQuery) || normalizedQuery.includes(normalizedTitle);
+  });
+};
+
+const formatMeta = (meta?: BotScenarioSnapshot['draftMeta']) => {
+  if (!meta) return 'Chưa có dữ liệu';
+  const timestamp = meta.updatedAt ? new Date(meta.updatedAt).toLocaleString('vi-VN') : 'chưa rõ thời gian';
+  return `v${meta.version} · ${timestamp}${meta.updatedBy ? ` · ${meta.updatedBy}` : ''}`;
+};
+
+const getScenarioIssues = (payload: BotScenarioPayload | null) => {
+  if (!payload) {
+    return {
+      emptyFields: REQUIRED_PROMPT_FIELDS,
+      duplicateQuickActionLabels: [] as string[],
+      missingActions: QUICK_ACTION_ORDER,
+    };
+  }
+
+  const emptyFields = REQUIRED_PROMPT_FIELDS.filter((field) => !String(payload[field.key] || '').trim());
+  const missingActions = QUICK_ACTION_ORDER.filter((key) => !payload.quickActions.some((action) => action.key === key && action.label.trim()));
+  const seenLabels = new Map<string, string>();
+  const duplicateQuickActionLabels: string[] = [];
+
+  payload.quickActions.forEach((action) => {
+    const normalizedLabel = normalizeSearch(action.label);
+    if (!normalizedLabel) return;
+    if (seenLabels.has(normalizedLabel)) {
+      duplicateQuickActionLabels.push(action.label);
+      return;
+    }
+    seenLabels.set(normalizedLabel, action.label);
+  });
+
+  return { emptyFields, duplicateQuickActionLabels, missingActions };
 };
 
 const AdminBotAI = () => {
@@ -58,6 +250,14 @@ const AdminBotAI = () => {
   const [savingDraft, setSavingDraft] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [savingFaq, setSavingFaq] = useState(false);
+  const [activeTab, setActiveTab] = useState<BotAdminTab>('flows');
+  const [faqSearch, setFaqSearch] = useState('');
+  const [faqTestQuery, setFaqTestQuery] = useState('');
+  const [simulatorMessages, setSimulatorMessages] = useState<DraftSimulatorMessage[]>([]);
+  const [simulatorInput, setSimulatorInput] = useState('');
+  const [simulatorStep, setSimulatorStep] = useState<DraftSimulatorStep>('menu');
+  const [pendingOrderCode, setPendingOrderCode] = useState('');
+  const [pendingHeight, setPendingHeight] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -80,10 +280,35 @@ const AdminBotAI = () => {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (!draft) return;
+    setSimulatorMessages((current) => (current.length ? current : [createMenuMessage(draft.welcomePrompt, draft)]));
+  }, [draft]);
+
+  const scenarioIssues = useMemo(() => getScenarioIssues(draft), [draft]);
+  const publishReady =
+    scenarioIssues.emptyFields.length === 0 &&
+    scenarioIssues.duplicateQuickActionLabels.length === 0 &&
+    scenarioIssues.missingActions.length === 0;
+
   const hasDraftChanged = useMemo(() => {
     if (!snapshot || !draft) return false;
     return JSON.stringify(sortQuickActions(snapshot.draft)) !== JSON.stringify(sortQuickActions(draft));
   }, [snapshot, draft]);
+
+  const canPublish = Boolean(snapshot && draft && publishReady && !hasDraftChanged);
+
+  const filteredFaqItems = useMemo(() => {
+    const normalizedSearch = normalizeSearch(faqSearch);
+    if (!normalizedSearch) return faqItems;
+
+    return faqItems.filter((item) => {
+      const haystack = normalizeSearch([item.title, item.body, ...(item.keywords || [])].join(' '));
+      return haystack.includes(normalizedSearch);
+    });
+  }, [faqItems, faqSearch]);
+
+  const faqTestMatch = useMemo(() => findFaqMatch(faqTestQuery, faqItems), [faqItems, faqTestQuery]);
 
   const updateDraftField = <K extends keyof BotScenarioPayload>(field: K, value: BotScenarioPayload[K]) => {
     setDraft((current) => (current ? { ...current, [field]: value } : current));
@@ -97,6 +322,122 @@ const AdminBotAI = () => {
         quickActions: current.quickActions.map((item) => (item.key === key ? { ...item, label } : item)),
       };
     });
+  };
+
+  const resetSimulator = useCallback(() => {
+    if (!draft) return;
+    setSimulatorMessages([createMenuMessage(draft.welcomePrompt, draft)]);
+    setSimulatorInput('');
+    setSimulatorStep('menu');
+    setPendingOrderCode('');
+    setPendingHeight(null);
+  }, [draft]);
+
+  const startSimulatorAction = (
+    actionKey: BotScenarioActionKey,
+    label = draft ? getActionLabel(draft, actionKey) : '',
+    options: { includeUserMessage?: boolean; prefix?: DraftSimulatorMessage[] } = {},
+  ) => {
+    if (!draft) return;
+
+    const nextMessages: DraftSimulatorMessage[] = [...(options.prefix || [])];
+    if (options.includeUserMessage !== false) {
+      nextMessages.push(createUserMessage(label));
+    }
+    if (actionKey === 'ORDER_LOOKUP') {
+      nextMessages.push(createBotMessage(draft.askOrderCodePrompt));
+      setSimulatorStep('awaitOrderCode');
+    }
+    if (actionKey === 'SIZE_ADVICE') {
+      nextMessages.push(createBotMessage(draft.askHeightPrompt));
+      setSimulatorStep('awaitHeight');
+    }
+    if (actionKey === 'PRODUCT_FAQ') {
+      nextMessages.push(createBotMessage('Nhập câu hỏi hoặc keyword FAQ để kiểm tra câu trả lời nháp.'));
+      setSimulatorStep('faqQuestion');
+    }
+    setSimulatorMessages((current) => [...current, ...nextMessages]);
+  };
+
+  const handleSimulatorSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!draft) return;
+
+    const value = simulatorInput.trim();
+    if (!value) return;
+
+    setSimulatorInput('');
+    const nextMessages: DraftSimulatorMessage[] = [createUserMessage(value)];
+
+    if (simulatorStep === 'menu') {
+      const matchedAction = draft.quickActions.find((action) => normalizeSearch(action.label) === normalizeSearch(value));
+      if (matchedAction) {
+        startSimulatorAction(matchedAction.key, matchedAction.label, { includeUserMessage: false, prefix: nextMessages });
+        return;
+      }
+      nextMessages.push(createMenuMessage(draft.unknownPrompt, draft));
+    }
+
+    if (simulatorStep === 'awaitOrderCode') {
+      setPendingOrderCode(value.toUpperCase());
+      setSimulatorStep('awaitOrderPhone');
+      nextMessages.push(createBotMessage(draft.askOrderPhonePrompt));
+    }
+
+    if (simulatorStep === 'awaitOrderPhone') {
+      const phone4 = digitsOnly(value);
+      if (phone4.length !== 4) {
+        nextMessages.push(createBotMessage(draft.orderPhoneInvalidPrompt));
+      } else {
+        nextMessages.push(
+          createBotMessage(`Đã nhận mã ${pendingOrderCode || 'đơn hàng'} và 4 số cuối SĐT. Runtime sẽ gọi backend để trả trạng thái đơn thật.`),
+          createMenuMessage(draft.orderLookupContinuePrompt, draft),
+        );
+        setPendingOrderCode('');
+        setSimulatorStep('menu');
+      }
+    }
+
+    if (simulatorStep === 'awaitHeight') {
+      const height = parsePositiveInt(value);
+      if (!height || height < 120 || height > 230) {
+        nextMessages.push(createBotMessage(draft.invalidHeightPrompt));
+      } else {
+        setPendingHeight(height);
+        setSimulatorStep('awaitWeight');
+        nextMessages.push(createBotMessage(draft.askWeightPrompt));
+      }
+    }
+
+    if (simulatorStep === 'awaitWeight') {
+      const weight = parsePositiveInt(value);
+      if (!weight || weight < 30 || weight > 200 || !pendingHeight) {
+        nextMessages.push(createBotMessage(draft.invalidWeightPrompt));
+      } else {
+        const suggestedSize = recommendSize(pendingHeight, weight);
+        nextMessages.push(
+          createBotMessage(`Với chiều cao ${pendingHeight}cm và cân nặng ${weight}kg, size gợi ý là ${suggestedSize}.`),
+          createMenuMessage(draft.sizeAdviceContinuePrompt, draft),
+        );
+        setPendingHeight(null);
+        setSimulatorStep('menu');
+      }
+    }
+
+    if (simulatorStep === 'faqQuestion') {
+      const matchedFaq = findFaqMatch(value, faqItems);
+      nextMessages.push(
+        createBotMessage(
+          matchedFaq
+            ? matchedFaq.body
+            : 'Chưa tìm thấy FAQ phù hợp trong danh sách keyword hiện tại.',
+        ),
+        createMenuMessage(draft.productFaqContinuePrompt, draft),
+      );
+      setSimulatorStep('menu');
+    }
+
+    setSimulatorMessages((current) => [...current, ...nextMessages]);
   };
 
   const handleSaveDraft = async () => {
@@ -115,6 +456,11 @@ const AdminBotAI = () => {
   };
 
   const handlePublish = async () => {
+    if (!canPublish) {
+      pushToast(hasDraftChanged ? 'Hãy lưu nháp trước khi publish.' : 'Kịch bản chưa sẵn sàng để publish.');
+      return;
+    }
+
     try {
       setPublishing(true);
       const nextSnapshot = await adminBotScenarioService.publishDraft();
@@ -133,6 +479,7 @@ const AdminBotAI = () => {
       const nextSnapshot = await adminBotScenarioService.resetDraftFromPublished();
       setSnapshot(nextSnapshot);
       setDraft(sortQuickActions(nextSnapshot.draft));
+      setSimulatorMessages([]);
       pushToast('Đã khôi phục draft theo bản published.');
     } catch {
       pushToast('Không thể khôi phục draft.');
@@ -199,28 +546,313 @@ const AdminBotAI = () => {
     }
   };
 
+  const renderPromptInput = (field: PromptField, index: number) => {
+    if (!draft) return null;
+    return (
+      <label className="bot-ai-step" key={field.key}>
+        <span className="bot-ai-step-index">{index + 1}</span>
+        <span className="bot-ai-step-body">
+          <span className="bot-ai-step-label">{field.label}</span>
+          <span className="bot-ai-field-helper">{field.helper}</span>
+          <textarea
+            value={draft[field.key]}
+            onChange={(e) => updateDraftField(field.key, e.target.value)}
+            rows={field.rows || 2}
+          />
+        </span>
+      </label>
+    );
+  };
+
+  const renderReadinessChecklist = () => (
+    <div className="bot-ai-checklist">
+      <div className={`bot-ai-checklist-row ${scenarioIssues.emptyFields.length ? 'warning' : 'ready'}`}>
+        {scenarioIssues.emptyFields.length ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+        <span>{scenarioIssues.emptyFields.length ? `${scenarioIssues.emptyFields.length} prompt còn trống` : 'Đủ prompt bắt buộc'}</span>
+      </div>
+      <div className={`bot-ai-checklist-row ${scenarioIssues.missingActions.length ? 'warning' : 'ready'}`}>
+        {scenarioIssues.missingActions.length ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+        <span>{scenarioIssues.missingActions.length ? 'Thiếu quick action' : 'Đủ 3 quick action'}</span>
+      </div>
+      <div className={`bot-ai-checklist-row ${scenarioIssues.duplicateQuickActionLabels.length ? 'warning' : 'ready'}`}>
+        {scenarioIssues.duplicateQuickActionLabels.length ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+        <span>{scenarioIssues.duplicateQuickActionLabels.length ? 'Quick action bị trùng nhãn' : 'Nhãn quick action không trùng'}</span>
+      </div>
+      <div className={`bot-ai-checklist-row ${hasDraftChanged ? 'warning' : 'ready'}`}>
+        {hasDraftChanged ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+        <span>{hasDraftChanged ? 'Có thay đổi chưa lưu' : 'Draft đã đồng bộ với server'}</span>
+      </div>
+    </div>
+  );
+
+  const renderFlowsTab = () => {
+    if (!draft) return null;
+
+    return (
+      <div className="bot-ai-workspace with-preview">
+        <div className="bot-ai-column">
+          <section className="bot-ai-section">
+            <div className="bot-ai-section-head">
+              <div>
+                <h3><MessageSquare size={16} /> Mở đầu & fallback</h3>
+                <p className="admin-muted small">Hai prompt này xuất hiện ở điểm đầu và khi bot không hiểu ý khách.</p>
+              </div>
+            </div>
+            <label>
+              Lời chào
+              <textarea
+                value={draft.welcomePrompt}
+                onChange={(e) => updateDraftField('welcomePrompt', e.target.value)}
+                rows={3}
+              />
+            </label>
+            <label>
+              Tin nhắn không hiểu
+              <textarea
+                value={draft.unknownPrompt}
+                onChange={(e) => updateDraftField('unknownPrompt', e.target.value)}
+                rows={2}
+              />
+            </label>
+          </section>
+
+          <div className="bot-ai-flow-board">
+            {FLOW_GROUPS.map((flow) => {
+              const FlowIcon = flow.icon;
+              return (
+                <section className="bot-ai-flow-card" key={flow.id}>
+                  <div className="bot-ai-flow-head">
+                    <div className="bot-ai-flow-icon"><FlowIcon size={18} /></div>
+                    <div className="bot-ai-flow-meta">
+                      <h3>{flow.title}</h3>
+                      <p>{flow.description}</p>
+                    </div>
+                  </div>
+                  <label className="bot-ai-action-label">
+                    Nhãn quick action
+                    <input
+                      value={getActionLabel(draft, flow.actionKey)}
+                      onChange={(e) => updateQuickActionLabel(flow.actionKey, e.target.value)}
+                    />
+                  </label>
+                  <div className="bot-ai-step-list">
+                    {flow.fields.map(renderPromptInput)}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </div>
+
+        <aside className="bot-ai-preview">
+          <h3>Published hiện tại</h3>
+          <p className="admin-muted small">Runtime chatbot đang dùng bản Published, không dùng nội dung đang gõ nếu chưa lưu và publish.</p>
+          <div className="bot-ai-preview-card">
+            <p className="bot-ai-preview-title">Welcome</p>
+            <p>{snapshot?.published.welcomePrompt}</p>
+            <p className="bot-ai-preview-title">Quick actions</p>
+            <div className="bot-ai-keyword-wrap">
+              {snapshot?.published.quickActions.map((action) => (
+                <span key={action.key} className="admin-pill neutral">{action.label}</span>
+              ))}
+            </div>
+            <p className="bot-ai-preview-title">Unknown</p>
+            <p>{snapshot?.published.unknownPrompt}</p>
+          </div>
+          <div className="bot-ai-preview-card">
+            <p className="bot-ai-preview-title">Publish checklist</p>
+            {renderReadinessChecklist()}
+          </div>
+        </aside>
+      </div>
+    );
+  };
+
+  const renderTestTab = () => {
+    if (!draft) return null;
+
+    return (
+      <div className="bot-ai-test-shell">
+        <section className="bot-ai-chat-card">
+          <div className="bot-ai-chat-head">
+            <div>
+              <h3><PlayCircle size={16} /> Test Draft local</h3>
+              <p className="admin-muted small">Kiểm tra nhanh nội dung draft và FAQ trước khi lưu/publish.</p>
+            </div>
+            <button type="button" className="admin-icon-btn subtle" onClick={resetSimulator} title="Reset test">
+              <RefreshCcw size={16} />
+            </button>
+          </div>
+          <div className="bot-ai-chat-log" aria-live="polite">
+            {simulatorMessages.map((message) => (
+              <div className={`bot-ai-message ${message.role}`} key={message.id}>
+                <p>{message.text}</p>
+                {message.actions?.length ? (
+                  <div className="bot-ai-message-actions">
+                    {message.actions.map((action) => (
+                      <button type="button" key={action.key} onClick={() => startSimulatorAction(action.key, action.label)}>
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+          <form className="bot-ai-chat-input" onSubmit={handleSimulatorSubmit}>
+            <input
+              value={simulatorInput}
+              onChange={(e) => setSimulatorInput(e.target.value)}
+              placeholder="Nhập phản hồi để test luồng..."
+              aria-label="Nhập phản hồi để test chatbot draft"
+            />
+            <button type="submit" className="admin-primary-btn">
+              <Send size={16} /> Gửi
+            </button>
+          </form>
+        </section>
+
+        <aside className="bot-ai-section">
+          <h3><ClipboardCheck size={16} /> Trạng thái publish</h3>
+          {renderReadinessChecklist()}
+          {scenarioIssues.emptyFields.length ? (
+            <div className="bot-ai-issue-list">
+              {scenarioIssues.emptyFields.slice(0, 6).map((field) => (
+                <span key={field.key}>{field.label}</span>
+              ))}
+            </div>
+          ) : null}
+        </aside>
+      </div>
+    );
+  };
+
+  const renderFaqTab = () => (
+    <div className="bot-ai-faq-panel">
+      <div className="bot-ai-faq-toolbar">
+        <label className="bot-ai-search">
+          <Search size={16} />
+          <input
+            value={faqSearch}
+            onChange={(e) => setFaqSearch(e.target.value)}
+            placeholder="Tìm FAQ theo tiêu đề, nội dung, keyword..."
+          />
+        </label>
+        <button type="button" className="admin-primary-btn" onClick={() => openFaqEditor()}>
+          <Plus size={16} /> Tạo FAQ
+        </button>
+      </div>
+
+      <div className="bot-ai-faq-layout">
+        <div className="bot-ai-faq-list">
+          {filteredFaqItems.length === 0 ? (
+            <p className="admin-muted">Chưa có FAQ phù hợp.</p>
+          ) : (
+            filteredFaqItems.map((item) => (
+              <div key={item.id} className={`bot-ai-faq-card ${faqForm.id === item.id ? 'active' : ''}`}>
+                <div className="bot-ai-faq-card-head">
+                  <h4><FileText size={14} /> {item.title}</h4>
+                  <div className="admin-actions">
+                    <button type="button" className="admin-icon-btn subtle" onClick={() => openFaqEditor(item)} title="Sửa FAQ">
+                      <Pencil size={14} />
+                    </button>
+                    <button type="button" className="admin-icon-btn subtle danger-icon" onClick={() => void handleDeleteFaq(item.id)} title="Xóa FAQ">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+                <p className="admin-muted">{item.body}</p>
+                <div className="bot-ai-keyword-wrap">
+                  {(item.keywords || []).map((keyword) => (
+                    <span key={`${item.id}-${keyword}`} className="admin-pill neutral">{keyword}</span>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="bot-ai-faq-side">
+          <div className="bot-ai-section">
+            <h3><Search size={16} /> Test keyword</h3>
+            <label>
+              Câu hỏi thử
+              <input
+                value={faqTestQuery}
+                onChange={(e) => setFaqTestQuery(e.target.value)}
+                placeholder="Ví dụ: giao hàng mất bao lâu?"
+              />
+            </label>
+            {faqTestQuery.trim() ? (
+              <div className={`bot-ai-faq-match ${faqTestMatch ? 'matched' : ''}`}>
+                <strong>{faqTestMatch ? `Match: ${faqTestMatch.title}` : 'Chưa match FAQ nào'}</strong>
+                {faqTestMatch ? <p>{faqTestMatch.body}</p> : <p>Thêm keyword hoặc chỉnh lại FAQ để bot nhận diện câu hỏi này.</p>}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="bot-ai-faq-editor">
+            <h3>{faqForm.id ? 'Chỉnh sửa FAQ' : 'FAQ mới'}</h3>
+            <label>
+              Tiêu đề
+              <input
+                value={faqForm.title}
+                onChange={(e) => setFaqForm((prev) => ({ ...prev, title: e.target.value }))}
+              />
+            </label>
+            <label>
+              Nội dung trả lời
+              <textarea
+                value={faqForm.body}
+                onChange={(e) => setFaqForm((prev) => ({ ...prev, body: e.target.value }))}
+                rows={6}
+              />
+            </label>
+            <label>
+              Keywords
+              <textarea
+                value={faqForm.keywordsText}
+                onChange={(e) => setFaqForm((prev) => ({ ...prev, keywordsText: e.target.value }))}
+                rows={4}
+                placeholder="Tách bằng dấu phẩy hoặc xuống dòng"
+              />
+            </label>
+            <div className="admin-topbar-actions">
+              <button type="button" className="admin-primary-btn dark" onClick={() => setFaqForm(emptyFaqForm)}>
+                Làm mới form
+              </button>
+              <button type="button" className="admin-primary-btn" onClick={() => void handleSaveFaq()} disabled={savingFaq}>
+                <Save size={16} /> {savingFaq ? 'Đang lưu...' : 'Lưu FAQ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <AdminLayout title="Bot và AI" breadcrumbs={['Bot và AI', 'Quản lý kịch bản chatbot']}>
       <div className="admin-panels single">
         <section className="admin-panel">
-          <div className="admin-panel-head">
+          <div className="admin-panel-head bot-ai-head">
             <div>
-              <h2>Cấu hình kịch bản chatbot</h2>
+              <h2>Quản lý kịch bản chatbot</h2>
               <p className="admin-muted">
-                Draft sẽ được chỉnh sửa ở đây. Runtime chatbot chỉ dùng bản Published.
+                Chỉnh nội dung theo từng luồng, test draft trước khi publish lên runtime Azure Bot/WebChat.
               </p>
             </div>
             <div className="admin-topbar-actions">
-              <button className="admin-icon-btn subtle" onClick={() => void loadData()} title="Tải lại dữ liệu">
+              <button type="button" className="admin-icon-btn subtle" onClick={() => void loadData()} title="Tải lại dữ liệu">
                 <RefreshCcw size={16} />
               </button>
-              <button className="admin-primary-btn dark" onClick={handleResetDraft} disabled={loading || !snapshot}>
+              <button type="button" className="admin-primary-btn dark" onClick={handleResetDraft} disabled={loading || !snapshot}>
                 <RefreshCcw size={16} /> Khôi phục draft
               </button>
-              <button className="admin-primary-btn" onClick={handleSaveDraft} disabled={loading || !draft || savingDraft || !hasDraftChanged}>
+              <button type="button" className="admin-primary-btn" onClick={handleSaveDraft} disabled={loading || !draft || savingDraft || !hasDraftChanged}>
                 <Save size={16} /> {savingDraft ? 'Đang lưu...' : 'Lưu nháp'}
               </button>
-              <button className="admin-primary-btn" onClick={handlePublish} disabled={loading || publishing || !snapshot}>
+              <button type="button" className="admin-primary-btn" onClick={handlePublish} disabled={loading || publishing || !canPublish}>
                 <UploadCloud size={16} /> {publishing ? 'Đang publish...' : 'Publish'}
               </button>
             </div>
@@ -229,154 +861,63 @@ const AdminBotAI = () => {
           {loading || !draft ? (
             <p className="admin-muted">Đang tải kịch bản chatbot...</p>
           ) : (
-            <div className="bot-ai-grid">
-              <div className="bot-ai-editor">
-                <div className="bot-ai-section">
-                  <h3><MessageSquare size={16} /> Prompt chính</h3>
-                  <label>
-                    Lời chào
-                    <textarea
-                      value={draft.welcomePrompt}
-                      onChange={(e) => updateDraftField('welcomePrompt', e.target.value)}
-                      rows={3}
-                    />
-                  </label>
-                  <label>
-                    Lời nhắn không hiểu
-                    <textarea
-                      value={draft.unknownPrompt}
-                      onChange={(e) => updateDraftField('unknownPrompt', e.target.value)}
-                      rows={2}
-                    />
-                  </label>
-                </div>
-
-                <div className="bot-ai-section">
-                  <h3>Quick actions</h3>
-                  {QUICK_ACTION_ORDER.map((key) => (
-                    <label key={key}>
-                      {QUICK_ACTION_LABEL[key]}
-                      <input
-                        value={draft.quickActions.find((item) => item.key === key)?.label || ''}
-                        onChange={(e) => updateQuickActionLabel(key, e.target.value)}
-                      />
-                    </label>
-                  ))}
-                </div>
-
-                <div className="bot-ai-section">
-                  <h3>Flow prompts</h3>
-                  <label>Yêu cầu mã đơn<input value={draft.askOrderCodePrompt} onChange={(e) => updateDraftField('askOrderCodePrompt', e.target.value)} /></label>
-                  <label>Yêu cầu 4 số cuối SDT<input value={draft.askOrderPhonePrompt} onChange={(e) => updateDraftField('askOrderPhonePrompt', e.target.value)} /></label>
-                  <label>Sai 4 số SDT<input value={draft.orderPhoneInvalidPrompt} onChange={(e) => updateDraftField('orderPhoneInvalidPrompt', e.target.value)} /></label>
-                  <label>Hỏi tiếp sau tra cứu đơn<input value={draft.orderLookupContinuePrompt} onChange={(e) => updateDraftField('orderLookupContinuePrompt', e.target.value)} /></label>
-                  <label>Yêu cầu chiều cao<input value={draft.askHeightPrompt} onChange={(e) => updateDraftField('askHeightPrompt', e.target.value)} /></label>
-                  <label>Sai chiều cao<input value={draft.invalidHeightPrompt} onChange={(e) => updateDraftField('invalidHeightPrompt', e.target.value)} /></label>
-                  <label>Yêu cầu cân nặng<input value={draft.askWeightPrompt} onChange={(e) => updateDraftField('askWeightPrompt', e.target.value)} /></label>
-                  <label>Sai cân nặng<input value={draft.invalidWeightPrompt} onChange={(e) => updateDraftField('invalidWeightPrompt', e.target.value)} /></label>
-                  <label>Hỏi tiếp sau tư vấn size<input value={draft.sizeAdviceContinuePrompt} onChange={(e) => updateDraftField('sizeAdviceContinuePrompt', e.target.value)} /></label>
-                  <label>Hỏi tiếp sau FAQ<input value={draft.productFaqContinuePrompt} onChange={(e) => updateDraftField('productFaqContinuePrompt', e.target.value)} /></label>
-                </div>
-              </div>
-
-              <div className="bot-ai-preview">
-                <h3>Preview (Published)</h3>
-                <p className="admin-muted small">
-                  Draft version: <strong>{snapshot?.draftMeta?.version || 0}</strong> |
-                  Published version: <strong>{snapshot?.publishedMeta?.version || 0}</strong>
-                </p>
-                <div className="bot-ai-preview-card">
-                  <p className="bot-ai-preview-title">Welcome</p>
-                  <p>{snapshot?.published.welcomePrompt}</p>
-                  <p className="bot-ai-preview-title">Quick actions</p>
-                  <div className="bot-ai-keyword-wrap">
-                    {snapshot?.published.quickActions.map((action) => (
-                      <span key={action.key} className="admin-pill neutral">{action.label}</span>
-                    ))}
+            <>
+              <div className="bot-ai-summary-grid">
+                <div className="bot-ai-status-card">
+                  <span className="bot-ai-status-icon"><GitBranch size={18} /></span>
+                  <div>
+                    <strong>Draft</strong>
+                    <p>{formatMeta(snapshot?.draftMeta)}</p>
                   </div>
-                  <p className="bot-ai-preview-title">Unknown</p>
-                  <p>{snapshot?.published.unknownPrompt}</p>
+                </div>
+                <div className="bot-ai-status-card">
+                  <span className="bot-ai-status-icon"><UploadCloud size={18} /></span>
+                  <div>
+                    <strong>Published</strong>
+                    <p>{formatMeta(snapshot?.publishedMeta)}</p>
+                  </div>
+                </div>
+                <div className={`bot-ai-status-card ${publishReady ? 'ready' : 'warning'}`}>
+                  <span className="bot-ai-status-icon">
+                    {publishReady ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
+                  </span>
+                  <div>
+                    <strong>{publishReady ? 'Sẵn sàng' : 'Cần kiểm tra'}</strong>
+                    <p>{publishReady ? 'Kịch bản đủ điều kiện publish' : 'Có prompt/action cần xử lý'}</p>
+                  </div>
+                </div>
+                <div className="bot-ai-status-card">
+                  <span className="bot-ai-status-icon"><FileText size={18} /></span>
+                  <div>
+                    <strong>{faqItems.length} FAQ</strong>
+                    <p>{filteredFaqItems.length} mục đang hiển thị</p>
+                  </div>
                 </div>
               </div>
-            </div>
+
+              <div className="admin-tabs bot-ai-tabs" role="tablist" aria-label="Bot AI tabs">
+                {BOT_ADMIN_TABS.map((tab) => {
+                  const TabIcon = tab.icon;
+                  return (
+                    <button
+                      type="button"
+                      key={tab.id}
+                      className={`admin-tab ${activeTab === tab.id ? 'active' : ''}`}
+                      onClick={() => setActiveTab(tab.id)}
+                      role="tab"
+                      aria-selected={activeTab === tab.id}
+                    >
+                      <TabIcon size={16} /> {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeTab === 'flows' ? renderFlowsTab() : null}
+              {activeTab === 'test' ? renderTestTab() : null}
+              {activeTab === 'faq' ? renderFaqTab() : null}
+            </>
           )}
-        </section>
-
-        <section className="admin-panel">
-          <div className="admin-panel-head">
-            <div>
-              <h2>FAQ cho chatbot</h2>
-              <p className="admin-muted">FAQ sử dụng module ContentPage. Match theo keywords đã normalize.</p>
-            </div>
-            <button className="admin-primary-btn" onClick={() => openFaqEditor()}>
-              <Plus size={16} /> Tạo FAQ
-            </button>
-          </div>
-
-          <div className="bot-ai-faq-layout">
-            <div className="bot-ai-faq-list">
-              {faqItems.length === 0 ? (
-                <p className="admin-muted">Chưa có FAQ.</p>
-              ) : (
-                faqItems.map((item) => (
-                  <div key={item.id} className="bot-ai-faq-card">
-                    <div className="bot-ai-faq-card-head">
-                      <h4><FileText size={14} /> {item.title}</h4>
-                      <div className="admin-actions">
-                        <button className="admin-icon-btn subtle" onClick={() => openFaqEditor(item)} title="Sửa FAQ">
-                          <Pencil size={14} />
-                        </button>
-                        <button className="admin-icon-btn subtle danger-icon" onClick={() => void handleDeleteFaq(item.id)} title="Xóa FAQ">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                    <p className="admin-muted">{item.body}</p>
-                    <div className="bot-ai-keyword-wrap">
-                      {(item.keywords || []).map((keyword) => (
-                        <span key={`${item.id}-${keyword}`} className="admin-pill neutral">{keyword}</span>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="bot-ai-faq-editor">
-              <h3>{faqForm.id ? 'Chỉnh sửa FAQ' : 'FAQ mới'}</h3>
-              <label>
-                Tiêu đề
-                <input
-                  value={faqForm.title}
-                  onChange={(e) => setFaqForm((prev) => ({ ...prev, title: e.target.value }))}
-                />
-              </label>
-              <label>
-                Nội dung trả lời
-                <textarea
-                  value={faqForm.body}
-                  onChange={(e) => setFaqForm((prev) => ({ ...prev, body: e.target.value }))}
-                  rows={6}
-                />
-              </label>
-              <label>
-                Keywords (tách bởi dấu phẩy hoặc xuống dòng)
-                <textarea
-                  value={faqForm.keywordsText}
-                  onChange={(e) => setFaqForm((prev) => ({ ...prev, keywordsText: e.target.value }))}
-                  rows={4}
-                />
-              </label>
-              <div className="admin-topbar-actions">
-                <button className="admin-primary-btn dark" onClick={() => setFaqForm(emptyFaqForm)}>
-                  Làm mới form
-                </button>
-                <button className="admin-primary-btn" onClick={() => void handleSaveFaq()} disabled={savingFaq}>
-                  <Save size={16} /> {savingFaq ? 'Đang lưu...' : 'Lưu FAQ'}
-                </button>
-              </div>
-            </div>
-          </div>
         </section>
       </div>
     </AdminLayout>
@@ -384,4 +925,3 @@ const AdminBotAI = () => {
 };
 
 export default AdminBotAI;
-

@@ -60,3 +60,4 @@ AGENTS.md
 # Local CI runtime files
 .ci-logs-local/
 .ci-logs-local/*.pid
+SRS/
