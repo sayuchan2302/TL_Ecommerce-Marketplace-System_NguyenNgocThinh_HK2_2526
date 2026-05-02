@@ -59,7 +59,7 @@ app:
   seed:
     enabled: ${APP_SEED_ENABLED:false}
     gap:
-      enabled: ${APP_SEED_GAP_ENABLED:false}
+      enabled: ${APP_SEED_GAP_ENABLED:true}
       target-count: ${APP_SEED_GAP_TARGET_COUNT:1000}
       styles-path: ${APP_SEED_GAP_STYLES_PATH:backend/src/main/resources/product/styles.csv}
       images-path: ${APP_SEED_GAP_IMAGES_PATH:backend/src/main/resources/product/images.csv}

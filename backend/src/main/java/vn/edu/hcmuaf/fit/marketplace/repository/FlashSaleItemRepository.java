@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import vn.edu.hcmuaf.fit.marketplace.entity.FlashSaleCampaign;
 import vn.edu.hcmuaf.fit.marketplace.entity.FlashSaleItem;
 
@@ -87,6 +88,7 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, UU
     Optional<FlashSaleItem> findByIdForUpdate(@Param("id") UUID id);
 
     @Modifying
+    @Transactional
     @Query("""
             DELETE FROM FlashSaleItem i
             WHERE i.product.id IN :productIds
@@ -94,6 +96,7 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, UU
     int deleteByProductIds(@Param("productIds") List<UUID> productIds);
 
     @Modifying
+    @Transactional
     @Query("""
             DELETE FROM FlashSaleItem i
             WHERE i.variant IS NOT NULL

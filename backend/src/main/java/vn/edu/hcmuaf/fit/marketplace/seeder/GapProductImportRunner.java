@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import vn.edu.hcmuaf.fit.marketplace.config.GapSeedProperties;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.ProductRequest;
 import vn.edu.hcmuaf.fit.marketplace.entity.Category;
@@ -290,7 +289,6 @@ public class GapProductImportRunner implements ApplicationRunner {
     }
 
     @Override
-    @Transactional
     public void run(ApplicationArguments args) {
         if (!EXECUTED.compareAndSet(false, true)) {
             return;
@@ -300,12 +298,18 @@ public class GapProductImportRunner implements ApplicationRunner {
             return;
         }
         if (!properties.isEnabled()) {
+            log.info("GAP import disabled. Set APP_SEED_GAP_ENABLED=true to import GAP CSV data.");
             return;
         }
+        log.info(
+                "GAP import starting: stylesPath={}, imagesPath={}, targetCount={}, cleanBeforeImport={}",
+                properties.getStylesPath(),
+                properties.getImagesPath(),
+                properties.getTargetCount(),
+                properties.isCleanBeforeImport());
         runImport();
     }
 
-    @Transactional
     void runImport() {
         int targetCount = Math.max(0, properties.getTargetCount());
         if (targetCount == 0) {
@@ -528,8 +532,9 @@ public class GapProductImportRunner implements ApplicationRunner {
             flashSaleCampaignRepository.deleteAll();
         }
 
-        List<Product> publicProducts = productRepository.findAllPublicProducts()
-                .stream()
+        List<Product> publicProducts = loadProductsWithImages(
+                productRepository.findAllPublicProducts())
+                        .stream()
                 .filter(this::hasCatalogImage)
                 .sorted(Comparator
                         .comparing(Product::getUpdatedAt,
@@ -631,9 +636,33 @@ public class GapProductImportRunner implements ApplicationRunner {
     }
 
     private boolean hasDisplayableFlashSaleItems() {
-        return flashSaleItemRepository.findAll().stream()
+        List<Product> products = flashSaleItemRepository.findAll().stream()
                 .map(FlashSaleItem::getProduct)
+                .filter(product -> product != null && product.getId() != null)
+                .distinct()
+                .toList();
+        return loadProductsWithImages(products).stream()
                 .anyMatch(this::hasCatalogImage);
+    }
+
+    private List<Product> loadProductsWithImages(List<Product> products) {
+        if (products == null || products.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> productIds = products.stream()
+                .filter(product -> product != null && product.getId() != null)
+                .map(Product::getId)
+                .distinct()
+                .toList();
+        if (productIds.isEmpty()) {
+            return List.of();
+        }
+        List<Product> fetchedProducts = productRepository
+                .findAllByIdInWithImages(productIds);
+        if (fetchedProducts == null || fetchedProducts.isEmpty()) {
+            return products;
+        }
+        return fetchedProducts;
     }
 
     private boolean hasCatalogImage(Product product) {
