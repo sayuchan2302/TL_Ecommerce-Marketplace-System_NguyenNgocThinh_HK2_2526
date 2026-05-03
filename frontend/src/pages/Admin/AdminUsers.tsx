@@ -21,13 +21,16 @@ import {
 import AdminLayout from './AdminLayout';
 import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminStateBlock } from './AdminStateBlocks';
-import { PanelStatsGrid, PanelTableFooter, PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelFilterSelect, PanelSearchField, PanelStatsGrid, PanelTableFooter } from '../../components/Panel/PanelPrimitives';
 import { useToast } from '../../contexts/ToastContext';
 import { adminUserService, type AdminUserRecord, type AdminUserRole, type AdminUserStatus } from '../../services/adminUserService';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import Drawer from '../../components/Drawer/Drawer';
+import { ADMIN_VIEW_KEYS } from './adminListView';
+import { useAdminViewState } from './useAdminViewState';
 
-type UserFilter = 'all' | 'customer' | 'vendor' | 'admin' | 'locked';
+type UserRoleFilter = 'all' | 'customer' | 'vendor' | 'admin';
+type UserAccountStatusFilter = 'all' | 'active' | 'locked' | 'pendingVendor';
 type UserRole = AdminUserRole;
 type UserStatus = AdminUserStatus;
 type UserRecord = AdminUserRecord & { note?: string };
@@ -38,13 +41,21 @@ type ConfirmState = {
   selectedItems: string[];
 };
 
-const USER_TABS: Array<{ key: UserFilter; label: string }> = [
+const USER_ROLE_FILTERS: Array<{ key: UserRoleFilter; label: string }> = [
   { key: 'all', label: 'Tất cả' },
   { key: 'customer', label: 'Khách hàng' },
   { key: 'vendor', label: 'Người bán' },
   { key: 'admin', label: 'Quản trị viên' },
-  { key: 'locked', label: 'Đã khóa' },
 ];
+
+const USER_STATUS_FILTERS: Array<{ key: UserAccountStatusFilter; label: string }> = [
+  { key: 'all', label: 'Tất cả tình trạng' },
+  { key: 'active', label: 'Đang hoạt động' },
+  { key: 'locked', label: 'Đã khóa' },
+  { key: 'pendingVendor', label: 'Chờ duyệt vendor' },
+];
+
+const validUserStatusFilters = new Set<UserAccountStatusFilter>(USER_STATUS_FILTERS.map((item) => item.key));
 
 const roleLabel = (role: UserRole) => {
   if (role === 'CUSTOMER') return 'Khách hàng';
@@ -209,13 +220,23 @@ const AdminUsers = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<UserFilter>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detailUser, setDetailUser] = useState<UserRecord | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
-  const [page, setPage] = useState(1);
   const pageSize = 8;
+  const view = useAdminViewState({
+    storageKey: ADMIN_VIEW_KEYS.customers,
+    path: '/admin/users',
+    validStatusKeys: USER_ROLE_FILTERS.map((tab) => tab.key),
+    defaultStatus: 'all',
+    extraFilters: [
+      { key: 'account_status', defaultValue: 'all', validate: (value) => validUserStatusFilters.has(value as UserAccountStatusFilter) },
+    ],
+  });
+  const roleFilter = (USER_ROLE_FILTERS.some((tab) => tab.key === view.status) ? view.status : 'all') as UserRoleFilter;
+  const accountStatusFilter = (validUserStatusFilters.has(view.extras.account_status as UserAccountStatusFilter) ? view.extras.account_status : 'all') as UserAccountStatusFilter;
+  const search = view.search;
+  const page = view.page;
 
   useEffect(() => {
     let mounted = true;
@@ -245,12 +266,19 @@ const AdminUsers = () => {
   const filteredUsers = useMemo(() => {
     let next = users;
 
-    if (activeTab !== 'all') {
+    if (roleFilter !== 'all') {
       next = next.filter((user) => {
-        if (activeTab === 'customer') return user.role === 'CUSTOMER';
-        if (activeTab === 'vendor') return user.role === 'VENDOR' || user.status === 'PENDING_VENDOR';
-        if (activeTab === 'admin') return user.role === 'SUPER_ADMIN';
-        return user.status === 'LOCKED';
+        if (roleFilter === 'customer') return user.role === 'CUSTOMER';
+        if (roleFilter === 'vendor') return user.role === 'VENDOR' || user.status === 'PENDING_VENDOR';
+        return user.role === 'SUPER_ADMIN';
+      });
+    }
+
+    if (accountStatusFilter !== 'all') {
+      next = next.filter((user) => {
+        if (accountStatusFilter === 'active') return user.status === 'ACTIVE';
+        if (accountStatusFilter === 'locked') return user.status === 'LOCKED';
+        return user.status === 'PENDING_VENDOR';
       });
     }
 
@@ -264,7 +292,7 @@ const AdminUsers = () => {
     }
 
     return next;
-  }, [activeTab, search, users]);
+  }, [accountStatusFilter, roleFilter, search, users]);
 
   const counts = useMemo(
     () => ({
@@ -272,7 +300,9 @@ const AdminUsers = () => {
       customer: users.filter((user) => user.role === 'CUSTOMER').length,
       vendor: users.filter((user) => user.role === 'VENDOR' || user.status === 'PENDING_VENDOR').length,
       admin: users.filter((user) => user.role === 'SUPER_ADMIN').length,
+      active: users.filter((user) => user.status === 'ACTIVE').length,
       locked: users.filter((user) => user.status === 'LOCKED').length,
+      pendingVendor: users.filter((user) => user.status === 'PENDING_VENDOR').length,
     }),
     [users],
   );
@@ -285,10 +315,27 @@ const AdminUsers = () => {
   }, [filteredUsers, safePage]);
 
   const resetCurrentView = () => {
-    setSearch('');
-    setActiveTab('all');
     setSelected(new Set());
-    setPage(1);
+    setDetailUser(null);
+    view.resetCurrentView();
+  };
+
+  const changeTab = (key: string) => {
+    setSelected(new Set());
+    setDetailUser(null);
+    view.setStatus(key);
+  };
+
+  const changeAccountStatus = (key: string) => {
+    setSelected(new Set());
+    setDetailUser(null);
+    view.setExtra('account_status', key);
+  };
+
+  const changeSearch = (value: string) => {
+    setSelected(new Set());
+    setDetailUser(null);
+    view.setSearch(value);
   };
 
   const openConfirm = (mode: 'lock' | 'unlock', ids: string[]) => {
@@ -337,7 +384,7 @@ const AdminUsers = () => {
             value: counts.customer,
             sub: 'Tài khoản mua hàng trên sàn',
             tone: 'info',
-            onClick: () => setActiveTab('customer'),
+            onClick: () => changeTab('customer'),
           },
           {
             key: 'vendor',
@@ -345,7 +392,7 @@ const AdminUsers = () => {
             value: counts.vendor,
             sub: 'Bao gồm vendor đang bán và đang chờ duyệt',
             tone: 'success',
-            onClick: () => setActiveTab('vendor'),
+            onClick: () => changeTab('vendor'),
           },
           {
             key: 'locked',
@@ -353,29 +400,50 @@ const AdminUsers = () => {
             value: counts.locked,
             sub: 'Tài khoản đang bị chặn đăng nhập',
             tone: counts.locked > 0 ? 'danger' : '',
-            onClick: () => setActiveTab('locked'),
+            onClick: () => changeAccountStatus('locked'),
           },
         ]}
-      />
-
-      <PanelTabs
-        items={USER_TABS.map((tab) => ({
-          key: tab.key,
-          label: tab.label,
-          count: counts[tab.key],
-        }))}
-        activeKey={activeTab}
-        onChange={(key) => {
-          setActiveTab(key as UserFilter);
-          setSelected(new Set());
-          setPage(1);
-        }}
       />
 
       <section className="admin-panels single">
         <div className="admin-panel">
           <div className="admin-panel-head">
             <h2>Danh sách người dùng</h2>
+          </div>
+          <div className="admin-filter-toolbar">
+            <PanelSearchField
+              placeholder="Tìm tên, email, số điện thoại hoặc gian hàng"
+              ariaLabel="Tìm người dùng"
+              value={search}
+              onChange={changeSearch}
+            />
+            <PanelFilterSelect
+              label="Vai trò"
+              ariaLabel="Lọc người dùng theo vai trò"
+              items={USER_ROLE_FILTERS.map((tab) => ({
+                key: tab.key,
+                label: tab.label,
+                count: counts[tab.key],
+              }))}
+              value={roleFilter}
+              onChange={changeTab}
+            />
+            <PanelFilterSelect
+              label="Tình trạng"
+              ariaLabel="Lọc người dùng theo tình trạng tài khoản"
+              items={USER_STATUS_FILTERS.map((item) => ({
+                key: item.key,
+                label: item.label,
+                count: counts[item.key],
+              }))}
+              value={accountStatusFilter}
+              onChange={changeAccountStatus}
+            />
+            {view.hasViewContext ? (
+              <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+                Đặt lại
+              </button>
+            ) : null}
           </div>
 
           {loading ? (
@@ -406,7 +474,7 @@ const AdminUsers = () => {
             />
           ) : (
             <>
-              <div className="admin-table" role="table" aria-label="Bảng người dùng hệ sinh thái">
+              <div className="admin-table admin-responsive-table" role="table" aria-label="Bảng người dùng hệ sinh thái">
 <div className="admin-table-row users admin-table-head" role="row">
                   <div role="columnheader">
                     <input
@@ -499,11 +567,63 @@ const AdminUsers = () => {
                 })}
               </div>
 
+              <div className="admin-mobile-cards" aria-label="Danh sách người dùng dạng thẻ">
+                {pagedUsers.map((user) => (
+                  <article key={user.id} className="admin-mobile-card">
+                    <div className="admin-mobile-card-head">
+                      <div className="admin-mobile-card-title">
+                        {renderUserAvatar(user)}
+                        <div className="admin-mobile-card-title-main">
+                          <p className="admin-bold">{user.name || 'Chưa cập nhật tên'}</p>
+                          <p className="admin-mobile-card-sub">{user.email}</p>
+                        </div>
+                      </div>
+                      <span className={`admin-pill ${statusTone(user.status)}`}>{statusLabel(user.status)}</span>
+                    </div>
+                    <div className="admin-mobile-card-grid">
+                      <div className="admin-mobile-card-field">
+                        <span>Vai trò</span>
+                        <strong>{roleLabel(user.role)}</strong>
+                        <p>{getUserScope(user).title}</p>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Tổng chi</span>
+                        <strong>{formatVnd(user.totalSpent)}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Liên hệ</span>
+                        <strong>{user.phone || 'Chưa cập nhật'}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Ngày tham gia</span>
+                        <strong>{formatDate(user.createdAt)}</strong>
+                      </div>
+                    </div>
+                    <div className="admin-mobile-card-actions">
+                      <button className="admin-primary-btn" type="button" onClick={() => setDetailUser(user)}>
+                        <Eye size={16} />
+                        Xem hồ sơ
+                      </button>
+                      {canManageUser(user) &&
+                        (user.status === 'LOCKED' ? (
+                          <button className="admin-icon-btn subtle" title="Mở khóa tài khoản" aria-label="Mở khóa tài khoản" onClick={() => openConfirm('unlock', [user.id])}>
+                            <CheckCircle2 size={16} />
+                          </button>
+                        ) : (
+                          <button className="admin-icon-btn subtle danger-icon" title="Khóa tài khoản" aria-label="Khóa tài khoản" onClick={() => openConfirm('lock', [user.id])}>
+                            <Ban size={16} />
+                          </button>
+                        ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+
               <PanelTableFooter
                 meta={`Hiển thị ${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, filteredUsers.length)} trên ${filteredUsers.length} tài khoản`}
                 page={safePage}
                 totalPages={totalPages}
-                onPageChange={setPage}
+                onPageChange={view.setPage}
                 prevLabel="Trước"
                 nextLabel="Sau"
               />

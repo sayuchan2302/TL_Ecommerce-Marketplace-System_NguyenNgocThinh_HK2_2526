@@ -9,7 +9,7 @@ import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
-import { PanelTableFooter, PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelFilterSelect, PanelSearchField, PanelTableFooter } from '../../components/Panel/PanelPrimitives';
 import Drawer from '../../components/Drawer/Drawer';
 import {
   adminPromotionService,
@@ -32,6 +32,16 @@ interface PromotionTableRow {
   memberPromotions: AdminPromotionRecord[];
   isGlobalCampaign: boolean;
 }
+
+type PromotionScopeFilter = 'all' | 'global' | 'vendor';
+
+const PROMOTION_SCOPE_FILTERS: Array<{ key: PromotionScopeFilter; label: string }> = [
+  { key: 'all', label: 'Tất cả phạm vi' },
+  { key: 'global', label: 'Toàn sàn' },
+  { key: 'vendor', label: 'Theo gian hàng' },
+];
+
+const validPromotionScopeFilters = new Set<PromotionScopeFilter>(PROMOTION_SCOPE_FILTERS.map((item) => item.key));
 
 const emptyPromotion = (): PromotionFormState => ({
   storeId: '',
@@ -134,7 +144,11 @@ const AdminPromotions = () => {
     path: '/admin/promotions',
     validStatusKeys: ['all', 'running', 'paused', 'expired'],
     defaultStatus: 'all',
+    extraFilters: [
+      { key: 'scope', defaultValue: 'all', validate: (value) => validPromotionScopeFilters.has(value as PromotionScopeFilter) },
+    ],
   });
+  const scopeFilter = (validPromotionScopeFilters.has(view.extras.scope as PromotionScopeFilter) ? view.extras.scope : 'all') as PromotionScopeFilter;
   const [rows, setRows] = useState<AdminPromotionRecord[]>([]);
   const [stores, setStores] = useState<StoreProfile[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -251,7 +265,6 @@ const AdminPromotions = () => {
     totalPages,
     startIndex,
     endIndex,
-    setPage,
   } = useAdminListState<PromotionTableRow>({
     items: tableRows,
     pageSize: 7,
@@ -261,8 +274,13 @@ const AdminPromotions = () => {
     onPageChange: view.setPage,
     getSearchText: (item) =>
       `${item.promotion.name} ${item.promotion.code} ${item.promotion.description} ${item.promotion.storeName} ${item.isGlobalCampaign ? 'toàn sàn' : ''}`,
-    filterPredicate: (item) => view.status === 'all' || deriveStatus(item.promotion) === view.status,
-    loadingDeps: [view.status],
+    filterPredicate: (item) => {
+      if (view.status !== 'all' && deriveStatus(item.promotion) !== view.status) return false;
+      if (scopeFilter === 'global') return item.isGlobalCampaign;
+      if (scopeFilter === 'vendor') return !item.isGlobalCampaign;
+      return true;
+    },
+    loadingDeps: [view.status, scopeFilter],
   });
 
   const stats = useMemo(() => {
@@ -279,10 +297,31 @@ const AdminPromotions = () => {
     };
   }, [tableRows]);
 
+  const scopeCounts: Record<PromotionScopeFilter, number> = {
+    all: tableRows.length,
+    global: tableRows.filter((item) => item.isGlobalCampaign).length,
+    vendor: tableRows.filter((item) => !item.isGlobalCampaign).length,
+  };
+
   const resetView = () => {
     view.resetCurrentView();
     setSelected(new Set());
     pushToast('Đã đặt lại bộ lọc chiến dịch.');
+  };
+
+  const changeStatus = (key: string) => {
+    setSelected(new Set());
+    view.setStatus(key);
+  };
+
+  const changeScope = (key: string) => {
+    setSelected(new Set());
+    view.setExtra('scope', key);
+  };
+
+  const changeSearch = (value: string) => {
+    setSelected(new Set());
+    view.setSearch(value);
   };
 
   const openCreate = () => {
@@ -399,38 +438,59 @@ const AdminPromotions = () => {
           <div className="admin-stat-value">{tableRows.length}</div>
           <div className="admin-stat-sub">Tỷ lệ sử dụng toàn sàn: {stats.usageRate}%</div>
         </div>
-        <div className="admin-stat-card success" onClick={() => view.setStatus('running')} style={{ cursor: 'pointer' }}>
+        <div className="admin-stat-card success" onClick={() => changeStatus('running')} style={{ cursor: 'pointer' }}>
           <div className="admin-stat-label">Đang chạy</div>
           <div className="admin-stat-value">{stats.running}</div>
           <div className="admin-stat-sub">Chiến dịch đang hoạt động</div>
         </div>
-        <div className="admin-stat-card warning" onClick={() => view.setStatus('paused')} style={{ cursor: 'pointer' }}>
+        <div className="admin-stat-card warning" onClick={() => changeStatus('paused')} style={{ cursor: 'pointer' }}>
           <div className="admin-stat-label">Tạm dừng</div>
           <div className="admin-stat-value">{stats.paused}</div>
           <div className="admin-stat-sub">Tạm ngưng hoặc draft</div>
         </div>
-        <div className="admin-stat-card danger" onClick={() => view.setStatus('expired')} style={{ cursor: 'pointer' }}>
+        <div className="admin-stat-card danger" onClick={() => changeStatus('expired')} style={{ cursor: 'pointer' }}>
           <div className="admin-stat-label">Hết hạn</div>
           <div className="admin-stat-value">{stats.expired}</div>
           <div className="admin-stat-sub">Cần gia hạn hoặc dọn dẹp</div>
         </div>
       </div>
 
-      <PanelTabs
-        items={[
-          { key: 'all', label: 'Tất cả', count: tableRows.length },
-          { key: 'running', label: 'Đang chạy', count: stats.running },
-          { key: 'paused', label: 'Tạm dừng', count: stats.paused },
-          { key: 'expired', label: 'Hết hạn', count: stats.expired },
-        ]}
-        activeKey={view.status}
-        onChange={(key) => view.setStatus(key)}
-      />
-
       <section className="admin-panels single">
         <div className="admin-panel">
           <div className="admin-panel-head">
             <h2>Kho voucher</h2>
+          </div>
+          <div className="admin-filter-toolbar">
+            <PanelSearchField
+              placeholder="Tìm tên, mã voucher, mô tả hoặc gian hàng"
+              ariaLabel="Tìm voucher"
+              value={search}
+              onChange={changeSearch}
+            />
+            <PanelFilterSelect
+              label="Trạng thái"
+              ariaLabel="Lọc voucher theo trạng thái"
+              items={[
+                { key: 'all', label: 'Tất cả', count: tableRows.length },
+                { key: 'running', label: 'Đang chạy', count: stats.running },
+                { key: 'paused', label: 'Tạm dừng', count: stats.paused },
+                { key: 'expired', label: 'Hết hạn', count: stats.expired },
+              ]}
+              value={view.status}
+              onChange={changeStatus}
+            />
+            <PanelFilterSelect
+              label="Phạm vi"
+              ariaLabel="Lọc voucher theo phạm vi áp dụng"
+              items={PROMOTION_SCOPE_FILTERS.map((item) => ({ key: item.key, label: item.label, count: scopeCounts[item.key] }))}
+              value={scopeFilter}
+              onChange={changeScope}
+            />
+            {view.hasViewContext ? (
+              <button type="button" className="admin-filter-reset" onClick={resetView}>
+                Đặt lại
+              </button>
+            ) : null}
           </div>
 
           {isInitializing ? (
@@ -452,7 +512,8 @@ const AdminPromotions = () => {
               onAction={resetView}
             />
           ) : (
-            <div className="admin-table" role="table" aria-label="Bảng chiến dịch toàn sàn">
+            <>
+            <div className="admin-table admin-responsive-table" role="table" aria-label="Bảng chiến dịch toàn sàn">
               <div className="admin-table-row admin-table-head promotions" role="row">
                 <div role="columnheader">
                   <input
@@ -529,13 +590,66 @@ const AdminPromotions = () => {
                 );
               })}
             </div>
+            <div className="admin-mobile-cards" aria-label="Danh sách voucher dạng thẻ">
+              {pagedItems.map((row) => {
+                const promo = row.promotion;
+                const usedPercent = promo.totalIssued > 0 ? Math.min(100, Math.round((promo.usedCount / promo.totalIssued) * 100)) : 0;
+                const currentStatus = deriveStatus(promo);
+
+                return (
+                  <article key={row.key} className="admin-mobile-card">
+                    <div className="admin-mobile-card-head">
+                      <div className="admin-mobile-card-title">
+                        <div className="admin-mobile-card-title-main">
+                          <p className="admin-bold">{promo.name}</p>
+                          <p className="admin-mobile-card-sub">{promo.code}</p>
+                        </div>
+                      </div>
+                      <span className={`admin-pill ${promotionStatusClass(currentStatus)}`}>{promotionStatusLabel(currentStatus)}</span>
+                    </div>
+                    <div className="admin-mobile-card-grid">
+                      <div className="admin-mobile-card-field">
+                        <span>Phạm vi</span>
+                        <strong>{row.isGlobalCampaign ? 'Toàn sàn' : (promo.storeName || 'Store không xác định')}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Giá trị</span>
+                        <strong>{promo.discountType === 'percent' ? `${promo.discountValue}%` : formatCurrency(promo.discountValue)}</strong>
+                        <p>Đơn từ {formatCurrency(promo.minOrderValue)}</p>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Đã sử dụng</span>
+                        <strong>{promo.usedCount}/{promo.totalIssued}</strong>
+                        <p>{usedPercent}%</p>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Lịch trình</span>
+                        <strong>{formatDate(promo.startDate)}</strong>
+                        <p>{formatDate(promo.endDate)}</p>
+                      </div>
+                    </div>
+                    <div className="admin-mobile-card-actions">
+                      <button className="admin-primary-btn" type="button" onClick={() => openEdit(row)}>
+                        <Pencil size={16} />
+                        Chỉnh sửa
+                      </button>
+                      <button className="admin-icon-btn subtle" type="button" onClick={() => void togglePause(row)} aria-label={promo.status === 'running' ? 'Tạm dừng chiến dịch' : 'Kích hoạt chiến dịch'}>
+                        {promo.status === 'running' ? <Pause size={16} /> : <Play size={16} />}
+                      </button>
+                      <button className="admin-icon-btn subtle danger-icon" type="button" onClick={() => setDeleteIds(row.memberPromotions.map((item) => item.id))} aria-label="Xóa chiến dịch"><Trash2 size={16} /></button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            </>
           )}
           {!isLoading && filteredItems.length > 0 && (
             <PanelTableFooter
               meta={`Hiển thị ${startIndex}-${endIndex} của ${filteredItems.length} chiến dịch`}
               page={page}
               totalPages={totalPages}
-              onPageChange={setPage}
+              onPageChange={view.setPage}
               prevLabel="Trước"
               nextLabel="Tiếp"
             />

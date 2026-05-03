@@ -11,6 +11,7 @@ import { vendorPortalService, type VendorOrderDetailData } from '../../services/
 import { useToast } from '../../contexts/ToastContext';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
+import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
 import { copyTextToClipboard } from './vendorHelpers';
 import { toDisplayOrderCode } from '../../utils/displayCode';
 import { getOptimizedImageUrl } from '../../utils/getOptimizedImageUrl';
@@ -47,6 +48,8 @@ const VendorOrderDetail = () => {
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [delayDialogOpen, setDelayDialogOpen] = useState(false);
+  const [delayReason, setDelayReason] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -129,23 +132,30 @@ const VendorOrderDetail = () => {
     );
   };
 
-  const handleNotifyDelay = async () => {
-    const delayReason = window.prompt('Nhập lý do chậm xử lý / giao hàng');
-    if (!delayReason || !delayReason.trim()) {
-      addToast('Cần nhập lý do delay.', 'error');
+  const requestNotifyDelay = () => {
+    setDelayReason('');
+    setDelayDialogOpen(true);
+  };
+
+  const confirmNotifyDelay = async () => {
+    const note = delayReason.trim();
+    if (!note) {
+      addToast('Cần nhập lý do chậm xử lý / giao hàng.', 'error');
       return;
     }
 
     setIsProcessing(true);
     try {
-      await vendorPortalService.notifyDelay(order.id || id, delayReason.trim());
+      await vendorPortalService.notifyDelay(order.id || id, note);
       setOrder((current) => ({
         ...current,
-        warehouseNote: delayReason.trim(),
+        warehouseNote: note,
       }));
-      addToast('Đã gửi notify delay cho đơn hàng.', 'success');
+      setDelayDialogOpen(false);
+      setDelayReason('');
+      addToast('Đã gửi ghi chú trễ đơn cho đơn hàng.', 'success');
     } catch (err: unknown) {
-      addToast(getUiErrorMessage(err, 'Không thể gửi notify delay'), 'error');
+      addToast(getUiErrorMessage(err, 'Không thể gửi ghi chú trễ đơn'), 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -213,9 +223,9 @@ const VendorOrderDetail = () => {
             </button>
           )}
           {canNotifyDelay && (
-            <button className="admin-ghost-btn" onClick={() => void handleNotifyDelay()} disabled={isProcessing}>
+            <button className="admin-ghost-btn" onClick={requestNotifyDelay} disabled={isProcessing}>
               <AlertTriangle size={16} />
-              Notify Delay
+              Báo đơn trễ
             </button>
           )}
         </div>
@@ -407,6 +417,35 @@ const VendorOrderDetail = () => {
           </div>
         </motion.div>
       )}
+      <AdminConfirmDialog
+        open={delayDialogOpen}
+        title="Báo đơn trễ"
+        description="Nhập lý do chậm xử lý hoặc giao hàng để lưu vào đơn và thông báo cho khách."
+        selectedItems={[toDisplayOrderCode(order.code)]}
+        selectedNoun="đơn"
+        confirmLabel={isProcessing ? 'Đang gửi...' : 'Gửi ghi chú'}
+        confirmDisabled={isProcessing || !delayReason.trim()}
+        cancelDisabled={isProcessing}
+        variant="vendor"
+        onCancel={() => {
+          if (!isProcessing) {
+            setDelayDialogOpen(false);
+            setDelayReason('');
+          }
+        }}
+        onConfirm={() => void confirmNotifyDelay()}
+      >
+        <label className="form-field full">
+          <span>Lý do trễ đơn</span>
+          <textarea
+            rows={4}
+            value={delayReason}
+            onChange={(event) => setDelayReason(event.target.value)}
+            placeholder="VD: Đơn cần thêm thời gian đóng gói do thiếu hàng tạm thời"
+            autoFocus
+          />
+        </label>
+      </AdminConfirmDialog>
     </VendorLayout>
   );
 };

@@ -75,7 +75,7 @@ const AdminFinancialWalletsPanel = ({
 
   return (
     <>
-      <div className="admin-table" role="table" aria-label="Bảng đối soát tài chính sàn">
+      <div className="admin-table admin-responsive-table" role="table" aria-label="Bảng đối soát tài chính sàn">
         <div className="admin-table-row financials financial-wallets admin-table-head" role="row">
           <div role="columnheader">
             <input
@@ -157,6 +157,61 @@ const AdminFinancialWalletsPanel = ({
                 )}
               </div>
             </motion.div>
+          );
+        })}
+      </div>
+
+      <div className="admin-mobile-cards" aria-label="Danh sách ví store dạng thẻ">
+        {records.map((record) => {
+          const status = walletStatusMeta(record);
+
+          return (
+            <article key={record.id} className="admin-mobile-card">
+              <div className="admin-mobile-card-head">
+                <div className="admin-mobile-card-title">
+                  <div className="admin-mobile-card-title-main">
+                    <p className="admin-bold">{record.storeName}</p>
+                    <p className="admin-mobile-card-sub">{toStoreRef(record)}</p>
+                  </div>
+                </div>
+                <span className={`admin-pill ${status.tone}`}>{status.label}</span>
+              </div>
+              <div className="admin-mobile-card-grid">
+                <div className="admin-mobile-card-field">
+                  <span>Tổng số dư</span>
+                  <strong>{formatCurrency(record.totalBalance)}</strong>
+                </div>
+                <div className="admin-mobile-card-field">
+                  <span>Có thể rút</span>
+                  <strong>{formatCurrency(record.availableBalance)}</strong>
+                </div>
+                <div className="admin-mobile-card-field">
+                  <span>Tạm giữ</span>
+                  <strong>{formatCurrency(record.frozenBalance)}</strong>
+                </div>
+                <div className="admin-mobile-card-field">
+                  <span>Chờ duyệt</span>
+                  <strong>{formatCurrency(record.reservedBalance)}</strong>
+                </div>
+              </div>
+              <div className="admin-mobile-card-actions">
+                <button className="admin-primary-btn" type="button" onClick={() => onOpenDetail(record)}>
+                  <Eye size={16} />
+                  Xem chi tiết
+                </button>
+                {record.reservedBalance > 0 && (
+                  <button
+                    className="admin-icon-btn subtle"
+                    type="button"
+                    title="Duyệt phiếu rút đang chờ"
+                    aria-label="Duyệt phiếu rút đang chờ"
+                    onClick={() => onOpenReleaseConfirm([record.storeId])}
+                  >
+                    <CheckCircle2 size={16} />
+                  </button>
+                )}
+              </div>
+            </article>
           );
         })}
       </div>

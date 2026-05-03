@@ -2,7 +2,7 @@ import './AdminFinancials.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import AdminLayout from './AdminLayout';
 import AdminConfirmDialog from './AdminConfirmDialog';
-import { PanelStatsGrid, PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelFilterSelect, PanelSearchField, PanelStatsGrid } from '../../components/Panel/PanelPrimitives';
 import { useToast } from '../../contexts/ToastContext';
 import { walletService, type VendorWallet, type PayoutRequest } from '../../services/walletService';
 import { adminDashboardService } from '../../services/adminDashboardService';
@@ -12,18 +12,22 @@ import AdminWalletDetailDrawer from './components/financials/AdminWalletDetailDr
 import AdminPayoutDetailDrawer from './components/financials/AdminPayoutDetailDrawer';
 import { PAGE_SIZE, formatCurrency } from './components/financials/adminFinancialPresentation';
 import type { AdminTab, ConfirmState, FinancialSnapshot } from './components/financials/adminFinancialTypes';
+import { ADMIN_VIEW_KEYS } from './adminListView';
+import { useAdminViewState } from './useAdminViewState';
+
+type PayoutConfirmState = {
+  mode: 'approve' | 'reject';
+  payout: PayoutRequest;
+};
 
 const AdminFinancials = () => {
   const { addToast } = useToast();
   const [wallets, setWallets] = useState<VendorWallet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [detailRecord, setDetailRecord] = useState<VendorWallet | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
-  const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [activeTab, setActiveTab] = useState<AdminTab>('wallets');
   const [financialSnapshot, setFinancialSnapshot] = useState<FinancialSnapshot>({
     gmv: 0,
     commission: 0,
@@ -32,11 +36,20 @@ const AdminFinancials = () => {
     pendingPayoutCount: 0,
   });
   const [pendingPayouts, setPendingPayouts] = useState<PayoutRequest[]>([]);
-  const [payoutPage, setPayoutPage] = useState(1);
   const [payoutTotalPages, setPayoutTotalPages] = useState(1);
   const [selectedPayout, setSelectedPayout] = useState<PayoutRequest | null>(null);
   const [rejectNote, setRejectNote] = useState('');
   const [isApplyingPayout, setIsApplyingPayout] = useState(false);
+  const [payoutConfirm, setPayoutConfirm] = useState<PayoutConfirmState | null>(null);
+  const view = useAdminViewState({
+    storageKey: ADMIN_VIEW_KEYS.financials,
+    path: '/admin/financials',
+    validStatusKeys: ['wallets', 'payouts'],
+    defaultStatus: 'wallets',
+  });
+  const activeTab = (view.status === 'payouts' ? 'payouts' : 'wallets') as AdminTab;
+  const search = view.search;
+  const page = view.page;
 
   const fetchData = useCallback(async () => {
     try {
@@ -74,13 +87,13 @@ const AdminFinancials = () => {
 
   const fetchPendingPayouts = useCallback(async () => {
     try {
-      const result = await walletService.getPendingPayouts(payoutPage, PAGE_SIZE);
+      const result = await walletService.getPendingPayouts(page, PAGE_SIZE);
       setPendingPayouts(result.content || []);
       setPayoutTotalPages(Math.max(Number(result.totalPages || 1), 1));
     } catch {
       setPendingPayouts([]);
     }
-  }, [payoutPage]);
+  }, [page]);
 
   const fetchAllPendingPayouts = useCallback(async () => {
     const allPending: PayoutRequest[] = [];
@@ -122,10 +135,24 @@ const AdminFinancials = () => {
   );
 
   const resetCurrentView = () => {
-    setSearch('');
-    setActiveTab('wallets');
     setSelected(new Set());
-    setPage(1);
+    setDetailRecord(null);
+    setSelectedPayout(null);
+    setRejectNote('');
+    view.resetCurrentView();
+  };
+
+  const changeTab = (key: string) => {
+    setSelected(new Set());
+    setDetailRecord(null);
+    setSelectedPayout(null);
+    setRejectNote('');
+    view.setStatus(key);
+  };
+
+  const changeSearch = (value: string) => {
+    setSelected(new Set());
+    view.setSearch(value);
   };
 
   const openReleaseConfirm = (storeIds: string[]) => {
@@ -213,6 +240,34 @@ const AdminFinancials = () => {
     }
   };
 
+  const requestApprovePayout = (payout: PayoutRequest) => {
+    setPayoutConfirm({ mode: 'approve', payout });
+  };
+
+  const requestRejectPayout = (payout: PayoutRequest) => {
+    if (!rejectNote.trim()) {
+      addToast('Vui lòng nhập lý do từ chối.', 'error');
+      return;
+    }
+    setPayoutConfirm({ mode: 'reject', payout });
+  };
+
+  const confirmSinglePayoutAction = async () => {
+    if (!payoutConfirm || isApplyingPayout) return;
+
+    try {
+      setIsApplyingPayout(true);
+      if (payoutConfirm.mode === 'approve') {
+        await handleApprovePayout(payoutConfirm.payout);
+      } else {
+        await handleRejectPayout(payoutConfirm.payout);
+      }
+      setPayoutConfirm(null);
+    } finally {
+      setIsApplyingPayout(false);
+    }
+  };
+
   return (
     <AdminLayout title="Tài chính sàn" breadcrumbs={['Tài chính sàn', 'Duyệt phiếu rút tiền']}>
       <PanelStatsGrid
@@ -247,23 +302,37 @@ const AdminFinancials = () => {
         ]}
       />
 
-      <PanelTabs
-        items={[
-          { key: 'wallets', label: 'Ví store', count: records.length },
-          { key: 'payouts', label: 'Chờ duyệt rút tiền', count: totals.pendingPayoutCount },
-        ]}
-        activeKey={activeTab}
-        onChange={(key) => {
-          setActiveTab(key as AdminTab);
-          setSelected(new Set());
-          setPage(1);
-        }}
-      />
-
       <section className="admin-panels single">
         <div className="admin-panel">
           <div className="admin-panel-head">
             <h2>{activeTab === 'wallets' ? 'Ví shop và số dư rút tiền' : 'Danh sách phiếu rút tiền chờ duyệt'}</h2>
+          </div>
+          <div className="admin-filter-toolbar">
+            {activeTab === 'wallets' ? (
+              <PanelSearchField
+                placeholder="Tìm gian hàng hoặc mã ví"
+                ariaLabel="Tìm ví store"
+                value={search}
+                onChange={changeSearch}
+              />
+            ) : (
+              <span className="admin-filter-toolbar-spacer" aria-hidden="true" />
+            )}
+            <PanelFilterSelect
+              label="Chế độ"
+              ariaLabel="Chọn chế độ tài chính"
+              items={[
+                { key: 'wallets', label: 'Ví store', count: records.length },
+                { key: 'payouts', label: 'Chờ duyệt rút tiền', count: totals.pendingPayoutCount },
+              ]}
+              value={activeTab}
+              onChange={changeTab}
+            />
+            {view.hasViewContext ? (
+              <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+                Đặt lại
+              </button>
+            ) : null}
           </div>
 
           {activeTab === 'wallets' ? (
@@ -275,7 +344,7 @@ const AdminFinancials = () => {
               page={page}
               totalPages={totalPages}
               onSelectionChange={setSelected}
-              onPageChange={setPage}
+              onPageChange={view.setPage}
               onResetCurrentView={resetCurrentView}
               onOpenDetail={setDetailRecord}
               onOpenReleaseConfirm={openReleaseConfirm}
@@ -283,11 +352,13 @@ const AdminFinancials = () => {
           ) : (
             <AdminFinancialPendingPayoutsPanel
               payouts={pendingPayouts}
-              payoutPage={payoutPage}
+              payoutPage={page}
               payoutTotalPages={payoutTotalPages}
-              onPageChange={setPayoutPage}
+              onPageChange={view.setPage}
               onOpenDetail={setSelectedPayout}
-              onApprove={handleApprovePayout}
+              onApprove={(payout) => {
+                requestApprovePayout(payout);
+              }}
               onPrepareReject={(payout) => {
                 setSelectedPayout(payout);
                 setRejectNote('');
@@ -313,6 +384,27 @@ const AdminFinancials = () => {
         onConfirm={() => void applyPayout()}
       />
 
+      <AdminConfirmDialog
+        open={Boolean(payoutConfirm)}
+        title={payoutConfirm?.mode === 'approve' ? 'Duyệt phiếu rút tiền' : 'Từ chối phiếu rút tiền'}
+        description={
+          payoutConfirm?.mode === 'approve'
+            ? 'Phiếu rút tiền sẽ được chuyển sang trạng thái đã duyệt và cập nhật số dư ví store.'
+            : 'Phiếu rút tiền sẽ bị từ chối với lý do đã nhập trong hồ sơ chi tiết.'
+        }
+        selectedItems={payoutConfirm ? [payoutConfirm.payout.storeName] : undefined}
+        selectedNoun="phiếu rút"
+        confirmLabel={isApplyingPayout ? 'Đang xử lý...' : payoutConfirm?.mode === 'approve' ? 'Duyệt phiếu' : 'Từ chối phiếu'}
+        danger={payoutConfirm?.mode === 'reject'}
+        confirmDisabled={isApplyingPayout || (payoutConfirm?.mode === 'reject' && !rejectNote.trim())}
+        cancelDisabled={isApplyingPayout}
+        onCancel={() => {
+          if (isApplyingPayout) return;
+          setPayoutConfirm(null);
+        }}
+        onConfirm={() => void confirmSinglePayoutAction()}
+      />
+
       <AdminWalletDetailDrawer
         record={detailRecord}
         onClose={() => setDetailRecord(null)}
@@ -327,8 +419,12 @@ const AdminFinancials = () => {
           setSelectedPayout(null);
           setRejectNote('');
         }}
-        onReject={handleRejectPayout}
-        onApprove={handleApprovePayout}
+        onReject={(payout) => {
+          requestRejectPayout(payout);
+        }}
+        onApprove={(payout) => {
+          requestApprovePayout(payout);
+        }}
       />
     </AdminLayout>
   );

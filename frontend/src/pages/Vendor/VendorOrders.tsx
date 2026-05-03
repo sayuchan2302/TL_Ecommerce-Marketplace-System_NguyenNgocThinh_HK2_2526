@@ -5,6 +5,7 @@ import { AlertTriangle, Check, Eye, Truck, XCircle, PackageCheck } from 'lucide-
 import { Link, useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import {
+  PanelSearchField,
   PanelStatsGrid,
   PanelTableFooter,
   PanelTabs,
@@ -14,7 +15,7 @@ import {
   getVendorOrderStatusTone,
 } from './vendorOrderPresentation';
 import { formatCurrency } from '../../services/commissionService';
-import { vendorPortalService, type VendorOrdersPage } from '../../services/vendorPortalService';
+import { vendorPortalService, type VendorOrderSummary, type VendorOrdersPage } from '../../services/vendorPortalService';
 import { useToast } from '../../contexts/ToastContext';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import { AdminStateBlock, AdminTableSkeleton } from '../Admin/AdminStateBlocks';
@@ -45,6 +46,11 @@ type PendingAction = {
   selectedItems: string[];
   requireTracking?: boolean;
   requireReason?: boolean;
+};
+
+type DelayAction = {
+  ids: string[];
+  selectedItems: string[];
 };
 
 const PAGE_SIZE = 8;
@@ -156,9 +162,11 @@ const VendorOrders = () => {
   const [updating, setUpdating] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [delayAction, setDelayAction] = useState<DelayAction | null>(null);
   const [trackingNumber, setTrackingNumber] = useState('');
   const [carrier, setCarrier] = useState('');
   const [cancelReason, setCancelReason] = useState('');
+  const [delayReason, setDelayReason] = useState('');
 
   const updateQuery = useCallback(
     (mutate: (query: URLSearchParams) => void, replace = false) => {
@@ -175,10 +183,8 @@ const VendorOrders = () => {
   );
 
   useEffect(() => {
-    if (searchQuery !== keyword) {
-      setSearchQuery(keyword);
-    }
-  }, [keyword, searchQuery]);
+    setSearchQuery(keyword);
+  }, [keyword]);
 
   useEffect(() => {
     if (searchQuery.trim() === keyword) {
@@ -279,6 +285,18 @@ const VendorOrders = () => {
     });
   };
 
+  const handleDateFilterChange = (key: 'date_from' | 'date_to', value: string) => {
+    setSelected(new Set());
+    updateQuery((query) => {
+      if (value) {
+        query.set(key, value);
+      } else {
+        query.delete(key);
+      }
+      query.set('page', '1');
+    });
+  };
+
   const setPage = (nextPage: number) => {
     updateQuery((query) => {
       query.set('page', String(Math.max(1, nextPage)));
@@ -368,17 +386,34 @@ const VendorOrders = () => {
     }
   };
 
-  const handleNotifyDelay = async (ids: string[]) => {
+  const requestDelayNotice = (ids: string[]) => {
     if (ids.length === 0) return;
-    const note = window.prompt('Nhập lý do chậm xử lý / giao hàng');
-    if (!note || !note.trim()) {
+    const selectedOrders = paginatedOrders.filter((order) => ids.includes(order.id));
+    if (selectedOrders.length === 0) {
+      return;
+    }
+
+    setDelayReason('');
+    setDelayAction({
+      ids,
+      selectedItems: selectedOrders.map((order) => toDisplayOrderCode(order.code)),
+    });
+  };
+
+  const confirmDelayNotice = async () => {
+    if (!delayAction) return;
+
+    const note = delayReason.trim();
+    if (!note) {
       addToast('Cần nhập lý do để gửi cảnh báo trễ đơn.', 'error');
       return;
     }
 
     setUpdating(true);
     try {
-      await Promise.all(ids.map((id) => vendorPortalService.notifyDelay(id, note.trim())));
+      await Promise.all(delayAction.ids.map((id) => vendorPortalService.notifyDelay(id, note)));
+      setDelayAction(null);
+      setDelayReason('');
       addToast('Đã gửi ghi chú trễ đơn cho các đơn đã chọn.', 'success');
       await loadOrders();
     } catch (err: unknown) {
@@ -427,10 +462,95 @@ const VendorOrders = () => {
     label: tab.label,
     count: tabCounts[tab.key],
   }));
-
-
-
   const allSelected = paginatedOrders.length > 0 && selected.size === paginatedOrders.length;
+  const isPendingConfirmDisabled = updating
+    || Boolean(pendingAction?.requireTracking && (!trackingNumber.trim() || !carrier.trim()))
+    || Boolean(pendingAction?.requireReason && !cancelReason.trim());
+  const isDelayConfirmDisabled = updating || !delayReason.trim();
+
+  const renderOrderActions = (order: VendorOrderSummary) => (
+    <div className="admin-actions vendor-order-actions">
+      <Link to={`/vendor/orders/${resolveDetailRouteKey(order.code, order.id)}`} className="admin-icon-btn subtle" title="Chi tiết đơn hàng" aria-label={`Chi tiết đơn ${toDisplayOrderCode(order.code)}`}>
+        <Eye size={16} />
+      </Link>
+      {order.status === 'pending' && (
+        <button
+          className="admin-icon-btn subtle"
+          title="Xác nhận đơn"
+          aria-label={`Xác nhận đơn ${toDisplayOrderCode(order.code)}`}
+          onClick={() => askStatusUpdate([order.id], 'CONFIRMED')}
+          disabled={updating}
+        >
+          <Check size={16} />
+        </button>
+      )}
+      {order.status === 'confirmed' && (
+        <button
+          className="admin-icon-btn subtle"
+          title="Bắt đầu xử lý"
+          aria-label={`Bắt đầu xử lý đơn ${toDisplayOrderCode(order.code)}`}
+          onClick={() => askStatusUpdate([order.id], 'PROCESSING')}
+          disabled={updating}
+        >
+          <PackageCheck size={16} />
+        </button>
+      )}
+      {order.status === 'processing' && (
+        <button
+          className="admin-icon-btn subtle"
+          title="Bàn giao vận chuyển"
+          aria-label={`Bàn giao vận chuyển đơn ${toDisplayOrderCode(order.code)}`}
+          onClick={() => askStatusUpdate([order.id], 'SHIPPED')}
+          disabled={updating}
+        >
+          <Truck size={16} />
+        </button>
+      )}
+      {order.status === 'shipped' && (
+        <button
+          className="admin-icon-btn subtle"
+          title="Xác nhận đã giao"
+          aria-label={`Xác nhận đã giao đơn ${toDisplayOrderCode(order.code)}`}
+          onClick={() => askStatusUpdate([order.id], 'DELIVERED')}
+          disabled={updating}
+        >
+          <PackageCheck size={16} />
+        </button>
+      )}
+      {order.status !== 'pending'
+        && order.status !== 'confirmed'
+        && order.status !== 'processing'
+        && order.status !== 'shipped' && (
+        <span className="vendor-order-action-slot" aria-hidden="true" />
+      )}
+      {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing') ? (
+        <button
+          className="admin-icon-btn subtle danger-icon"
+          title="Hủy đơn"
+          aria-label={`Hủy đơn ${toDisplayOrderCode(order.code)}`}
+          onClick={() => askStatusUpdate([order.id], 'CANCELLED')}
+          disabled={updating}
+        >
+          <XCircle size={16} />
+        </button>
+      ) : (
+        <span className="vendor-order-action-slot" aria-hidden="true" />
+      )}
+      {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped') ? (
+        <button
+          className="admin-icon-btn subtle"
+          title="Báo đơn trễ"
+          aria-label={`Báo đơn trễ ${toDisplayOrderCode(order.code)}`}
+          onClick={() => requestDelayNotice([order.id])}
+          disabled={updating}
+        >
+          <AlertTriangle size={16} />
+        </button>
+      ) : (
+        <span className="vendor-order-action-slot" aria-hidden="true" />
+      )}
+    </div>
+  );
 
   return (
     <VendorLayout
@@ -442,9 +562,35 @@ const VendorOrders = () => {
       </div>
 
       <div className="admin-panels single">
-         <div className="admin-toolbar">
-            <PanelTabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} accentClassName="vendor-active-tab" />
-          </div>
+        <div className="admin-toolbar vendor-filter-toolbar">
+          <PanelSearchField
+            placeholder="Tìm theo khách hàng, email, mã đơn..."
+            ariaLabel="Tìm đơn hàng shop"
+            value={searchQuery}
+            onChange={setSearchQuery}
+          />
+          <label className="vendor-date-field">
+            <span>Từ ngày</span>
+            <input
+              type="date"
+              value={dateFrom}
+              aria-label="Lọc đơn từ ngày"
+              onChange={(event) => handleDateFilterChange('date_from', event.target.value)}
+            />
+          </label>
+          <label className="vendor-date-field">
+            <span>Đến ngày</span>
+            <input
+              type="date"
+              value={dateTo}
+              aria-label="Lọc đơn đến ngày"
+              onChange={(event) => handleDateFilterChange('date_to', event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="admin-toolbar vendor-tabs-toolbar">
+          <PanelTabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} accentClassName="vendor-active-tab" />
+        </div>
         <div className="admin-panel">
           
          
@@ -475,7 +621,7 @@ const VendorOrders = () => {
             />
           ) : (
             <>
-              <div className="admin-table vendor-table">
+              <div className="admin-table vendor-table vendor-orders-table">
                 <div className="admin-table-head admin-table-row vendor-orders">
 <div>
                     <input
@@ -550,82 +696,82 @@ const VendorOrders = () => {
                         <span className="order-date-time">{new Date(order.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span>
                         <span className="order-date-day">{new Date(order.date).toLocaleDateString('vi-VN')}</span>
                       </div>
-                      <div className="admin-actions vendor-order-actions">
-                        <Link to={`/vendor/orders/${resolveDetailRouteKey(order.code, order.id)}`} className="admin-icon-btn subtle" title="Chi tiết đơn hàng">
-                          <Eye size={16} />
-                        </Link>
-                        {order.status === 'pending' && (
-                          <button
-                            className="admin-icon-btn subtle"
-                            title="Xác nhận đơn"
-                            onClick={() => askStatusUpdate([order.id], 'CONFIRMED')}
-                            disabled={updating}
-                          >
-                            <Check size={16} />
-                          </button>
-                        )}
-                        {order.status === 'confirmed' && (
-                          <button
-                            className="admin-icon-btn subtle"
-                            title="Bắt đầu xử lý"
-                            onClick={() => askStatusUpdate([order.id], 'PROCESSING')}
-                            disabled={updating}
-                          >
-                            <PackageCheck size={16} />
-                          </button>
-                        )}
-                        {order.status === 'processing' && (
-                          <button
-                            className="admin-icon-btn subtle"
-                            title="Bàn giao vận chuyển"
-                            onClick={() => askStatusUpdate([order.id], 'SHIPPED')}
-                            disabled={updating}
-                          >
-                            <Truck size={16} />
-                          </button>
-                        )}
-                        {order.status === 'shipped' && (
-                          <button
-                            className="admin-icon-btn subtle"
-                            title="Xác nhận đã giao"
-                            onClick={() => askStatusUpdate([order.id], 'DELIVERED')}
-                            disabled={updating}
-                          >
-                            <PackageCheck size={16} />
-                          </button>
-                        )}
-                        {order.status !== 'pending'
-                          && order.status !== 'confirmed'
-                          && order.status !== 'processing'
-                          && order.status !== 'shipped' && (
-                          <span className="vendor-order-action-slot" aria-hidden="true" />
-                        )}
-                        {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing') ? (
-                          <button
-                            className="admin-icon-btn subtle danger-icon"
-                            title="Hủy đơn"
-                            onClick={() => askStatusUpdate([order.id], 'CANCELLED')}
-                            disabled={updating}
-                          >
-                            <XCircle size={16} />
-                          </button>
-                        ) : (
-                          <span className="vendor-order-action-slot" aria-hidden="true" />
-                        )}
-                        {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped') ? (
-                          <button
-                            className="admin-icon-btn subtle"
-                            title="Báo đơn trễ"
-                            onClick={() => void handleNotifyDelay([order.id])}
-                            disabled={updating}
-                          >
-                            <AlertTriangle size={16} />
-                          </button>
-                        ) : (
-                          <span className="vendor-order-action-slot" aria-hidden="true" />
-                        )}
-                      </div>
+                      {renderOrderActions(order)}
                     </motion.div>
+                  );
+                })}
+              </div>
+
+              <div className="vendor-mobile-cards vendor-order-card-list" aria-label="Danh sách đơn hàng dạng thẻ">
+                {paginatedOrders.map((order, index) => {
+                  const statusTone = getVendorOrderStatusTone(order.status);
+                  const statusLabel = getVendorOrderStatusLabel(order.status);
+                  const isSelected = selected.has(order.id);
+                  const productVariantLine = [order.productMeta, order.productExtra]
+                    .map((value) => value?.trim())
+                    .filter(Boolean)
+                    .join(' · ');
+
+                  return (
+                    <motion.article
+                      key={`order-card-${order.id}`}
+                      className="vendor-mobile-card vendor-order-card"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.16, delay: Math.min(index * 0.02, 0.1) }}
+                    >
+                      <div className="vendor-card-head">
+                        <label className="vendor-card-check">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            aria-label={`Chọn đơn ${toDisplayOrderCode(order.code)}`}
+                            onChange={(event) => toggleOne(order.id, event.target.checked)}
+                          />
+                          <span>#{toDisplayOrderCode(order.code)}</span>
+                        </label>
+                        <span className={`admin-pill ${statusTone}`}>{statusLabel}</span>
+                      </div>
+
+                      <div className="vendor-card-product">
+                        <img
+                          src={order.productImage || order.thumb}
+                          alt={order.productName || 'Sản phẩm'}
+                          className="vendor-admin-thumb"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        <div className="order-product-copy">
+                          <p className="admin-bold order-product-name" title={order.productName || 'Sản phẩm'}>
+                            {order.productName || 'Sản phẩm'}
+                          </p>
+                          {productVariantLine ? (
+                            <p className="admin-muted order-product-meta" title={productVariantLine}>{productVariantLine}</p>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="vendor-card-meta-grid">
+                        <div>
+                          <span>Khách hàng</span>
+                          <strong>{order.customer}</strong>
+                          <small>{order.email}</small>
+                        </div>
+                        <div>
+                          <span>Giá trị</span>
+                          <strong>{formatCurrency(order.total)}</strong>
+                        </div>
+                        <div>
+                          <span>Thời gian</span>
+                          <strong>{new Date(order.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</strong>
+                          <small>{new Date(order.date).toLocaleDateString('vi-VN')}</small>
+                        </div>
+                      </div>
+
+                      <div className="vendor-card-actions">
+                        {renderOrderActions(order)}
+                      </div>
+                    </motion.article>
                   );
                 })}
               </div>
@@ -646,9 +792,18 @@ const VendorOrders = () => {
         title={pendingAction?.title || ''}
         description={pendingAction?.description || ''}
         selectedItems={pendingAction?.selectedItems}
-        confirmLabel={pendingAction?.confirmLabel || 'Xác nhận'}
+        confirmLabel={updating ? 'Đang xử lý...' : pendingAction?.confirmLabel || 'Xác nhận'}
+        confirmDisabled={isPendingConfirmDisabled}
+        cancelDisabled={updating}
         variant="vendor"
-        onCancel={() => setPendingAction(null)}
+        onCancel={() => {
+          if (!updating) {
+            setPendingAction(null);
+            setTrackingNumber('');
+            setCarrier('');
+            setCancelReason('');
+          }
+        }}
         onConfirm={() => void confirmPendingAction()}
       >
         {pendingAction?.requireTracking && (
@@ -682,6 +837,36 @@ const VendorOrders = () => {
             />
           </label>
         )}
+      </AdminConfirmDialog>
+
+      <AdminConfirmDialog
+        open={Boolean(delayAction)}
+        title="Báo đơn trễ"
+        description="Nhập lý do chậm xử lý hoặc giao hàng để lưu audit và thông báo cho khách."
+        selectedItems={delayAction?.selectedItems}
+        selectedNoun="đơn"
+        confirmLabel={updating ? 'Đang gửi...' : 'Gửi ghi chú'}
+        confirmDisabled={isDelayConfirmDisabled}
+        cancelDisabled={updating}
+        variant="vendor"
+        onCancel={() => {
+          if (!updating) {
+            setDelayAction(null);
+            setDelayReason('');
+          }
+        }}
+        onConfirm={() => void confirmDelayNotice()}
+      >
+        <label className="form-field full">
+          <span>Lý do trễ đơn</span>
+          <textarea
+            rows={4}
+            value={delayReason}
+            onChange={(event) => setDelayReason(event.target.value)}
+            placeholder="VD: Shop cần thêm thời gian đóng gói do thiếu hàng tạm thời"
+            autoFocus
+          />
+        </label>
       </AdminConfirmDialog>
     </VendorLayout>
   );

@@ -11,7 +11,7 @@ type Props = {
   payoutTotalPages: number;
   onPageChange: (page: number) => void;
   onOpenDetail: (payout: PayoutRequest) => void;
-  onApprove: (payout: PayoutRequest) => Promise<void>;
+  onApprove: (payout: PayoutRequest) => void | Promise<void>;
   onPrepareReject: (payout: PayoutRequest) => void;
 };
 
@@ -36,7 +36,7 @@ const AdminFinancialPendingPayoutsPanel = ({
 
   return (
     <>
-      <div className="admin-table" role="table" aria-label="Bảng yêu cầu rút tiền">
+      <div className="admin-table admin-responsive-table" role="table" aria-label="Bảng yêu cầu rút tiền">
         <div className="admin-table-row financials financial-payouts admin-table-head" role="row">
           <div role="columnheader">STT</div>
           <div role="columnheader">Store</div>
@@ -85,6 +85,58 @@ const AdminFinancialPendingPayoutsPanel = ({
               </button>
             </div>
           </motion.div>
+        ))}
+      </div>
+
+      <div className="admin-mobile-cards" aria-label="Danh sách phiếu rút tiền dạng thẻ">
+        {payouts.map((payout) => (
+          <article key={payout.id} className="admin-mobile-card">
+            <div className="admin-mobile-card-head">
+              <div className="admin-mobile-card-title">
+                <div className="admin-mobile-card-title-main">
+                  <p className="admin-bold">{payout.storeName}</p>
+                  <p className="admin-mobile-card-sub">{toStoreRef({ storeSlug: payout.storeSlug })}</p>
+                </div>
+              </div>
+              <span className="admin-pill pending">Chờ duyệt</span>
+            </div>
+            <div className="admin-mobile-card-grid">
+              <div className="admin-mobile-card-field">
+                <span>Số tiền</span>
+                <strong>{formatCurrency(payout.amount)}</strong>
+              </div>
+              <div className="admin-mobile-card-field">
+                <span>Ngân hàng</span>
+                <strong>{payout.bankName}</strong>
+              </div>
+              <div className="admin-mobile-card-field">
+                <span>STK</span>
+                <strong>{payout.bankAccountNumber}</strong>
+              </div>
+              <div className="admin-mobile-card-field">
+                <span>Ngày yêu cầu</span>
+                <strong>{new Date(payout.createdAt).toLocaleString('vi-VN')}</strong>
+              </div>
+            </div>
+            <div className="admin-mobile-card-actions">
+              <button className="admin-primary-btn" type="button" onClick={() => onOpenDetail(payout)}>
+                <Eye size={16} />
+                Xem chi tiết
+              </button>
+              <button className="admin-icon-btn subtle" type="button" title="Duyệt" aria-label="Duyệt phiếu rút" onClick={() => void onApprove(payout)}>
+                <CheckCircle2 size={16} />
+              </button>
+              <button
+                className="admin-icon-btn subtle danger-icon"
+                type="button"
+                title="Từ chối"
+                aria-label="Từ chối phiếu rút"
+                onClick={() => onPrepareReject(payout)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </article>
         ))}
       </div>
 

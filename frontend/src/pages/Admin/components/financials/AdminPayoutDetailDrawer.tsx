@@ -8,8 +8,8 @@ type Props = {
   rejectNote: string;
   onRejectNoteChange: (note: string) => void;
   onClose: () => void;
-  onReject: (payout: PayoutRequest) => Promise<void>;
-  onApprove: (payout: PayoutRequest) => Promise<void>;
+  onReject: (payout: PayoutRequest) => void | Promise<void>;
+  onApprove: (payout: PayoutRequest) => void | Promise<void>;
 };
 
 const AdminPayoutDetailDrawer = ({

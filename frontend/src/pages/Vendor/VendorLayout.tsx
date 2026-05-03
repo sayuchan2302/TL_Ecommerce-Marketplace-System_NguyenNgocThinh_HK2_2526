@@ -11,6 +11,7 @@ interface VendorLayoutProps {
   actions?: ReactNode;
   children: ReactNode;
   hideTopbarTitle?: boolean;
+  hideHeaderSearch?: boolean;
   breadcrumbs?: string[];
   shellRoot?: boolean;
 }
@@ -21,7 +22,15 @@ let vendorStoreNameMemoryCache = '';
 
 const vendorNavItems: PanelNavItem[] = vendorPanelNav;
 
-const VendorLayout = ({ title, actions, children, hideTopbarTitle = false, breadcrumbs, shellRoot = false }: VendorLayoutProps) => {
+const VendorLayout = ({
+  title,
+  actions,
+  children,
+  hideTopbarTitle = false,
+  hideHeaderSearch = true,
+  breadcrumbs,
+  shellRoot = false,
+}: VendorLayoutProps) => {
   const getInitialStoreName = () => {
     if (vendorStoreNameMemoryCache) return vendorStoreNameMemoryCache;
     if (typeof window === 'undefined') return '';
@@ -73,6 +82,7 @@ const VendorLayout = ({ title, actions, children, hideTopbarTitle = false, bread
       actions={actions}
       variant="vendor"
       hideTopbarTitle={hideTopbarTitle}
+      hideHeaderSearch={hideHeaderSearch}
       hideSidebarCard
       breadcrumbs={normalizedBreadcrumbs}
       navItems={vendorNavItems}

@@ -1,7 +1,7 @@
 import './Admin.css';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LayoutGrid, Search, Bell, Settings, ChevronRight, LogOut, Home } from 'lucide-react';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ADMIN_DICTIONARY } from './adminDictionary';
 import { useAuth } from '../../contexts/AuthContext';
@@ -30,6 +30,7 @@ interface AdminLayoutProps {
   sidebarCtaLabel?: string;
   sidebarCtaTo?: string;
   searchPlaceholder?: string;
+  hideHeaderSearch?: boolean;
   notificationsLabel?: string;
   settingsLabel?: string;
   hideSidebarCard?: boolean;
@@ -53,6 +54,7 @@ const AdminLayout = ({
   sidebarCtaLabel,
   sidebarCtaTo,
   searchPlaceholder,
+  hideHeaderSearch,
   notificationsLabel,
   settingsLabel,
   hideSidebarCard = false,
@@ -65,7 +67,9 @@ const AdminLayout = ({
   const { addToast } = useToast();
   const { user: sessionUser, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const avatarWrapperRef = useRef<HTMLDivElement>(null);
   const t = ADMIN_DICTIONARY.layout;
+  const avatarMenuId = 'admin-avatar-menu';
   const resolvedSidebarDescription = sidebarDescription ?? t.sidebar.description;
   const resolvedSidebarCtaLabel = sidebarCtaLabel ?? t.sidebar.cta;
   const shouldRenderSidebarCard =
@@ -78,6 +82,7 @@ const AdminLayout = ({
   const displayAvatar = sessionUser?.avatar || displayName.charAt(0).toUpperCase() || '?';
 
   const handleLogout = () => {
+    setIsDropdownOpen(false);
     logout();
     addToast('Đã đăng xuất', 'info');
     navigate('/');
@@ -106,9 +111,33 @@ const AdminLayout = ({
 
   useEffect(() => {
     if (!shellRoot && setShellState) {
-      setShellState({ title, actions, hideTopbarTitle, breadcrumbs });
+      setShellState({ title, actions, hideTopbarTitle, breadcrumbs, hideHeaderSearch });
     }
-  }, [actions, breadcrumbs, hideTopbarTitle, setShellState, shellRoot, title]);
+  }, [actions, breadcrumbs, hideHeaderSearch, hideTopbarTitle, setShellState, shellRoot, title]);
+
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!avatarWrapperRef.current?.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isDropdownOpen]);
 
   if (shouldRenderNestedContent) {
     // When wrapped by a parent AdminLayout, only render content; shell (sidebar/header) handled by parent.
@@ -149,7 +178,7 @@ const AdminLayout = ({
       </aside>
 
       <main className="admin-main">
-        <header className="admin-header">
+        <header className={`admin-header ${hideHeaderSearch ? 'no-search' : ''}`.trim()}>
           <div className="admin-breadcrumbs" aria-label="Breadcrumb">
             {crumbs.map((crumb, idx) => (
               <span key={`${crumb}-${idx}`} className="breadcrumb-item">
@@ -159,13 +188,15 @@ const AdminLayout = ({
             ))}
           </div>
 
-          <div className="admin-header-search">
-            <Search size={16} />
-            <input
-              placeholder={searchPlaceholder || t.searchPlaceholder}
-              aria-label={searchPlaceholder || t.searchPlaceholder}
-            />
-          </div>
+          {!hideHeaderSearch ? (
+            <div className="admin-header-search">
+              <Search size={16} />
+              <input
+                placeholder={searchPlaceholder || t.searchPlaceholder}
+                aria-label={searchPlaceholder || t.searchPlaceholder}
+              />
+            </div>
+          ) : null}
 
           <div className="admin-header-actions">
             <button className="admin-icon-btn subtle has-dot" aria-label={notificationsLabel || t.notifications}>
@@ -176,15 +207,21 @@ const AdminLayout = ({
               <Settings size={16} />
             </button>
             <div
+              ref={avatarWrapperRef}
               className="admin-avatar-wrapper"
-              onMouseEnter={() => setIsDropdownOpen(true)}
-              onMouseLeave={() => setIsDropdownOpen(false)}
             >
-              <button className="admin-avatar-btn">
+              <button
+                type="button"
+                className="admin-avatar-btn"
+                aria-haspopup="menu"
+                aria-expanded={isDropdownOpen}
+                aria-controls={avatarMenuId}
+                onClick={() => setIsDropdownOpen((open) => !open)}
+              >
                 <span className="avatar-circle">{displayAvatar}</span>
                 <span className="avatar-name">{displayName}</span>
               </button>
-              <div className={`admin-avatar-dropdown ${isDropdownOpen ? 'show' : ''}`}>
+              <div id={avatarMenuId} className={`admin-avatar-dropdown ${isDropdownOpen ? 'show' : ''}`} role="menu">
                 <div className="admin-dropdown-header">
                   <span className="admin-dropdown-avatar">{displayAvatar}</span>
                   <div className="admin-dropdown-info">
@@ -193,12 +230,12 @@ const AdminLayout = ({
                   </div>
                 </div>
                 <div className="admin-dropdown-divider"></div>
-                <button className="admin-dropdown-item" onClick={handleGoHome}>
+                <button className="admin-dropdown-item" onClick={handleGoHome} role="menuitem">
                   <Home size={16} />
                   Quay về trang chủ
                 </button>
                 <div className="admin-dropdown-divider"></div>
-                <button className="admin-dropdown-item logout" onClick={handleLogout}>
+                <button className="admin-dropdown-item logout" onClick={handleLogout} role="menuitem">
                   <LogOut size={16} />
                   Đăng xuất
                 </button>

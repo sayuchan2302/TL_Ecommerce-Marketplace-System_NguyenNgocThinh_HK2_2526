@@ -21,6 +21,7 @@ const AdminReturns = lazy(() => import('./AdminReturns'));
 const AdminProductGovernance = lazy(() => import('./AdminProductGovernance'));
 
 const defaultShellState: AdminShellState = {
+  hideHeaderSearch: true,
   title: 'Tổng quan',
 };
 
@@ -89,6 +90,7 @@ const areReactNodesEqual = (left: ReactNode, right: ReactNode): boolean => {
 
 const areShellStatesEqual = (left: AdminShellState, right: AdminShellState) =>
   left.hideTopbarTitle === right.hideTopbarTitle &&
+  left.hideHeaderSearch === right.hideHeaderSearch &&
   areReactNodesEqual(left.title, right.title) &&
   areReactNodesEqual(left.actions, right.actions) &&
   (left.breadcrumbs?.length || 0) === (right.breadcrumbs?.length || 0) &&
@@ -112,6 +114,7 @@ const AdminWorkspace = () => {
         title={shellState.title}
         actions={shellState.actions}
         hideTopbarTitle={shellState.hideTopbarTitle}
+        hideHeaderSearch={shellState.hideHeaderSearch ?? true}
         breadcrumbs={shellState.breadcrumbs}
         shellRoot
       >

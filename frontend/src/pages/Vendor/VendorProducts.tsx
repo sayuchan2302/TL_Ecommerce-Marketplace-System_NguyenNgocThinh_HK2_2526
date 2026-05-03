@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import VendorLayout from './VendorLayout';
 import { useToast } from '../../contexts/ToastContext';
-import { PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelSearchField, PanelTabs } from '../../components/Panel/PanelPrimitives';
 import { AdminToast } from '../Admin/AdminStateBlocks';
 import { PRODUCT_TABS, PAGE_SIZE } from './vendorProducts.constants';
 import { useVendorProductsQueryState } from './useVendorProductsQueryState';
@@ -95,6 +95,36 @@ const VendorProducts = () => {
   const endIndex = Math.min(page * PAGE_SIZE, totalElements);
   const productIds = useMemo(() => products.map((product) => product.id), [products]);
   const allSelected = productIds.length > 0 && selection.selected.size === productIds.length;
+  const clearProductSelection = selection.clearSelection;
+  const [searchQuery, setSearchQuery] = useState(keyword);
+
+  useEffect(() => {
+    setSearchQuery(keyword);
+  }, [keyword]);
+
+  useEffect(() => {
+    if (searchQuery.trim() === keyword) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      clearProductSelection();
+      updateQuery(
+        (query) => {
+          const normalized = searchQuery.trim();
+          if (normalized) {
+            query.set('q', normalized);
+          } else {
+            query.delete('q');
+          }
+          query.set('page', '1');
+        },
+        true,
+      );
+    }, 260);
+
+    return () => window.clearTimeout(timer);
+  }, [clearProductSelection, keyword, searchQuery, updateQuery]);
 
   const tabItems = PRODUCT_TABS.map((tab) => ({
     key: tab.key,
@@ -107,6 +137,7 @@ const VendorProducts = () => {
           ? statusCounts.outOfStock
           : statusCounts.draft,
   }));
+  const hasViewContext = activeTab !== 'all' || Boolean(keyword);
 
   return (
     <VendorLayout
@@ -121,7 +152,18 @@ const VendorProducts = () => {
     >
       <VendorProductsStats statusCounts={statusCounts} onTabChange={handleTabChange} />
 
-      <PanelTabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} accentClassName="vendor-active-tab" />
+      <div className="admin-toolbar vendor-filter-toolbar">
+        <PanelSearchField
+          placeholder="Tìm sản phẩm, SKU..."
+          ariaLabel="Tìm sản phẩm shop"
+          value={searchQuery}
+          onChange={setSearchQuery}
+        />
+      </div>
+
+      <div className="admin-toolbar vendor-tabs-toolbar">
+        <PanelTabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} accentClassName="vendor-active-tab" />
+      </div>
 
       <section className="admin-panels single">
         <div className="admin-panel">
@@ -134,7 +176,7 @@ const VendorProducts = () => {
           <VendorProductsTable
             loading={loading}
             loadError={loadError}
-            keyword={keyword}
+            hasViewContext={hasViewContext}
             products={products}
             allSelected={allSelected}
             working={bulkActions.working}

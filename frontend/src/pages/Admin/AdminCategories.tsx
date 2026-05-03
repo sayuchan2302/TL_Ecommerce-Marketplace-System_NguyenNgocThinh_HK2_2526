@@ -6,12 +6,15 @@ import AdminLayout from './AdminLayout';
 import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminStateBlock } from './AdminStateBlocks';
 import { useAdminToast } from './useAdminToast';
-import { PanelStatsGrid, PanelTabs, PanelTableFooter } from '../../components/Panel/PanelPrimitives';
+import { PanelFilterSelect, PanelSearchField, PanelStatsGrid, PanelTableFooter } from '../../components/Panel/PanelPrimitives';
 
 import { adminCategoryService, type Category } from './adminCategoryService';
 import { PLACEHOLDER_CATEGORY_IMAGE } from '../../constants/placeholders';
+import { ADMIN_VIEW_KEYS } from './adminListView';
+import { useAdminViewState } from './useAdminViewState';
 
-type CategoryFilter = 'all' | 'visible' | 'hidden' | 'leaf';
+type CategoryVisibilityFilter = 'all' | 'visible' | 'hidden';
+type CategoryLevelFilter = 'all' | 'root' | 'leaf';
 
 interface CategoryDraft {
   id: string;
@@ -39,7 +42,8 @@ const emptyDraft: CategoryDraft = {
   description: '',
 };
 
-const validFilters = new Set<CategoryFilter>(['all', 'visible', 'hidden', 'leaf']);
+const validVisibilityFilters = new Set<CategoryVisibilityFilter>(['all', 'visible', 'hidden']);
+const validLevelFilters = new Set<CategoryLevelFilter>(['all', 'root', 'leaf']);
 const CATEGORY_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 const toSlug = (value: string) =>
@@ -58,8 +62,6 @@ const AdminCategories = () => {
   const { pushToast, toast } = useAdminToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<CategoryFilter>('all');
-  const [search, setSearch] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string>('');
   const [draftMode, setDraftMode] = useState<DraftMode>('view');
@@ -67,8 +69,20 @@ const AdminCategories = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
-  const [page, setPage] = useState(0);
   const PAGE_SIZE = 12;
+  const view = useAdminViewState({
+    storageKey: ADMIN_VIEW_KEYS.categories,
+    path: '/admin/categories',
+    validStatusKeys: Array.from(validVisibilityFilters),
+    defaultStatus: 'all',
+    extraFilters: [
+      { key: 'level', defaultValue: 'all', validate: (value) => validLevelFilters.has(value as CategoryLevelFilter) },
+    ],
+  });
+  const visibilityFilter = (validVisibilityFilters.has(view.status as CategoryVisibilityFilter) ? view.status : 'all') as CategoryVisibilityFilter;
+  const levelFilter = (validLevelFilters.has(view.extras.level as CategoryLevelFilter) ? view.extras.level : 'all') as CategoryLevelFilter;
+  const search = view.search;
+  const page = Math.max(0, view.page - 1);
 
   const loadCategories = useCallback(async () => {
     setIsLoading(true);
@@ -168,11 +182,12 @@ const AdminCategories = () => {
   );
 
   const passesFilter = useCallback((item: Category) => {
-    if (activeFilter === 'visible') return item.status === 'visible';
-    if (activeFilter === 'hidden') return item.status === 'hidden';
-    if (activeFilter === 'leaf') return isLeaf.has(item.id);
+    if (visibilityFilter === 'visible' && item.status !== 'visible') return false;
+    if (visibilityFilter === 'hidden' && item.status !== 'hidden') return false;
+    if (levelFilter === 'root' && item.parentId) return false;
+    if (levelFilter === 'leaf' && !isLeaf.has(item.id)) return false;
     return true;
-  }, [activeFilter, isLeaf]);
+  }, [isLeaf, levelFilter, visibilityFilter]);
 
   const query = search.trim().toLowerCase();
   const searchMatches = useMemo(() => {
@@ -224,21 +239,40 @@ const AdminCategories = () => {
   }, [byId, categories, passesFilter, searchMatches]);
 
   const paginatedCategories = useMemo(() => {
-    const start = page * PAGE_SIZE;
+    const safePage = Math.min(page, Math.max(0, Math.ceil(flatFilteredCategories.length / PAGE_SIZE) - 1));
+    const start = safePage * PAGE_SIZE;
     return flatFilteredCategories.slice(start, start + PAGE_SIZE);
   }, [flatFilteredCategories, page]);
 
   const totalPages = Math.ceil(flatFilteredCategories.length / PAGE_SIZE) || 1;
-
-  useEffect(() => {
-    setPage(0);
-  }, [activeFilter, search]);
-
-
+  const currentPageIndex = Math.min(page, totalPages - 1);
 
   const resetView = () => {
-    setActiveFilter('all');
-    setSearch('');
+    setSelectedId('');
+    setDraftMode('view');
+    setDraft(emptyDraft);
+    view.resetCurrentView();
+  };
+
+  const resetCategoryContext = () => {
+    setSelectedId('');
+    setDraftMode('view');
+    setDraft(emptyDraft);
+  };
+
+  const changeVisibilityFilter = (key: string) => {
+    resetCategoryContext();
+    view.setStatus((validVisibilityFilters.has(key as CategoryVisibilityFilter) ? key : 'all') as CategoryVisibilityFilter);
+  };
+
+  const changeLevelFilter = (key: string) => {
+    resetCategoryContext();
+    view.setExtra('level', validLevelFilters.has(key as CategoryLevelFilter) ? key : 'all');
+  };
+
+  const changeSearch = (value: string) => {
+    resetCategoryContext();
+    view.setSearch(value);
   };
 
   const openEditor = (category: Category, mode: DraftMode = 'edit') => {
@@ -507,7 +541,6 @@ const AdminCategories = () => {
   const deleteTarget = deleteId ? byId.get(deleteId) || null : null;
   const selectedPath = selectedCategory ? buildPath(selectedCategory.id, byId) : [];
   const draftParentLabel = draft.parentId ? byId.get(draft.parentId)?.name || 'Không xác định' : 'Danh mục gốc';
-
   return (
     <AdminLayout
       title="Danh mục"
@@ -518,20 +551,9 @@ const AdminCategories = () => {
         items={[
           { key: 'all', label: 'Tổng danh mục', value: stats.all, sub: 'Toàn bộ danh mục đang quản lý' },
           { key: 'root', label: 'Danh mục gốc', value: stats.root, sub: 'Cấp 1 điều hướng toàn sàn', tone: 'info' },
-          { key: 'leaf', label: 'Danh mục lá', value: stats.leaf, sub: 'Nhà bán hàng chỉ được chọn nhóm này', tone: 'success', onClick: () => setActiveFilter('leaf') },
+          { key: 'leaf', label: 'Danh mục lá', value: stats.leaf, sub: 'Nhà bán hàng chỉ được chọn nhóm này', tone: 'success', onClick: () => changeLevelFilter('leaf') },
           { key: 'hidden', label: 'Đã ẩn', value: stats.hidden, sub: 'Nhóm đang tạm ngưng phân phối', tone: stats.hidden > 0 ? 'warning' : '' },
         ]}
-      />
-
-      <PanelTabs
-        items={[
-          { key: 'all', label: 'Tất cả', count: stats.all },
-          { key: 'visible', label: 'Đang hiện', count: stats.visible },
-          { key: 'hidden', label: 'Đã ẩn', count: stats.hidden },
-          { key: 'leaf', label: 'Danh mục lá', count: stats.leaf },
-        ]}
-        activeKey={activeFilter}
-        onChange={(key) => setActiveFilter((validFilters.has(key as CategoryFilter) ? key : 'all') as CategoryFilter)}
       />
 
       <section className="admin-panels category-manager-layout">
@@ -666,6 +688,41 @@ const AdminCategories = () => {
               <h2>Danh sách rà soát danh mục</h2>
             </div>
           </div>
+          <div className="admin-filter-toolbar">
+            <PanelSearchField
+              placeholder="Tìm tên, slug hoặc đường dẫn danh mục"
+              ariaLabel="Tìm danh mục"
+              value={search}
+              onChange={changeSearch}
+            />
+            <PanelFilterSelect
+              label="Trạng thái"
+              ariaLabel="Lọc danh mục theo trạng thái"
+              items={[
+                { key: 'all', label: 'Tất cả', count: stats.all },
+                { key: 'visible', label: 'Đang hiện', count: stats.visible },
+                { key: 'hidden', label: 'Đã ẩn', count: stats.hidden },
+              ]}
+              value={visibilityFilter}
+              onChange={changeVisibilityFilter}
+            />
+            <PanelFilterSelect
+              label="Cấp danh mục"
+              ariaLabel="Lọc danh mục theo cấp"
+              items={[
+                { key: 'all', label: 'Tất cả', count: stats.all },
+                { key: 'root', label: 'Danh mục gốc', count: stats.root },
+                { key: 'leaf', label: 'Danh mục lá', count: stats.leaf },
+              ]}
+              value={levelFilter}
+              onChange={changeLevelFilter}
+            />
+            {view.hasViewContext ? (
+              <button type="button" className="admin-filter-reset" onClick={resetView}>
+                Đặt lại
+              </button>
+            ) : null}
+          </div>
               {flatFilteredCategories.length === 0 ? (
             <AdminStateBlock
               type={query ? 'search-empty' : 'empty'}
@@ -676,7 +733,7 @@ const AdminCategories = () => {
             />
           ) : (
             <>
-              <div className="admin-table" role="table" aria-label="Bảng danh sách danh mục">
+              <div className="admin-table admin-responsive-table" role="table" aria-label="Bảng danh sách danh mục">
                 <div className="admin-table-row taxonomy-audit admin-table-head" role="row">
                   <div role="columnheader">STT</div>
                   <div role="columnheader">Danh mục</div>
@@ -688,7 +745,7 @@ const AdminCategories = () => {
                 </div>
                 {paginatedCategories.map((item, index) => (
                   <motion.div key={item.id} className="admin-table-row taxonomy-audit" role="row">
-                    <div role="cell" className="admin-mono">{page * PAGE_SIZE + index + 1}</div>
+                    <div role="cell" className="admin-mono">{currentPageIndex * PAGE_SIZE + index + 1}</div>
                     <div role="cell"><div className="admin-bold">{item.name}</div><div className="admin-muted small">{item.slug}</div></div>
                     <div role="cell" className="admin-muted">{buildPath(item.id, byId).join(' > ')}</div>
                     <div role="cell"><span className="badge gray">Cấp {getLevel(item.id, byId)}</span></div>
@@ -703,11 +760,56 @@ const AdminCategories = () => {
                   </motion.div>
                 ))}
               </div>
+              <div className="admin-mobile-cards" aria-label="Danh sách rà soát danh mục dạng thẻ">
+                {paginatedCategories.map((item) => (
+                  <article key={item.id} className="admin-mobile-card">
+                    <div className="admin-mobile-card-head">
+                      <div className="admin-mobile-card-title">
+                        <img src={item.image || PLACEHOLDER_CATEGORY_IMAGE} alt={item.name} />
+                        <div className="admin-mobile-card-title-main">
+                          <p className="admin-bold">{item.name}</p>
+                          <p className="admin-mobile-card-sub">{item.slug}</p>
+                        </div>
+                      </div>
+                      <span className={`admin-pill ${item.status === 'visible' ? 'success' : 'neutral'}`}>
+                        {item.status === 'visible' ? 'Đang hiện' : 'Đã ẩn'}
+                      </span>
+                    </div>
+                    <div className="admin-mobile-card-grid">
+                      <div className="admin-mobile-card-field">
+                        <span>Đường dẫn</span>
+                        <strong>{buildPath(item.id, byId).join(' > ')}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Cấp</span>
+                        <strong>Cấp {getLevel(item.id, byId)}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Sản phẩm</span>
+                        <strong>{getCategoryProductTotal(item.id)} SP</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Menu</span>
+                        <strong>{item.showOnMenu ? 'Hiện menu' : 'Ẩn menu'}</strong>
+                      </div>
+                    </div>
+                    <div className="admin-mobile-card-actions">
+                      <button className="admin-primary-btn" type="button" onClick={() => setSelectedId(item.id)}>
+                        <ChevronRight size={16} />
+                        Xem chi tiết
+                      </button>
+                      <button className="admin-icon-btn subtle" title="Chỉnh sửa" aria-label="Chỉnh sửa" onClick={() => openEditor(item)}><Pencil size={16} /></button>
+                      <button className="admin-icon-btn subtle" title={item.status === 'visible' ? 'Ẩn danh mục' : 'Hiện danh mục'} aria-label={item.status === 'visible' ? 'Ẩn danh mục' : 'Hiện danh mục'} onClick={() => toggleVisibility(item.id)}>{item.status === 'visible' ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                      <button className="admin-icon-btn subtle danger-icon" title="Xóa" aria-label="Xóa" onClick={() => requestDelete(item.id)}><Trash2 size={16} /></button>
+                    </div>
+                  </article>
+                ))}
+              </div>
               <PanelTableFooter
-                meta={`Trang ${page + 1}/${totalPages} · ${paginatedCategories.length} danh mục/trang`}
-                page={page + 1}
+                meta={`Trang ${currentPageIndex + 1}/${totalPages} · ${paginatedCategories.length} danh mục/trang`}
+                page={currentPageIndex + 1}
                 totalPages={totalPages}
-                onPageChange={(p) => setPage(p - 1)}
+                onPageChange={view.setPage}
                 prevLabel="Trước"
                 nextLabel="Sau"
               />

@@ -1,12 +1,16 @@
+import { motion } from 'framer-motion';
+import { Eye, EyeOff, Pencil, Trash2 } from 'lucide-react';
 import { AdminStateBlock, AdminTableSkeleton } from '../../../Admin/AdminStateBlocks';
 import { PanelTableFooter } from '../../../../components/Panel/PanelPrimitives';
+import { formatCurrency } from '../../../../services/commissionService';
 import type { VendorProductRecord } from '../../../../services/vendorProductService';
+import { getVendorProductStatusLabel, getVendorProductStatusTone } from '../../vendorProductsHelpers';
 import VendorProductsRow from './VendorProductsRow';
 
 interface VendorProductsTableProps {
   loading: boolean;
   loadError: string;
-  keyword: string;
+  hasViewContext: boolean;
   products: VendorProductRecord[];
   allSelected: boolean;
   working: boolean;
@@ -30,7 +34,7 @@ interface VendorProductsTableProps {
 const VendorProductsTable = ({
   loading,
   loadError,
-  keyword,
+  hasViewContext,
   products,
   allSelected,
   working,
@@ -69,18 +73,18 @@ const VendorProductsTable = ({
   if (products.length === 0) {
     return (
       <AdminStateBlock
-        type={keyword ? 'search-empty' : 'empty'}
-        title={keyword ? 'Không tìm thấy SKU phù hợp' : 'Chưa có sản phẩm nào'}
-        description={keyword ? 'Thử đổi từ khóa tìm kiếm hoặc đặt lại bộ lọc.' : 'Khi shop tạo sản phẩm mới, danh sách sẽ xuất hiện tại đây.'}
-        actionLabel={keyword ? 'Đặt lại bộ lọc' : 'Thêm sản phẩm'}
-        onAction={keyword ? onResetCurrentView : onOpenCreateProductDrawer}
+        type={hasViewContext ? 'search-empty' : 'empty'}
+        title={hasViewContext ? 'Không tìm thấy SKU phù hợp' : 'Chưa có sản phẩm nào'}
+        description={hasViewContext ? 'Thử đổi từ khóa tìm kiếm hoặc đặt lại bộ lọc.' : 'Khi shop tạo sản phẩm mới, danh sách sẽ xuất hiện tại đây.'}
+        actionLabel={hasViewContext ? 'Đặt lại bộ lọc' : 'Thêm sản phẩm'}
+        onAction={hasViewContext ? onResetCurrentView : onOpenCreateProductDrawer}
       />
     );
   }
 
   return (
     <>
-      <div className="admin-table" role="table" aria-label="Bảng sản phẩm của gian hàng">
+      <div className="admin-table vendor-products-table" role="table" aria-label="Bảng sản phẩm của gian hàng">
         <div className="admin-table-row vendor-products admin-table-head" role="row">
           <div role="columnheader">
             <input type="checkbox" aria-label="Chọn tất cả sản phẩm" checked={allSelected} onChange={(event) => onToggleSelectAll(event.target.checked)} />
@@ -108,6 +112,79 @@ const VendorProductsTable = ({
             onToggleVisibility={() => onToggleVisibility(product.id, !product.visible)}
             onDelete={() => onRequestDelete([product.id])}
           />
+        ))}
+      </div>
+
+      <div className="vendor-mobile-cards vendor-product-card-list" aria-label="Danh sách sản phẩm dạng thẻ">
+        {products.map((product, index) => (
+          <motion.article
+            key={`product-card-${product.id}`}
+            className={`vendor-mobile-card vendor-product-card ${product.status === 'draft' ? 'row-muted' : ''}`}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.16, delay: Math.min(index * 0.02, 0.1) }}
+            onClick={() => onOpenEditDrawer(product.id)}
+          >
+            <div className="vendor-card-head">
+              <label className="vendor-card-check" onClick={(event) => event.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  aria-label={`Chọn ${product.name}`}
+                  checked={isSelected(product.id)}
+                  onChange={(event) => onToggleOne(product.id, event.target.checked)}
+                />
+                <span>#{startIndex + index}</span>
+              </label>
+              <span className={`admin-pill ${getVendorProductStatusTone(product.status)}`}>
+                {getVendorProductStatusLabel(product.status)}
+              </span>
+            </div>
+
+            <div className="vendor-card-product">
+              <img src={product.image} alt={product.name} className="vendor-admin-thumb" loading="lazy" decoding="async" />
+              <div className="vendor-admin-product-copy">
+                <div className="admin-bold">{product.name}</div>
+                <div className="admin-muted small">SKU: {product.sku}</div>
+              </div>
+            </div>
+
+            <div className="vendor-card-meta-grid product">
+              <div>
+                <span>Danh mục</span>
+                <strong>{product.category}</strong>
+              </div>
+              <div>
+                <span>Giá bán</span>
+                <strong>{formatCurrency(product.price)}</strong>
+              </div>
+              <div>
+                <span>Tồn kho</span>
+                <strong>{product.stock} sản phẩm</strong>
+              </div>
+              <div>
+                <span>Đã bán</span>
+                <strong>{product.sold}</strong>
+              </div>
+            </div>
+
+            <div className="vendor-card-actions" onClick={(event) => event.stopPropagation()}>
+              <button className="admin-icon-btn subtle" title="Chỉnh sửa sản phẩm" aria-label={`Chỉnh sửa ${product.name}`} onClick={() => onOpenEditDrawer(product.id)}>
+                <Pencil size={16} />
+              </button>
+              <button
+                className="admin-icon-btn subtle"
+                title={product.visible ? 'Ẩn sản phẩm' : 'Hiển thị sản phẩm'}
+                aria-label={product.visible ? `Ẩn ${product.name}` : `Hiển thị ${product.name}`}
+                onClick={() => onToggleVisibility(product.id, !product.visible)}
+                disabled={working}
+              >
+                {product.visible ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+              <button className="admin-icon-btn subtle danger-icon" title="Xóa sản phẩm" aria-label={`Xóa ${product.name}`} onClick={() => onRequestDelete([product.id])} disabled={working}>
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </motion.article>
         ))}
       </div>
 

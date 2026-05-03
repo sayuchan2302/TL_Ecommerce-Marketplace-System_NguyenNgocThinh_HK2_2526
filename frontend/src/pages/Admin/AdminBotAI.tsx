@@ -20,7 +20,9 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
+import AdminConfirmDialog from './AdminConfirmDialog';
 import { useAdminToast } from './useAdminToast';
+import { PanelFilterSelect } from '../../components/Panel/PanelPrimitives';
 import {
   adminBotScenarioService,
   type BotScenarioActionKey,
@@ -72,10 +74,10 @@ const QUICK_ACTION_LABEL: Record<BotScenarioActionKey, string> = {
   PRODUCT_FAQ: 'Hỏi đáp sản phẩm',
 };
 
-const BOT_ADMIN_TABS: Array<{ id: BotAdminTab; label: string; icon: LucideIcon }> = [
+const BOT_ADMIN_TABS: Array<{ id: BotAdminTab; label: string; icon?: LucideIcon }> = [
   { id: 'flows', label: 'Luồng hội thoại', icon: GitBranch },
-  { id: 'test', label: 'Test Draft', icon: PlayCircle },
-  { id: 'faq', label: 'FAQ / Knowledge', icon: FileText },
+  { id: 'test', label: 'Test Draft' },
+  { id: 'faq', label: 'FAQ / Knowledge' },
 ];
 
 const FLOW_GROUPS: ConversationFlow[] = [
@@ -258,6 +260,7 @@ const AdminBotAI = () => {
   const [simulatorStep, setSimulatorStep] = useState<DraftSimulatorStep>('menu');
   const [pendingOrderCode, setPendingOrderCode] = useState('');
   const [pendingHeight, setPendingHeight] = useState<number | null>(null);
+  const [deleteFaqTarget, setDeleteFaqTarget] = useState<ContentPage | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -532,14 +535,21 @@ const AdminBotAI = () => {
     }
   };
 
-  const handleDeleteFaq = async (id: string) => {
-    if (!confirm('Bạn chắc chắn muốn xóa FAQ này?')) return;
+  const handleDeleteFaq = (id: string) => {
+    const target = faqItems.find((item) => item.id === id);
+    if (!target) return;
+    setDeleteFaqTarget(target);
+  };
+
+  const confirmDeleteFaq = async () => {
+    if (!deleteFaqTarget) return;
     try {
-      await contentService.remove(id);
-      setFaqItems((prev) => prev.filter((item) => item.id !== id));
-      if (faqForm.id === id) {
+      await contentService.remove(deleteFaqTarget.id);
+      setFaqItems((prev) => prev.filter((item) => item.id !== deleteFaqTarget.id));
+      if (faqForm.id === deleteFaqTarget.id) {
         setFaqForm(emptyFaqForm);
       }
+      setDeleteFaqTarget(null);
       pushToast('Đã xóa FAQ.');
     } catch {
       pushToast('Không thể xóa FAQ.');
@@ -895,22 +905,15 @@ const AdminBotAI = () => {
                 </div>
               </div>
 
-              <div className="admin-tabs bot-ai-tabs" role="tablist" aria-label="Bot AI tabs">
-                {BOT_ADMIN_TABS.map((tab) => {
-                  const TabIcon = tab.icon;
-                  return (
-                    <button
-                      type="button"
-                      key={tab.id}
-                      className={`admin-tab ${activeTab === tab.id ? 'active' : ''}`}
-                      onClick={() => setActiveTab(tab.id)}
-                      role="tab"
-                      aria-selected={activeTab === tab.id}
-                    >
-                      <TabIcon size={16} /> {tab.label}
-                    </button>
-                  );
-                })}
+              <div className="admin-filter-toolbar bot-ai-tabs">
+                <span className="admin-filter-toolbar-spacer" aria-hidden="true" />
+                <PanelFilterSelect
+                  label="Khu vực"
+                  ariaLabel="Chọn khu vực quản lý Bot AI"
+                  items={BOT_ADMIN_TABS.map((tab) => ({ key: tab.id, label: tab.label }))}
+                  value={activeTab}
+                  onChange={(key) => setActiveTab(key as BotAdminTab)}
+                />
               </div>
 
               {activeTab === 'flows' ? renderFlowsTab() : null}
@@ -920,6 +923,17 @@ const AdminBotAI = () => {
           )}
         </section>
       </div>
+      <AdminConfirmDialog
+        open={Boolean(deleteFaqTarget)}
+        title="Xóa FAQ"
+        description="FAQ này sẽ bị xóa khỏi knowledge base của Bot/AI. Hành động này không thể hoàn tác."
+        selectedItems={deleteFaqTarget ? [deleteFaqTarget.title] : undefined}
+        selectedNoun="FAQ"
+        confirmLabel="Xóa FAQ"
+        danger
+        onCancel={() => setDeleteFaqTarget(null)}
+        onConfirm={() => void confirmDeleteFaq()}
+      />
     </AdminLayout>
   );
 };

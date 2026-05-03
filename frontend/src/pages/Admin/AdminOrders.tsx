@@ -19,12 +19,14 @@ import {
   type FulfillmentStatus,
   type PaymentStatus,
 } from './orderWorkflow';
-import { PanelStatsGrid, PanelTableFooter, PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelFilterSelect, PanelSearchField, PanelStatsGrid, PanelTableFooter } from '../../components/Panel/PanelPrimitives';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import {
   resolveDetailRouteKey,
   toDisplayOrderCode,
 } from '../../utils/displayCode';
+import { ADMIN_VIEW_KEYS } from './adminListView';
+import { useAdminViewState } from './useAdminViewState';
 
 interface AdminOrderRow {
   id: string;
@@ -75,6 +77,16 @@ const toTimestamp = (value: string) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+const isDateInputValue = (value: string) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
+
+const toDateInputValue = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
 const displayOrderCode = (code: string) => toDisplayOrderCode(code);
 
 const formatPaymentMethod = (method: string) => {
@@ -111,19 +123,46 @@ const tabs = [
   { key: 'canceled', label: 'Đã hủy' },
 ];
 
+type PaymentFilter = 'all' | PaymentStatus;
+
+const paymentFilters: Array<{ key: PaymentFilter; label: string }> = [
+  { key: 'all', label: 'Tất cả' },
+  { key: 'paid', label: 'Đã thanh toán' },
+  { key: 'unpaid', label: 'Chưa thanh toán' },
+  { key: 'cod_uncollected', label: 'COD chưa thu' },
+  { key: 'refund_pending', label: 'Đang hoàn' },
+  { key: 'refunded', label: 'Đã hoàn' },
+];
+
+const validPaymentFilters = new Set<PaymentFilter>(paymentFilters.map((item) => item.key));
+
 const AdminOrders = () => {
   const c = ADMIN_DICTIONARY.common;
   const actions = ADMIN_DICTIONARY.actions;
   const actionTitles = ADMIN_DICTIONARY.actionTitles;
   const aria = useMemo(() => c.aria, [c.aria]);
-  const [activeTab, setActiveTab] = useState<string>('all');
-  const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [isInitializing, setIsInitializing] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const { toast, pushToast } = useAdminToast();
+  const view = useAdminViewState({
+    storageKey: ADMIN_VIEW_KEYS.orders,
+    path: '/admin/orders',
+    validStatusKeys: tabs.map((tab) => tab.key),
+    defaultStatus: 'all',
+    extraFilters: [
+      { key: 'payment', defaultValue: 'all', validate: (value) => validPaymentFilters.has(value as PaymentFilter) },
+      { key: 'date_from', defaultValue: '', validate: isDateInputValue },
+      { key: 'date_to', defaultValue: '', validate: isDateInputValue },
+    ],
+  });
+  const activeTab = view.status;
+  const search = view.search;
+  const page = view.page;
+  const paymentFilter = (validPaymentFilters.has(view.extras.payment as PaymentFilter) ? view.extras.payment : 'all') as PaymentFilter;
+  const dateFrom = view.extras.date_from || '';
+  const dateTo = view.extras.date_to || '';
 
   const getSearchText = useCallback(
     (row: AdminOrderRow) =>
@@ -133,10 +172,14 @@ const AdminOrders = () => {
 
   const filterPredicate = useCallback(
     (row: AdminOrderRow) => {
-      if (activeTab === 'all') return true;
-      return row.fulfillment === activeTab;
+      if (activeTab !== 'all' && row.fulfillment !== activeTab) return false;
+      if (paymentFilter !== 'all' && row.paymentStatus !== paymentFilter) return false;
+      const orderDay = toDateInputValue(row.date);
+      if (dateFrom && orderDay && orderDay < dateFrom) return false;
+      if (dateTo && orderDay && orderDay > dateTo) return false;
+      return true;
     },
-    [activeTab],
+    [activeTab, dateFrom, dateTo, paymentFilter],
   );
 
   const {
@@ -150,12 +193,12 @@ const AdminOrders = () => {
     items: rows,
     pageSize: 6,
     searchValue: search,
-    onSearchChange: setSearch,
+    onSearchChange: view.setSearch,
     pageValue: page,
-    onPageChange: setPage,
+    onPageChange: view.setPage,
     getSearchText,
     filterPredicate,
-    loadingDeps: [activeTab],
+    loadingDeps: [activeTab, dateFrom, dateTo, paymentFilter],
   });
 
   const fetchOrders = useCallback(async () => {
@@ -182,9 +225,7 @@ const AdminOrders = () => {
 
   const resetCurrentView = () => {
     setSelected(new Set());
-    setActiveTab('all');
-    setSearch('');
-    setPage(1);
+    view.resetCurrentView();
     pushToast('Đã đặt lại danh sách đơn hàng.');
   };
 
@@ -197,9 +238,33 @@ const AdminOrders = () => {
     canceled: rows.filter((row) => row.fulfillment === 'canceled').length,
   } as const;
 
+  const paymentCounts: Record<PaymentFilter, number> = {
+    all: rows.length,
+    paid: rows.filter((row) => row.paymentStatus === 'paid').length,
+    unpaid: rows.filter((row) => row.paymentStatus === 'unpaid').length,
+    cod_uncollected: rows.filter((row) => row.paymentStatus === 'cod_uncollected').length,
+    refund_pending: rows.filter((row) => row.paymentStatus === 'refund_pending').length,
+    refunded: rows.filter((row) => row.paymentStatus === 'refunded').length,
+  };
+
   const changeTab = (nextTab: string) => {
     setSelected(new Set());
-    setActiveTab(nextTab);
+    view.setStatus(nextTab);
+  };
+
+  const changeSearch = (value: string) => {
+    setSelected(new Set());
+    view.setSearch(value);
+  };
+
+  const changePaymentFilter = (value: string) => {
+    setSelected(new Set());
+    view.setExtra('payment', value);
+  };
+
+  const changeDateFilter = (key: 'date_from' | 'date_to', value: string) => {
+    setSelected(new Set());
+    view.setExtra(key, value);
   };
 
   const toggleAll = (checked: boolean) => {
@@ -252,22 +317,63 @@ const AdminOrders = () => {
         ]}
       />
 
-      <PanelTabs
-        items={tabs.map((tab) => ({
-          key: tab.key,
-          label: tab.label,
-          count: tabCounts[tab.key as keyof typeof tabCounts],
-        }))}
-        activeKey={activeTab}
-        onChange={changeTab}
-      />
-
       <section className="admin-panels single">
         <div className="admin-panel">
           <div className="admin-panel-head">
             <h2>Danh sách đơn hàng (Giám sát)</h2>
           </div>
 
+          <div className="admin-filter-toolbar">
+            <PanelSearchField
+              placeholder="Tìm theo mã đơn, khách hàng, sản phẩm"
+              ariaLabel="Tìm đơn hàng"
+              value={search}
+              onChange={changeSearch}
+            />
+            <PanelFilterSelect
+              label="Trạng thái"
+              ariaLabel="Lọc đơn hàng theo trạng thái"
+              items={tabs.map((tab) => ({
+                key: tab.key,
+                label: tab.label,
+                count: tabCounts[tab.key as keyof typeof tabCounts],
+              }))}
+              value={activeTab}
+              onChange={changeTab}
+            />
+            <PanelFilterSelect
+              label="Thanh toán"
+              ariaLabel="Lọc đơn hàng theo thanh toán"
+              items={paymentFilters.map((item) => ({
+                key: item.key,
+                label: item.label,
+                count: paymentCounts[item.key],
+              }))}
+              value={paymentFilter}
+              onChange={changePaymentFilter}
+            />
+            <label className="admin-date-field">
+              Từ
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(event) => changeDateFilter('date_from', event.target.value)}
+              />
+            </label>
+            <label className="admin-date-field">
+              Đến
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(event) => changeDateFilter('date_to', event.target.value)}
+              />
+            </label>
+            {view.hasViewContext ? (
+              <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+                Đặt lại
+              </button>
+            ) : null}
+          </div>
           {isInitializing ? (
             <div className="admin-loading" style={{ padding: '3rem', textAlign: 'center' }}>Đang tải dữ liệu...</div>
           ) : isLoading ? null : loadError ? (
@@ -294,7 +400,8 @@ const AdminOrders = () => {
               onAction={resetCurrentView}
             />
           ) : (
-            <div className="admin-table" role="table" aria-label="Bảng đơn hàng marketplace">
+            <>
+            <div className="admin-table admin-responsive-table" role="table" aria-label="Bảng đơn hàng marketplace">
               <div className="admin-table-row admin-table-head orders" role="row">
                 <div role="columnheader">
                   <input
@@ -377,6 +484,63 @@ const AdminOrders = () => {
                 </motion.div>
               ))}
             </div>
+            <div className="admin-mobile-cards" aria-label="Danh sách đơn hàng dạng thẻ">
+              {pagedOrders.map((order) => {
+                const routeKey = resolveDetailRouteKey(order.code, order.id);
+                const detailHref = routeKey ? `/admin/orders/${routeKey}` : '/admin/orders';
+
+                return (
+                  <article key={order.id} className="admin-mobile-card">
+                    <div className="admin-mobile-card-head">
+                      <div className="admin-mobile-card-title">
+                        <img src={order.avatar} alt={order.customer} />
+                        <div className="admin-mobile-card-title-main">
+                          <p className="admin-bold">{order.customer}</p>
+                          <p className="admin-mobile-card-sub">{displayOrderCode(order.code)}</p>
+                        </div>
+                      </div>
+                      <span className={`status-pill status-${order.fulfillment}`}>{shipLabel(order.fulfillment)}</span>
+                    </div>
+                    <div className="admin-mobile-card-grid">
+                      <div className="admin-mobile-card-field">
+                        <span>Sản phẩm</span>
+                        <strong>{order.productName}</strong>
+                        <p>{order.productMeta}{order.productExtra ? ` · ${order.productExtra}` : ''}</p>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Giá trị</span>
+                        <strong>{order.total}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Thanh toán</span>
+                        <strong>{formatPaymentMethod(order.paymentMethod)}</strong>
+                        <p>{paymentLabel(order.paymentStatus)}</p>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Thời gian</span>
+                        <strong>{new Date(order.date).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</strong>
+                        <p>{new Date(order.date).toLocaleDateString('vi-VN')}</p>
+                      </div>
+                    </div>
+                    <div className="admin-mobile-card-actions">
+                      <Link to={detailHref} className="admin-primary-btn">
+                        <Eye size={16} />
+                        Xem chi tiết
+                      </Link>
+                      <button
+                        className="admin-icon-btn subtle"
+                        type="button"
+                        aria-label={actionTitles.printInvoice}
+                        title={actionTitles.printInvoice}
+                      >
+                        <Printer size={16} />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            </>
           )}
 
           {!isLoading && filteredOrders.length > 0 && (
@@ -384,7 +548,7 @@ const AdminOrders = () => {
               meta={c.showing(startIndex, endIndex, filteredOrders.length, 'đơn hàng')}
               page={page}
               totalPages={totalPages}
-              onPageChange={setPage}
+              onPageChange={view.setPage}
               prevLabel={c.previous}
               nextLabel={c.next}
             />

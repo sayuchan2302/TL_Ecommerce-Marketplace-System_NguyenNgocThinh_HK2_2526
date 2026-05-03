@@ -111,24 +111,60 @@ export const PanelTabs = ({ items, activeKey, onChange, accentClassName = '' }: 
   </div>
 );
 
-interface PanelViewSummaryProps {
-  chips: Array<{ key: string; label: ReactNode }>;
-  clearLabel: string;
-  onClear: () => void;
+interface PanelFilterSelectProps {
+  items: PanelTabItem[];
+  value: string;
+  onChange: (key: string) => void;
+  label: ReactNode;
+  ariaLabel?: string;
+  className?: string;
 }
 
-export const PanelViewSummary = ({ chips, clearLabel, onClear }: PanelViewSummaryProps) => {
-  if (chips.length === 0) return null;
+const toOptionText = (value: ReactNode) =>
+  typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
-  return (
-    <div className="admin-view-summary">
-      {chips.map((chip) => (
-        <span key={chip.key} className="summary-chip">{chip.label}</span>
-      ))}
-      <button className="summary-clear" onClick={onClear}>{clearLabel}</button>
-    </div>
-  );
-};
+export const PanelFilterSelect = ({
+  items,
+  value,
+  onChange,
+  label,
+  ariaLabel,
+  className = '',
+}: PanelFilterSelectProps) => (
+  <label className={['admin-filter-select', className].filter(Boolean).join(' ')}>
+    <span className="admin-filter-select-label">{label}</span>
+    <select value={value} aria-label={ariaLabel || toOptionText(label)} onChange={(event) => onChange(event.target.value)}>
+      {items.map((item) => {
+        const labelText = toOptionText(item.label) || item.key;
+        const countText = item.count !== undefined ? toOptionText(item.count) : '';
+        return (
+          <option key={item.key} value={item.key}>
+            {countText ? `${labelText} (${countText})` : labelText}
+          </option>
+        );
+      })}
+    </select>
+  </label>
+);
+
+interface PanelFilterBarProps {
+  search?: ReactNode;
+  filters?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+}
+
+export const PanelFilterBar = ({ search, filters, actions, className = '' }: PanelFilterBarProps) => (
+  <div className={['admin-filter-toolbar', className].filter(Boolean).join(' ')}>
+    {search ? <div className="admin-filter-search">{search}</div> : <span className="admin-filter-toolbar-spacer" aria-hidden="true" />}
+    {filters || actions ? (
+      <div className="admin-filter-controls">
+        {filters}
+        {actions}
+      </div>
+    ) : null}
+  </div>
+);
 
 interface PanelSectionHeaderProps {
   title: ReactNode;
@@ -236,12 +272,18 @@ interface PanelSearchFieldProps {
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
+  ariaLabel?: string;
 }
 
-export const PanelSearchField = ({ placeholder, value, onChange }: PanelSearchFieldProps) => (
+export const PanelSearchField = ({ placeholder, value, onChange, ariaLabel }: PanelSearchFieldProps) => (
   <div className="admin-search">
     <Search size={16} />
-    <input placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />
+    <input
+      placeholder={placeholder}
+      value={value}
+      aria-label={ariaLabel || placeholder}
+      onChange={(event) => onChange(event.target.value)}
+    />
   </div>
 );
 

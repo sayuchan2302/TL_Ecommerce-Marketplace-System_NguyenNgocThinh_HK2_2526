@@ -4,6 +4,9 @@ export const ADMIN_VIEW_KEYS = {
   promotions: 'admin.promotions.view',
   customers: 'admin.customers.view',
   categories: 'admin.categories.view',
+  stores: 'admin.stores.view',
+  productGovernance: 'admin.productGovernance.view',
+  financials: 'admin.financials.view',
   reviews: 'admin.reviews.view',
   returns: 'admin.returns.view',
 } as const;

@@ -46,51 +46,82 @@ type RevenueChartPoint = {
   dateLabel: string;
   fullDate: string;
   gmv: number;
+  netRevenue: number;
+};
+
+type DailyRevenueBucket = {
+  date: Date;
+  gmv: number;
   commission: number;
 };
 
-const toSafeDate = (value: string) => {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+const RANGE_DAY_COUNT: Record<Exclude<RevenueRange, 'year'>, number> = {
+  week: 7,
+  month: 30,
 };
 
-const getWeekStart = (date: Date) => {
+const startOfLocalDay = (date: Date) => {
   const clone = new Date(date);
-  const day = (clone.getDay() + 6) % 7;
-  clone.setDate(clone.getDate() - day);
   clone.setHours(0, 0, 0, 0);
   return clone;
 };
 
-const ensureRenderableTrendPoints = (points: RevenueChartPoint[], range: RevenueRange): RevenueChartPoint[] => {
-  if (points.length !== 1) return points;
+const addDays = (date: Date, days: number) => {
+  const clone = new Date(date);
+  clone.setDate(clone.getDate() + days);
+  return clone;
+};
 
-  const current = points[0];
-  const prevDate = new Date(current.ts);
+const toDateKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-  if (range === 'year') {
-    prevDate.setFullYear(prevDate.getFullYear() - 1);
-  } else if (range === 'month') {
-    prevDate.setMonth(prevDate.getMonth() - 1);
-  } else {
-    prevDate.setDate(prevDate.getDate() - 7);
+const toSafeDate = (value: string) => {
+  const normalized = value.trim();
+  const localDateMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (localDateMatch) {
+    const [, year, month, day] = localDateMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
   }
 
-  const prevPoint: RevenueChartPoint = {
-    ts: prevDate.getTime(),
-    dateLabel:
-      range === 'year'
-        ? String(prevDate.getFullYear())
-        : `${String(prevDate.getMonth() + 1).padStart(2, '0')}/${prevDate.getFullYear()}`,
-    fullDate:
-      range === 'year'
-        ? `Nam ${prevDate.getFullYear()}`
-        : `Thang ${String(prevDate.getMonth() + 1).padStart(2, '0')}/${prevDate.getFullYear()}`,
-    gmv: 0,
-    commission: 0,
-  };
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
 
-  return [prevPoint, current].sort((a, b) => a.ts - b.ts);
+const buildDailyChartPoint = (date: Date, data?: Pick<DailyRevenueBucket, 'gmv' | 'commission'>): RevenueChartPoint => ({
+  ts: date.getTime(),
+  dateLabel: date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+  fullDate: date.toLocaleDateString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }),
+  gmv: data?.gmv || 0,
+  netRevenue: Math.max((data?.gmv || 0) - (data?.commission || 0), 0),
+});
+
+const buildDailyBuckets = (trend: Array<{ date: string; gmv: number; commission: number }>) => {
+  const buckets = new Map<string, DailyRevenueBucket>();
+
+  trend.forEach((point) => {
+    const parsedDate = toSafeDate(point.date);
+    if (!parsedDate) return;
+
+    const date = startOfLocalDay(parsedDate);
+    const key = toDateKey(date);
+    const existing = buckets.get(key) || {
+      date,
+      gmv: 0,
+      commission: 0,
+    };
+
+    existing.gmv += Number(point.gmv || 0);
+    existing.commission += Number(point.commission || 0);
+    buckets.set(key, existing);
+  });
+
+  return buckets;
+};
+
+const getLatestTrendDate = (buckets: Map<string, DailyRevenueBucket>) => {
+  const dates = Array.from(buckets.values()).map((bucket) => bucket.date);
+  return dates.reduce((latest, date) => (date.getTime() > latest.getTime() ? date : latest), dates[0]);
 };
 
 const buildChartDataByRange = (
@@ -99,92 +130,83 @@ const buildChartDataByRange = (
 ): RevenueChartPoint[] => {
   if (!trend.length) return [];
 
-  const buckets = new Map<string, {
-    ts: number;
-    gmv: number;
-    commission: number;
-    dateLabel: string;
-    fullDate: string;
-  }>();
+  const dailyBuckets = buildDailyBuckets(trend);
+  if (!dailyBuckets.size) return [];
 
-  if (range === 'week') {
-    trend.forEach((point) => {
-      const date = toSafeDate(point.date);
-      if (!date) return;
-      const weekStart = getWeekStart(date);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 6);
-      const key = weekStart.toISOString().slice(0, 10);
-      const label = weekStart.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-      const rangeLabel = `${weekStart.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })} - ${weekEnd.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
-      const existing = buckets.get(key) || {
-        ts: weekStart.getTime(),
-        gmv: 0,
-        commission: 0,
-        dateLabel: label,
-        fullDate: `Tuần ${rangeLabel}`,
-      };
-      existing.gmv += Number(point.gmv || 0);
-      existing.commission += Number(point.commission || 0);
-      buckets.set(key, existing);
+  if (range === 'week' || range === 'month') {
+    const latestDate = getLatestTrendDate(dailyBuckets);
+    const dayCount = RANGE_DAY_COUNT[range];
+    const startDate = addDays(latestDate, -(dayCount - 1));
+
+    return Array.from({ length: dayCount }, (_, index) => {
+      const date = addDays(startDate, index);
+      return buildDailyChartPoint(date, dailyBuckets.get(toDateKey(date)));
     });
   }
 
-  if (range === 'month') {
-    trend.forEach((point) => {
-      const date = toSafeDate(point.date);
-      if (!date) return;
-      const year = date.getFullYear();
-      const month = date.getMonth() + 1;
-      const key = `${year}-${String(month).padStart(2, '0')}`;
-      const label = `${String(month).padStart(2, '0')}/${year}`;
-      const existing = buckets.get(key) || {
-        ts: new Date(year, month - 1, 1).getTime(),
-        gmv: 0,
-        commission: 0,
-        dateLabel: label,
-        fullDate: `Thang ${label}`,
-      };
-      existing.gmv += Number(point.gmv || 0);
-      existing.commission += Number(point.commission || 0);
-      buckets.set(key, existing);
-    });
-  }
+  const yearlyBuckets = new Map<string, { ts: number; gmv: number; commission: number }>();
 
-  if (range === 'year') {
-    trend.forEach((point) => {
-      const date = toSafeDate(point.date);
-      if (!date) return;
-      const year = date.getFullYear();
-      const key = String(year);
-      const existing = buckets.get(key) || {
-        ts: new Date(year, 0, 1).getTime(),
-        gmv: 0,
-        commission: 0,
-        dateLabel: key,
-        fullDate: `Nam ${key}`,
-      };
-      existing.gmv += Number(point.gmv || 0);
-      existing.commission += Number(point.commission || 0);
-      buckets.set(key, existing);
-    });
-  }
+  dailyBuckets.forEach((bucket) => {
+    const year = String(bucket.date.getFullYear());
+    const existing = yearlyBuckets.get(year) || {
+      ts: new Date(Number(year), 0, 1).getTime(),
+      gmv: 0,
+      commission: 0,
+    };
+    existing.gmv += bucket.gmv;
+    existing.commission += bucket.commission;
+    yearlyBuckets.set(year, existing);
+  });
 
-  const points = Array.from(buckets.values())
-    .sort((a, b) => a.ts - b.ts)
-    .map((bucket) => ({
+  const points = Array.from(yearlyBuckets.entries())
+    .map(([year, bucket]) => ({
       ts: bucket.ts,
-      dateLabel: bucket.dateLabel,
-      fullDate: bucket.fullDate,
+      dateLabel: year,
+      fullDate: `Năm ${year}`,
       gmv: bucket.gmv,
-      commission: bucket.commission,
-    }));
+      netRevenue: Math.max(bucket.gmv - bucket.commission, 0),
+    }))
+    .sort((a, b) => a.ts - b.ts);
 
-  if (range === 'month' || range === 'year') {
-    return ensureRenderableTrendPoints(points, range);
+  if (points.length !== 1) return points;
+
+  const current = points[0];
+  const previousYear = String(Number(current.dateLabel) - 1);
+
+  return [
+    {
+      ts: new Date(Number(previousYear), 0, 1).getTime(),
+      dateLabel: previousYear,
+      fullDate: `Năm ${previousYear}`,
+      gmv: 0,
+      netRevenue: 0,
+    },
+    current,
+  ];
+};
+
+const formatCompactMoney = (value: number) => {
+  const safeValue = Math.max(0, Number(value) || 0);
+
+  if (safeValue >= 1000000) {
+    const millions = safeValue / 1000000;
+    return `${millions >= 10 ? millions.toFixed(0) : millions.toFixed(1)}M`;
   }
 
-  return points;
+  if (safeValue >= 1000) {
+    return `${Math.round(safeValue / 1000)}K`;
+  }
+
+  return String(Math.round(safeValue));
+};
+
+const getYAxisMax = (points: RevenueChartPoint[]) => {
+  const maxValue = Math.max(...points.flatMap((point) => [point.gmv, point.netRevenue]), 0);
+
+  if (maxValue <= 0) return 1000000;
+  if (maxValue < 1000000) return Math.ceil((maxValue * 1.25) / 100000) * 100000;
+
+  return Math.ceil((maxValue * 1.15) / 1000000) * 1000000;
 };
 
 const Admin = () => {
@@ -217,23 +239,21 @@ const Admin = () => {
     () => buildChartDataByRange(dashboard?.trend || [], revenueRange),
     [dashboard?.trend, revenueRange]
   );
+  const yAxisMax = useMemo(() => getYAxisMax(chartData), [chartData]);
 
   const revenueRangeMeta = useMemo(() => {
     if (revenueRange === 'week') {
       return {
-        description: 'GMV va hoa hong theo ngay',
-        summary: 'Che do tuan',
+        description: 'Doanh thu gộp và thực nhận theo tuần',
       };
     }
     if (revenueRange === 'month') {
       return {
-        description: 'GMV va hoa hong theo thang',
-        summary: 'Che do thang',
+        description: 'Doanh thu gộp và thực nhận theo tháng',
       };
     }
     return {
-      description: 'GMV va hoa hong theo nam',
-      summary: 'Che do nam',
+      description: 'Doanh thu gộp và thực nhận theo năm',
     };
   }, [revenueRange]);
 
@@ -394,8 +414,11 @@ const Admin = () => {
 
       <motion.section className="admin-panel">
         <div className="admin-panel-head">
-          <h2>Biểu đồ doanh thu</h2>
-          <div className="admin-chart-range-controls" role="tablist" aria-label="Revenue range">
+          <div>
+            <h2>Biểu đồ doanh thu</h2>
+            <span className="admin-muted">{revenueRangeMeta.description}</span>
+          </div>
+          <div className="admin-chart-range-controls" role="tablist" aria-label="Khoảng thời gian doanh thu">
             <button
               type="button"
               role="tab"
@@ -425,7 +448,6 @@ const Admin = () => {
             </button>
           </div>
         </div>
-        <span className="admin-muted">{revenueRangeMeta.description}</span>
         <div className="area-chart-wrap">
           {chartData.length === 0 ? (
             <div className="admin-chart-empty">
@@ -435,15 +457,15 @@ const Admin = () => {
             </div>
           ) : (
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="adminGmvGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#16a34a" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#16a34a" stopOpacity={0} />
                   </linearGradient>
-                  <linearGradient id="adminCommissionGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.28} />
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                  <linearGradient id="adminNetRevenueGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -454,10 +476,12 @@ const Admin = () => {
                   tick={{ fontSize: 12, fill: '#94a3b8' }}
                 />
                 <YAxis
+                  width={50}
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: '#94a3b8' }}
-                  tickFormatter={(value: number) => `${(value / 1000000).toFixed(1)}M`}
+                  domain={[0, yAxisMax]}
+                  tickFormatter={formatCompactMoney}
                 />
                 <Tooltip content={<DashboardTrendTooltip />} />
                 <Legend
@@ -469,26 +493,22 @@ const Admin = () => {
                 <Area
                   type="monotone"
                   dataKey="gmv"
-                  name="GMV"
-                  stroke="#3b82f6"
+                  name="Doanh thu gộp"
+                  stroke="#16a34a"
                   strokeWidth={2}
                   fill="url(#adminGmvGradient)"
                 />
                 <Area
                   type="monotone"
-                  dataKey="commission"
-                  name="Hoa hồng"
-                  stroke="#f59e0b"
+                  dataKey="netRevenue"
+                  name="Thực nhận"
+                  stroke="#f97316"
                   strokeWidth={2}
-                  fill="url(#adminCommissionGradient)"
+                  fill="url(#adminNetRevenueGradient)"
                 />
               </AreaChart>
             </ResponsiveContainer>
           )}
-          <div className="chart-axes chart-axes-bottom">
-            <span>{revenueRangeMeta.summary}</span>
-            <span>{chartData.length} mốc thời gian</span>
-          </div>
         </div>
       </motion.section>
 

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Eye, ShieldAlert, XCircle } from 'lucide-react';
 import AdminLayout from './AdminLayout';
+import AdminConfirmDialog from './AdminConfirmDialog';
 import { AdminStateBlock } from './AdminStateBlocks';
 import { useAdminToast } from './useAdminToast';
 import { returnService, type AdminVerdictAction, type ReturnRequest, type ReturnStatus } from '../../services/returnService';
@@ -10,13 +11,16 @@ import {
   PanelDrawerFooter,
   PanelDrawerHeader,
   PanelDrawerSection,
+  PanelFilterSelect,
+  PanelSearchField,
   PanelStatsGrid,
-  PanelTabs,
   PanelTableFooter,
 } from '../../components/Panel/PanelPrimitives';
 import Drawer from '../../components/Drawer/Drawer';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import { toDisplayOrderCode, toDisplayReturnCode } from '../../utils/displayCode';
+import { ADMIN_VIEW_KEYS } from './adminListView';
+import { useAdminViewState } from './useAdminViewState';
 
 const statusConfig: Record<ReturnStatus, { label: string; pillClass: string }> = {
   PENDING_VENDOR: { label: 'Chờ vendor xử lý', pillClass: 'admin-pill pending' },
@@ -90,6 +94,13 @@ const getReturnAmount = (request: ReturnRequest) => {
 };
 
 type AdminTabCounts = Record<TabKey, number>;
+type VerdictConfirmState = {
+  id: string;
+  code: string;
+  action: AdminVerdictAction;
+  label: string;
+  danger: boolean;
+};
 
 const EMPTY_ADMIN_COUNTS: AdminTabCounts = {
   all: 0,
@@ -102,7 +113,6 @@ const EMPTY_ADMIN_COUNTS: AdminTabCounts = {
 
 const AdminReturns = () => {
   const { pushToast } = useAdminToast();
-  const [activeTab, setActiveTab] = useState<TabKey>('all');
   const [rows, setRows] = useState<ReturnRequest[]>([]);
   const [tabCounts, setTabCounts] = useState<AdminTabCounts>(EMPTY_ADMIN_COUNTS);
   const [totalElements, setTotalElements] = useState(0);
@@ -112,8 +122,16 @@ const AdminReturns = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [drawerItem, setDrawerItem] = useState<ReturnRequest | null>(null);
   const [drawerNote, setDrawerNote] = useState('');
-  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [verdictConfirm, setVerdictConfirm] = useState<VerdictConfirmState | null>(null);
+  const view = useAdminViewState({
+    storageKey: ADMIN_VIEW_KEYS.returns,
+    path: '/admin/returns',
+    validStatusKeys: TABS.map((tab) => tab.key),
+    defaultStatus: 'all',
+  });
+  const activeTab = (TABS.some((tab) => tab.key === view.status) ? view.status : 'all') as TabKey;
+  const page = view.page;
 
   const drawerItemCount = useMemo(
     () => (drawerItem ? drawerItem.items.reduce((sum, item) => sum + Math.max(0, item.quantity), 0) : 0),
@@ -151,6 +169,7 @@ const AdminReturns = () => {
       setLoadError(null);
       const response = await returnService.listAdmin({
         statuses: TAB_STATUS_MAP[activeTab],
+        q: view.search,
         page: Math.max(page - 1, 0),
         size: PAGE_SIZE,
       });
@@ -170,7 +189,7 @@ const AdminReturns = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, page]);
+  }, [activeTab, page, view.search]);
 
   useEffect(() => {
     void fetchTabCounts();
@@ -181,15 +200,10 @@ const AdminReturns = () => {
   }, [fetchPageData]);
 
   useEffect(() => {
-    setPage(1);
-    setSelected(new Set());
-  }, [activeTab]);
-
-  useEffect(() => {
     if (page > totalPages) {
-      setPage(totalPages);
+      view.setPage(totalPages);
     }
-  }, [page, totalPages]);
+  }, [page, totalPages, view]);
 
   const safePage = Math.min(page, totalPages);
   const startIndex = totalElements === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
@@ -218,10 +232,40 @@ const AdminReturns = () => {
   };
 
   const resetCurrentView = () => {
-    setActiveTab('all');
-    
-    setPage(1);
     setSelected(new Set());
+    setDrawerItem(null);
+    setDrawerNote('');
+    view.resetCurrentView();
+  };
+
+  const changeTab = (key: string) => {
+    setSelected(new Set());
+    setDrawerItem(null);
+    setDrawerNote('');
+    view.setStatus(key);
+  };
+
+  const changeSearch = (value: string) => {
+    setSelected(new Set());
+    setDrawerItem(null);
+    setDrawerNote('');
+    view.setSearch(value);
+  };
+
+  const openVerdictConfirm = (item: ReturnRequest, action: AdminVerdictAction) => {
+    setVerdictConfirm({
+      id: item.id,
+      code: toDisplayReturnCode(item.code),
+      action,
+      label: action === 'REFUND_TO_CUSTOMER' ? 'Hoàn tiền khách' : 'Giữ tiền vendor',
+      danger: action === 'RELEASE_TO_VENDOR',
+    });
+  };
+
+  const confirmFinalVerdict = async () => {
+    if (!verdictConfirm) return;
+    await applyFinalVerdict(verdictConfirm.id, verdictConfirm.action);
+    setVerdictConfirm(null);
   };
 
   return (
@@ -234,7 +278,7 @@ const AdminReturns = () => {
             value: tabCounts.disputed,
             sub: 'Case cần phán quyết cuối',
             tone: tabCounts.disputed > 0 ? 'danger' : 'info',
-            onClick: () => setActiveTab('disputed'),
+            onClick: () => changeTab('disputed'),
           },
           {
             key: 'pendingVendor',
@@ -242,7 +286,7 @@ const AdminReturns = () => {
             value: tabCounts.pendingVendor,
             sub: 'Vendor chưa phản hồi',
             tone: tabCounts.pendingVendor > 0 ? 'warning' : '',
-            onClick: () => setActiveTab('pendingVendor'),
+            onClick: () => changeTab('pendingVendor'),
           },
           {
             key: 'inProgress',
@@ -250,7 +294,7 @@ const AdminReturns = () => {
             value: tabCounts.inProgress,
             sub: 'Đang vận chuyển/kiểm hàng',
             tone: 'info',
-            onClick: () => setActiveTab('inProgress'),
+            onClick: () => changeTab('inProgress'),
           },
           {
             key: 'completed',
@@ -258,22 +302,9 @@ const AdminReturns = () => {
             value: tabCounts.completed,
             sub: 'Yêu cầu đã đóng',
             tone: 'success',
-            onClick: () => setActiveTab('completed'),
+            onClick: () => changeTab('completed'),
           },
         ]}
-      />
-
-      <PanelTabs
-        items={TABS.map((tab) => ({
-          key: tab.key,
-          label: tab.label,
-          count: tabCounts[tab.key],
-        }))}
-        activeKey={activeTab}
-        onChange={(key) => {
-          setActiveTab(key as TabKey);
-          setPage(1);
-        }}
       />
 
       <section className="admin-panels single">
@@ -288,6 +319,30 @@ const AdminReturns = () => {
                 </span>
               )}
             </div>
+          </div>
+          <div className="admin-filter-toolbar">
+            <PanelSearchField
+              placeholder="Tìm mã hoàn trả, đơn hàng, khách hàng hoặc gian hàng"
+              ariaLabel="Tìm yêu cầu hoàn trả"
+              value={view.search}
+              onChange={changeSearch}
+            />
+            <PanelFilterSelect
+              label="Trạng thái"
+              ariaLabel="Lọc yêu cầu hoàn trả theo trạng thái"
+              items={TABS.map((tab) => ({
+                key: tab.key,
+                label: tab.label,
+                count: tabCounts[tab.key],
+              }))}
+              value={activeTab}
+              onChange={changeTab}
+            />
+            {view.hasViewContext ? (
+              <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+                Đặt lại
+              </button>
+            ) : null}
           </div>
 
           {isLoading ? (
@@ -314,7 +369,7 @@ const AdminReturns = () => {
             />
           ) : (
             <>
-<div className="admin-table" role="table" aria-label="Bảng yêu cầu hoàn trả">
+<div className="admin-table admin-responsive-table" role="table" aria-label="Bảng yêu cầu hoàn trả">
                 <div className="admin-table-row admin-table-head returns-row" role="row">
                   <div role="columnheader" className="returns-checkbox-cell">
                     <input
@@ -389,7 +444,7 @@ const AdminReturns = () => {
                             className="admin-icon-btn subtle"
                             title="Hoàn tiền cho khách"
                             disabled={actionLoading}
-                            onClick={() => void applyFinalVerdict(item.id, 'REFUND_TO_CUSTOMER')}
+                            onClick={() => openVerdictConfirm(item, 'REFUND_TO_CUSTOMER')}
                           >
                             <CheckCircle2 size={16} />
                           </button>
@@ -397,7 +452,7 @@ const AdminReturns = () => {
                             className="admin-icon-btn subtle danger-icon"
                             title="Giữ tiền cho vendor"
                             disabled={actionLoading}
-                            onClick={() => void applyFinalVerdict(item.id, 'RELEASE_TO_VENDOR')}
+                            onClick={() => openVerdictConfirm(item, 'RELEASE_TO_VENDOR')}
                           >
                             <XCircle size={16} />
                           </button>
@@ -408,11 +463,74 @@ const AdminReturns = () => {
                 ))}
               </div>
 
+              <div className="admin-mobile-cards" aria-label="Danh sách hoàn trả dạng thẻ">
+                {rows.map((item) => (
+                  <article key={item.id} className="admin-mobile-card">
+                    <div className="admin-mobile-card-head">
+                      <div className="admin-mobile-card-title">
+                        <div className="admin-mobile-card-title-main">
+                          <p className="admin-bold">{toDisplayReturnCode(item.code)}</p>
+                          <p className="admin-mobile-card-sub">Đơn #{toDisplayOrderCode(item.orderCode)}</p>
+                        </div>
+                      </div>
+                      <span className={statusConfig[item.status].pillClass}>{statusConfig[item.status].label}</span>
+                    </div>
+                    <div className="admin-mobile-card-grid">
+                      <div className="admin-mobile-card-field">
+                        <span>Khách hàng</span>
+                        <strong>{item.customerName}</strong>
+                        <p>{item.customerEmail || 'Chưa có email'}</p>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Gian hàng</span>
+                        <strong>{item.storeName || 'Chưa xác định'}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Sản phẩm</span>
+                        <strong>{item.items.map((product) => `${product.productName} (x${product.quantity})`).join(', ')}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Giá trị</span>
+                        <strong>{formatVnd(getReturnAmount(item))}</strong>
+                      </div>
+                    </div>
+                    <div className="admin-mobile-card-actions">
+                      <button className="admin-primary-btn" type="button" onClick={() => setDrawerItem(item)}>
+                        <Eye size={16} />
+                        Xem chi tiết
+                      </button>
+                      {item.status === 'DISPUTED' && (
+                        <>
+                          <button
+                            className="admin-icon-btn subtle"
+                            title="Hoàn tiền cho khách"
+                            aria-label="Hoàn tiền cho khách"
+                            disabled={actionLoading}
+                            onClick={() => openVerdictConfirm(item, 'REFUND_TO_CUSTOMER')}
+                          >
+                            <CheckCircle2 size={16} />
+                          </button>
+                          <button
+                            className="admin-icon-btn subtle danger-icon"
+                            title="Giữ tiền cho vendor"
+                            aria-label="Giữ tiền cho vendor"
+                            disabled={actionLoading}
+                            onClick={() => openVerdictConfirm(item, 'RELEASE_TO_VENDOR')}
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+
               <PanelTableFooter
                 meta={`Hiển thị ${startIndex}-${endIndex} trên ${totalElements} yêu cầu`}
                 page={safePage}
                 totalPages={totalPages}
-                onPageChange={setPage}
+                onPageChange={view.setPage}
                 prevLabel="Trước"
                 nextLabel="Sau"
               />
@@ -563,7 +681,7 @@ const AdminReturns = () => {
                   <button
                     className="admin-ghost-btn danger"
                     disabled={actionLoading}
-                    onClick={() => void applyFinalVerdict(drawerItem.id, 'RELEASE_TO_VENDOR')}
+                    onClick={() => openVerdictConfirm(drawerItem, 'RELEASE_TO_VENDOR')}
                   >
                     <XCircle size={14} />
                     Giữ tiền vendor
@@ -571,7 +689,7 @@ const AdminReturns = () => {
                   <button
                     className="admin-primary-btn"
                     disabled={actionLoading}
-                    onClick={() => void applyFinalVerdict(drawerItem.id, 'REFUND_TO_CUSTOMER')}
+                    onClick={() => openVerdictConfirm(drawerItem, 'REFUND_TO_CUSTOMER')}
                   >
                     <CheckCircle2 size={14} />
                     Hoàn tiền khách
@@ -582,6 +700,24 @@ const AdminReturns = () => {
           </>
         ) : null}
       </Drawer>
+
+      <AdminConfirmDialog
+        open={Boolean(verdictConfirm)}
+        title="Xác nhận phán quyết hoàn trả"
+        description={
+          verdictConfirm?.action === 'REFUND_TO_CUSTOMER'
+            ? 'Khoản tiền sẽ được hoàn cho khách hàng và case tranh chấp được đóng.'
+            : 'Khoản tiền sẽ được giữ cho vendor và case tranh chấp được đóng.'
+        }
+        selectedItems={verdictConfirm ? [verdictConfirm.code] : undefined}
+        selectedNoun="yêu cầu"
+        confirmLabel={actionLoading ? 'Đang xử lý...' : verdictConfirm?.label}
+        danger={verdictConfirm?.danger}
+        confirmDisabled={actionLoading}
+        cancelDisabled={actionLoading}
+        onCancel={() => setVerdictConfirm(null)}
+        onConfirm={() => void confirmFinalVerdict()}
+      />
     </AdminLayout>
   );
 };

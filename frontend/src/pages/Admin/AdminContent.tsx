@@ -1,11 +1,12 @@
 import './Admin.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Search, Plus, Edit2, Trash2, X, Save, FileText, Shield } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Save } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { useAdminToast } from './useAdminToast';
 import { ADMIN_DICTIONARY } from './adminDictionary';
 import { contentService, type ContentPage, type ContentType } from '../../services/contentService';
+import { PanelFilterSelect, PanelSearchField } from '../../components/Panel/PanelPrimitives';
 
 const mapTabToType = (tab: 'faq' | 'policy'): ContentType => (tab === 'faq' ? 'FAQ' : 'POLICY');
 
@@ -91,40 +92,33 @@ const AdminContent = () => {
   };
 
   const tabs = [
-    { key: 'faq' as const, label: t.tabs.faq, icon: FileText },
-    { key: 'policy' as const, label: t.tabs.policy, icon: Shield },
+    { key: 'faq' as const, label: t.tabs.faq },
+    { key: 'policy' as const, label: t.tabs.policy },
   ];
 
   return (
     <AdminLayout
       title={t.title}
       actions={
-        <>
-          <div className="admin-search">
-            <Search size={16} />
-            <input
-              placeholder="Tìm nội dung..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <button className="admin-primary-btn" onClick={() => setIsCreating(true)}>
-            <Plus size={16} /> {t.form.addNew}
-          </button>
-        </>
+        <button className="admin-primary-btn" onClick={() => setIsCreating(true)}>
+          <Plus size={16} /> {t.form.addNew}
+        </button>
       }
     >
-      <div className="admin-tabs">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            className={`admin-tab ${activeTab === tab.key ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            <tab.icon size={16} />
-            <span>{tab.label}</span>
-          </button>
-        ))}
+      <div className="admin-filter-toolbar">
+        <PanelSearchField
+          placeholder="Tìm nội dung..."
+          ariaLabel="Tìm nội dung"
+          value={search}
+          onChange={setSearch}
+        />
+        <PanelFilterSelect
+          label="Loại nội dung"
+          ariaLabel="Chọn loại nội dung"
+          items={tabs.map((tab) => ({ key: tab.key, label: tab.label }))}
+          value={activeTab}
+          onChange={(key) => setActiveTab(key as 'faq' | 'policy')}
+        />
       </div>
 
       <div className="admin-content-list">

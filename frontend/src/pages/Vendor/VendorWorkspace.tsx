@@ -18,6 +18,7 @@ const VendorFinance = lazy(() => import('./VendorFinance'));
 
 const defaultShellState: AdminShellState = {
   title: 'Tổng quan',
+  hideHeaderSearch: true,
 };
 
 const isPrimitiveNode = (value: ReactNode) =>
@@ -85,6 +86,7 @@ const areReactNodesEqual = (left: ReactNode, right: ReactNode): boolean => {
 
 const areShellStatesEqual = (left: AdminShellState, right: AdminShellState) =>
   left.hideTopbarTitle === right.hideTopbarTitle &&
+  left.hideHeaderSearch === right.hideHeaderSearch &&
   areReactNodesEqual(left.title, right.title) &&
   areReactNodesEqual(left.actions, right.actions) &&
   (left.breadcrumbs?.length || 0) === (right.breadcrumbs?.length || 0) &&
@@ -103,6 +105,7 @@ const VendorWorkspace = () => {
         title={shellState.title}
         actions={shellState.actions}
         hideTopbarTitle={shellState.hideTopbarTitle}
+        hideHeaderSearch={shellState.hideHeaderSearch}
         breadcrumbs={shellState.breadcrumbs}
         shellRoot
       >

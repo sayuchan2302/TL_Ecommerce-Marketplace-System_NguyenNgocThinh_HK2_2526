@@ -1,5 +1,5 @@
 import './Admin.css';
-import { Filter, Search, Plus, Pencil, Layers, Trash2, ArrowUpDown, X, Link2 } from 'lucide-react';
+import { Filter, Plus, Pencil, Layers, Trash2, ArrowUpDown, X, Link2 } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -12,7 +12,7 @@ import { useAdminListState } from './useAdminListState';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
 import { useAdminToast } from './useAdminToast';
-import { PanelTableFooter } from '../../components/Panel/PanelPrimitives';
+import { PanelFilterSelect, PanelSearchField, PanelTableFooter } from '../../components/Panel/PanelPrimitives';
 import {
   adjustProductStock,
   applyVariantMatrix,
@@ -151,9 +151,6 @@ const AdminProducts = () => {
     view.resetCurrentView();
      pushToast(ADMIN_DICTIONARY.messages.products.resetView);
   };
-
-  const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label || t.tabs.all;
-  const hasViewContext = activeTab !== 'all' || Boolean(search.trim()) || view.page > 1 || Boolean(view.sortKey);
 
   const changeTab = (nextTab: string) => {
     setSelected(new Set());
@@ -296,10 +293,6 @@ const AdminProducts = () => {
       title={t.title}
       actions={(
         <>
-          <div className="admin-search">
-            <Search size={16} />
-            <input placeholder={t.searchPlaceholder} aria-label={t.searchPlaceholder} value={search} onChange={e => handleSearchChange(e.target.value)} />
-          </div>
           <button className="admin-ghost-btn" onClick={() => pushToast(ADMIN_DICTIONARY.messages.advancedFilterComingSoon)}><Filter size={16} /> {c.filter}</button>
           <button className="admin-ghost-btn" onClick={shareCurrentView}><Link2 size={16} /> {ADMIN_DICTIONARY.actions.shareView}</button>
           <button className="admin-ghost-btn" onClick={resetCurrentView}>{ADMIN_DICTIONARY.actions.resetView}</button>
@@ -334,29 +327,27 @@ const AdminProducts = () => {
         </div>
       </div>
 
-      <div className="admin-tabs">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            className={`admin-tab ${activeTab === tab.key ? 'active' : ''}`}
-            onClick={() => changeTab(tab.key)}
-          >
-            <span>{tab.label}</span>
-            <span className="admin-tab-count">{tabCounts[tab.key as keyof typeof tabCounts]}</span>
-          </button>
-        ))}
-      </div>
-
-      {hasViewContext && (
-        <div className="admin-view-summary">
-          <span className="summary-chip">{c.statusLabel}: {activeTabLabel}</span>
-          {search.trim() && <span className="summary-chip">{c.keyword}: {search.trim()}</span>}
-          <button className="summary-clear" onClick={resetCurrentView}>{c.clearFilters}</button>
-        </div>
-      )}
-
       <section className="admin-panels single">
         <div className="admin-panel">
+          <div className="admin-filter-toolbar">
+            <PanelSearchField
+              placeholder={t.searchPlaceholder}
+              ariaLabel={t.searchPlaceholder}
+              value={search}
+              onChange={handleSearchChange}
+            />
+            <PanelFilterSelect
+              label="Tình trạng"
+              ariaLabel="Lọc sản phẩm theo tình trạng"
+              items={tabs.map((tab) => ({
+                key: tab.key,
+                label: tab.label,
+                count: tabCounts[tab.key as keyof typeof tabCounts],
+              }))}
+              value={activeTab}
+              onChange={changeTab}
+            />
+          </div>
           {isLoading ? null : filtered.length === 0 ? (
             <AdminStateBlock
               type={search.trim() ? 'search-empty' : 'empty'}

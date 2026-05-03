@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Ban, CheckCircle2, Eye } from 'lucide-react';
 import AdminLayout from './AdminLayout';
 import { AdminStateBlock } from './AdminStateBlocks';
-import { PanelStatsGrid, PanelTableFooter, PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelFilterSelect, PanelSearchField, PanelStatsGrid, PanelTableFooter } from '../../components/Panel/PanelPrimitives';
 import { useAdminToast } from './useAdminToast';
 import ProductReviewModal from './ProductReviewModal';
 import {
@@ -15,8 +15,11 @@ import {
   type ProductApprovalStatus,
 } from './adminProductModerationService';
 import { getUiErrorMessage } from '../../utils/errorMessage';
+import { ADMIN_VIEW_KEYS } from './adminListView';
+import { useAdminViewState } from './useAdminViewState';
 
 type StatusFilter = ProductApprovalStatus | 'ALL';
+type PriceFilter = 'all' | 'under100k' | '100to500k' | 'over500k';
 
 const PAGE_SIZE = 12;
 
@@ -25,6 +28,15 @@ const STATUS_TABS: Array<{ key: StatusFilter; label: string }> = [
   { key: 'APPROVED', label: 'Đang hiển thị' },
   { key: 'BANNED', label: 'Đã chặn' },
 ];
+
+const priceFilters: Array<{ key: PriceFilter; label: string; minPrice?: number; maxPrice?: number }> = [
+  { key: 'all', label: 'Tất cả giá' },
+  { key: 'under100k', label: 'Dưới 100K', maxPrice: 99999 },
+  { key: '100to500k', label: '100K - 500K', minPrice: 100000, maxPrice: 500000 },
+  { key: 'over500k', label: 'Trên 500K', minPrice: 500001 },
+];
+
+const validPriceFilters = new Set<PriceFilter>(priceFilters.map((item) => item.key));
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('vi-VN', {
@@ -56,7 +68,6 @@ const AdminProductGovernance = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [tabCounts, setTabCounts] = useState<Record<StatusFilter, number>>({
     ALL: 0,
@@ -65,8 +76,20 @@ const AdminProductGovernance = () => {
   });
 
   const [reviewingProduct, setReviewingProduct] = useState<AdminModerationProduct | null>(null);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const view = useAdminViewState({
+    storageKey: ADMIN_VIEW_KEYS.productGovernance,
+    path: '/admin/product-governance',
+    validStatusKeys: STATUS_TABS.map((tab) => tab.key),
+    defaultStatus: 'ALL',
+    extraFilters: [
+      { key: 'price', defaultValue: 'all', validate: (value) => validPriceFilters.has(value as PriceFilter) },
+    ],
+  });
+  const statusFilter = (STATUS_TABS.some((tab) => tab.key === view.status) ? view.status : 'ALL') as StatusFilter;
+  const priceFilter = (validPriceFilters.has(view.extras.price as PriceFilter) ? view.extras.price : 'all') as PriceFilter;
+  const selectedPriceFilter = priceFilters.find((item) => item.key === priceFilter) || priceFilters[0];
+  const page = Math.max(0, view.page - 1);
 
   const baseFilterParams = useMemo(
     () => ({
@@ -85,6 +108,9 @@ const AdminProductGovernance = () => {
         page,
         size: PAGE_SIZE,
         status: statusFilter,
+        searchKeyword: view.search,
+        minPrice: selectedPriceFilter.minPrice,
+        maxPrice: selectedPriceFilter.maxPrice,
       });
 
       setRows(response.content);
@@ -105,7 +131,7 @@ const AdminProductGovernance = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [baseFilterParams, page, statusFilter]);
+  }, [baseFilterParams, page, selectedPriceFilter.maxPrice, selectedPriceFilter.minPrice, statusFilter, view.search]);
 
   const loadStatusCounts = useCallback(async () => {
     try {
@@ -168,6 +194,26 @@ const AdminProductGovernance = () => {
     }
   };
 
+  const changeStatus = (nextStatus: string) => {
+    setSelected(new Set());
+    view.setStatus(nextStatus);
+  };
+
+  const changeSearch = (value: string) => {
+    setSelected(new Set());
+    view.setSearch(value);
+  };
+
+  const changePriceFilter = (value: string) => {
+    setSelected(new Set());
+    view.setExtra('price', value);
+  };
+
+  const resetCurrentView = () => {
+    setSelected(new Set());
+    view.resetCurrentView();
+  };
+
   return (
     <AdminLayout title="Quản lý sản phẩm" breadcrumbs={['Gian hàng', 'Quản lý sản phẩm']}>
       <PanelStatsGrid
@@ -177,10 +223,7 @@ const AdminProductGovernance = () => {
             label: 'Tổng sản phẩm',
             value: tabCounts.ALL,
             sub: 'Toàn bộ sản phẩm theo bộ lọc hiện tại',
-            onClick: () => {
-              setStatusFilter('ALL');
-              setPage(0);
-            },
+            onClick: () => changeStatus('ALL'),
           },
           {
             key: 'approved',
@@ -188,10 +231,7 @@ const AdminProductGovernance = () => {
             value: tabCounts.APPROVED,
             sub: 'Được phép hiển thị trên sàn',
             tone: 'success',
-            onClick: () => {
-              setStatusFilter('APPROVED');
-              setPage(0);
-            },
+            onClick: () => changeStatus('APPROVED'),
           },
           {
             key: 'banned',
@@ -199,32 +239,46 @@ const AdminProductGovernance = () => {
             value: tabCounts.BANNED,
             sub: 'Vi phạm chính sách, đang bị ẩn',
             tone: tabCounts.BANNED > 0 ? 'danger' : '',
-            onClick: () => {
-              setStatusFilter('BANNED');
-              setPage(0);
-            },
+            onClick: () => changeStatus('BANNED'),
           },
         ]}
-      />
-
-      <PanelTabs
-        items={STATUS_TABS.map((tab) => ({
-          key: tab.key,
-          label: tab.label,
-          count: tabCounts[tab.key],
-        }))}
-        activeKey={statusFilter}
-        onChange={(key) => {
-          setStatusFilter(key as StatusFilter);
-          setSelected(new Set());
-          setPage(0);
-        }}
       />
 
       <section className="admin-panels single">
         <div className="admin-panel">
           <div className="admin-panel-head">
             <h2>Danh sách sản phẩm vendor</h2>
+          </div>
+          <div className="admin-filter-toolbar">
+            <PanelSearchField
+              placeholder="Tìm tên, mã sản phẩm hoặc gian hàng"
+              ariaLabel="Tìm sản phẩm cần kiểm duyệt"
+              value={view.search}
+              onChange={changeSearch}
+            />
+            <PanelFilterSelect
+              label="Trạng thái"
+              ariaLabel="Lọc sản phẩm theo trạng thái kiểm duyệt"
+              items={STATUS_TABS.map((tab) => ({
+                key: tab.key,
+                label: tab.label,
+                count: tabCounts[tab.key],
+              }))}
+              value={statusFilter}
+              onChange={changeStatus}
+            />
+            <PanelFilterSelect
+              label="Khoảng giá"
+              ariaLabel="Lọc sản phẩm theo khoảng giá"
+              items={priceFilters.map((item) => ({ key: item.key, label: item.label }))}
+              value={priceFilter}
+              onChange={changePriceFilter}
+            />
+            {view.hasViewContext ? (
+              <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+                Đặt lại
+              </button>
+            ) : null}
           </div>
 
           {isLoading ? (
@@ -251,7 +305,7 @@ const AdminProductGovernance = () => {
             />
           ) : (
             <>
-                <div className="admin-table moderation-table" role="table" aria-label="Danh sách sản phẩm vendor">
+                <div className="admin-table moderation-table admin-responsive-table" role="table" aria-label="Danh sách sản phẩm vendor">
                 <div className="admin-table-row admin-table-head moderation-row" role="row">
                   <div role="columnheader">
                     <input
@@ -355,11 +409,81 @@ const AdminProductGovernance = () => {
                 ))}
               </div>
 
+              <div className="admin-mobile-cards" aria-label="Danh sách sản phẩm kiểm duyệt dạng thẻ">
+                {rows.map((product) => (
+                  <article key={product.id} className="admin-mobile-card">
+                    <div className="admin-mobile-card-head">
+                      <div className="admin-mobile-card-title">
+                        <img src={product.thumbnail || ''} alt={product.name} />
+                        <div className="admin-mobile-card-title-main">
+                          <p className="admin-bold">{product.name}</p>
+                          <p className="admin-mobile-card-sub">{product.productCode}</p>
+                        </div>
+                      </div>
+                      <span className={statusPillClass(product.approvalStatus)}>{statusLabel[product.approvalStatus]}</span>
+                    </div>
+                    <div className="admin-mobile-card-grid">
+                      <div className="admin-mobile-card-field">
+                        <span>Gian hàng</span>
+                        <strong>{product.storeName || 'Không rõ gian hàng'}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Danh mục</span>
+                        <strong>{product.categoryName || 'N/A'}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Giá</span>
+                        <strong>{formatCurrency(product.price)}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Kho / đã bán</span>
+                        <strong>{product.stock} kho</strong>
+                        <p>{product.sales} đã bán</p>
+                      </div>
+                    </div>
+                    <div className="admin-mobile-card-actions">
+                      <button
+                        className="admin-primary-btn"
+                        type="button"
+                        onClick={() => setReviewingProduct(product)}
+                        disabled={actionLoading}
+                      >
+                        <Eye size={16} />
+                        Xem chi tiết
+                      </button>
+                      {product.approvalStatus === 'BANNED' ? (
+                        <button
+                          className="admin-icon-btn subtle moderation-icon-approve"
+                          title="Gỡ chặn"
+                          aria-label="Gỡ chặn"
+                          onClick={() => {
+                            void handleUnblock(product);
+                          }}
+                          disabled={actionLoading}
+                        >
+                          <CheckCircle2 size={16} />
+                        </button>
+                      ) : (
+                        <button
+                          className="admin-icon-btn subtle danger-icon moderation-icon-ban"
+                          title="Chặn sản phẩm"
+                          aria-label="Chặn sản phẩm"
+                          onClick={() => setReviewingProduct(product)}
+                          disabled={actionLoading}
+                        >
+                          <Ban size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+
               <PanelTableFooter
                 meta={`Trang ${page + 1}/${totalPages} · ${rows.length} sản phẩm/trang`}
                 page={page + 1}
                 totalPages={totalPages}
-                onPageChange={(next) => setPage(next - 1)}
+                onPageChange={view.setPage}
                 prevLabel="Trước"
                 nextLabel="Sau"
               />

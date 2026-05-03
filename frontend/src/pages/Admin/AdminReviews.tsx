@@ -11,8 +11,9 @@ import {
   PanelDrawerFooter,
   PanelDrawerHeader,
   PanelDrawerSection,
+  PanelFilterSelect,
+  PanelSearchField,
   PanelTableFooter,
-  PanelTabs,
 } from '../../components/Panel/PanelPrimitives';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { adminReviewService, type Review, type ReviewStatus } from './adminReviewService';
@@ -45,6 +46,17 @@ const RatingStars = ({ rating, size = 14 }: { rating: number; size?: number }) =
     ))}
   </div>
 );
+
+type RatingFilter = 'all' | '5' | '4' | '1-3';
+
+const ratingFilters: Array<{ key: RatingFilter; label: string }> = [
+  { key: 'all', label: 'Tất cả sao' },
+  { key: '5', label: '5 sao' },
+  { key: '4', label: '4 sao' },
+  { key: '1-3', label: '1-3 sao' },
+];
+
+const validRatingFilters = new Set<RatingFilter>(ratingFilters.map((item) => item.key));
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -104,12 +116,23 @@ const AdminReviews = () => {
     path: '/admin/reviews',
     validStatusKeys: ['all', 'visible', 'hidden'],
     defaultStatus: 'visible',
+    extraFilters: [
+      { key: 'rating', defaultValue: 'all', validate: (value) => validRatingFilters.has(value as RatingFilter) },
+    ],
   });
+  const ratingFilter = (validRatingFilters.has(view.extras.rating as RatingFilter) ? view.extras.rating : 'all') as RatingFilter;
 
   const filteredByStatus = useMemo(() => {
-    if (view.status === 'all') return allReviews;
-    return allReviews.filter((item) => normalizeStatus(item.status) === view.status);
-  }, [allReviews, view.status]);
+    let next = view.status === 'all' ? allReviews : allReviews.filter((item) => normalizeStatus(item.status) === view.status);
+    if (ratingFilter !== 'all') {
+      next = next.filter((item) => {
+        if (ratingFilter === '5') return item.rating === 5;
+        if (ratingFilter === '4') return item.rating === 4;
+        return item.rating >= 1 && item.rating <= 3;
+      });
+    }
+    return next;
+  }, [allReviews, ratingFilter, view.status]);
 
   const {
     search,
@@ -129,7 +152,7 @@ const AdminReviews = () => {
     onPageChange: view.setPage,
     getSearchText: (row) => `${row.productName} ${row.customerName} ${row.content} ${row.orderCode || ''}`,
     filterPredicate: () => true,
-    loadingDeps: [view.status],
+    loadingDeps: [view.status, ratingFilter],
   });
 
   const stats = useMemo(() => {
@@ -148,6 +171,13 @@ const AdminReviews = () => {
     }),
     [allReviews],
   );
+
+  const ratingCounts: Record<RatingFilter, number> = {
+    all: allReviews.length,
+    '5': allReviews.filter((item) => item.rating === 5).length,
+    '4': allReviews.filter((item) => item.rating === 4).length,
+    '1-3': allReviews.filter((item) => item.rating >= 1 && item.rating <= 3).length,
+  };
 
   const handleHide = useCallback(
     async (id: string) => {
@@ -182,6 +212,25 @@ const AdminReviews = () => {
   const resetCurrentView = () => {
     view.resetCurrentView();
     setSelected(new Set());
+    setDrawerReview(null);
+  };
+
+  const changeStatus = (key: string) => {
+    setSelected(new Set());
+    setDrawerReview(null);
+    view.setStatus(key);
+  };
+
+  const changeSearch = (value: string) => {
+    setSelected(new Set());
+    setDrawerReview(null);
+    view.setSearch(value);
+  };
+
+  const changeRating = (value: string) => {
+    setSelected(new Set());
+    setDrawerReview(null);
+    view.setExtra('rating', value);
   };
 
   return (
@@ -192,14 +241,14 @@ const AdminReviews = () => {
           <div className="admin-stat-value">{stats.total}</div>
           <div className="admin-stat-sub">Tất cả phản hồi từ khách hàng</div>
         </div>
-        <div className="admin-stat-card success" onClick={() => view.setStatus('visible')} style={{ cursor: 'pointer' }}>
+        <div className="admin-stat-card success" onClick={() => changeStatus('visible')} style={{ cursor: 'pointer' }}>
           <div className="admin-stat-label">Đang hiển thị</div>
           <div className="admin-stat-value">{stats.visible}</div>
           <div className="admin-stat-sub">Đang xuất hiện trên trang sản phẩm</div>
         </div>
         <div
           className={`admin-stat-card ${stats.hidden > 0 ? 'warning' : ''}`}
-          onClick={() => view.setStatus('hidden')}
+          onClick={() => changeStatus('hidden')}
           style={{ cursor: 'pointer' }}
         >
           <div className="admin-stat-label">Đã ẩn</div>
@@ -216,20 +265,41 @@ const AdminReviews = () => {
         </div>
       </div>
 
-      <PanelTabs
-        items={[
-          { key: 'all', label: 'Tất cả', count: tabCounts.all },
-          { key: 'visible', label: 'Đang hiển thị', count: tabCounts.visible },
-          { key: 'hidden', label: 'Đã ẩn', count: tabCounts.hidden },
-        ]}
-        activeKey={view.status}
-        onChange={(key) => view.setStatus(key)}
-      />
-
       <section className="admin-panels single">
         <div className="admin-panel">
           <div className="admin-panel-head">
             <h2>Danh sách đánh giá</h2>
+          </div>
+          <div className="admin-filter-toolbar">
+            <PanelSearchField
+              placeholder="Tìm sản phẩm, khách hàng, nội dung hoặc mã đơn"
+              ariaLabel="Tìm đánh giá"
+              value={search}
+              onChange={changeSearch}
+            />
+            <PanelFilterSelect
+              label="Trạng thái"
+              ariaLabel="Lọc đánh giá theo trạng thái"
+              items={[
+                { key: 'all', label: 'Tất cả', count: tabCounts.all },
+                { key: 'visible', label: 'Đang hiển thị', count: tabCounts.visible },
+                { key: 'hidden', label: 'Đã ẩn', count: tabCounts.hidden },
+              ]}
+              value={view.status}
+              onChange={changeStatus}
+            />
+            <PanelFilterSelect
+              label="Điểm sao"
+              ariaLabel="Lọc đánh giá theo điểm sao"
+              items={ratingFilters.map((item) => ({ key: item.key, label: item.label, count: ratingCounts[item.key] }))}
+              value={ratingFilter}
+              onChange={changeRating}
+            />
+            {view.hasViewContext ? (
+              <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+                Đặt lại
+              </button>
+            ) : null}
           </div>
 
           {isLoading ? (
@@ -248,7 +318,7 @@ const AdminReviews = () => {
             />
           ) : (
             <>
-              <div className="admin-table" role="table" aria-label="Bảng đánh giá">
+              <div className="admin-table admin-responsive-table" role="table" aria-label="Bảng đánh giá">
                 <div className="admin-table-row admin-table-head reviews" role="row">
                   <div role="columnheader">
                     <input
@@ -336,6 +406,62 @@ const AdminReviews = () => {
                       </button>
                     </div>
                   </motion.div>
+                ))}
+              </div>
+
+              <div className="admin-mobile-cards" aria-label="Danh sách đánh giá dạng thẻ">
+                {pagedItems.map((review) => (
+                  <article key={review.id} className="admin-mobile-card">
+                    <div className="admin-mobile-card-head">
+                      <div className="admin-mobile-card-title">
+                        <img src={review.productImage} alt={review.productName} />
+                        <div className="admin-mobile-card-title-main">
+                          <p className="admin-bold">{review.productName}</p>
+                          <p className="admin-mobile-card-sub">{review.customerName}</p>
+                        </div>
+                      </div>
+                      <ReviewStatusBadge status={review.status} />
+                    </div>
+                    <div className="admin-mobile-card-grid">
+                      <div className="admin-mobile-card-field">
+                        <span>Đánh giá</span>
+                        <strong>{review.rating}/5</strong>
+                        <p><RatingStars rating={review.rating} size={13} /></p>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Khách hàng</span>
+                        <strong>{review.customerName}</strong>
+                        <p>{review.customerEmail}</p>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Ngày</span>
+                        <strong>{formatDate(review.date)}</strong>
+                      </div>
+                      <div className="admin-mobile-card-field">
+                        <span>Nội dung</span>
+                        <strong>{review.content || 'Chưa có nội dung'}</strong>
+                      </div>
+                    </div>
+                    <div className="admin-mobile-card-actions">
+                      <button className="admin-primary-btn" type="button" onClick={() => setDrawerReview(review)}>
+                        <Eye size={16} />
+                        Xem chi tiết
+                      </button>
+                      {normalizeStatus(review.status) !== 'hidden' && (
+                        <button className="admin-icon-btn subtle" onClick={() => void handleHide(review.id)} title="Ẩn" aria-label="Ẩn đánh giá">
+                          <EyeOff size={16} />
+                        </button>
+                      )}
+                      <button
+                        className="admin-icon-btn subtle danger-icon"
+                        onClick={() => setDeleteTarget({ ids: [review.id], names: [review.productName] })}
+                        title="Xóa"
+                        aria-label="Xóa đánh giá"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </article>
                 ))}
               </div>
 
