@@ -2,15 +2,16 @@ import './Vendor.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Eye, MessageSquare, Star } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import {
   PanelDrawerFooter,
   PanelDrawerHeader,
   PanelDrawerSection,
+  PanelFilterSelect,
   PanelSearchField,
   PanelStatsGrid,
   PanelTableFooter,
-  PanelTabs,
 } from '../../components/Panel/PanelPrimitives';
 import {
   reviewService,
@@ -24,12 +25,39 @@ import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
 import Drawer from '../../components/Drawer/Drawer';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import { toDisplayOrderCode } from '../../utils/displayCode';
+import { normalizePositiveInteger } from './vendorHelpers';
 
 const TABS = [
   { key: 'all', label: 'Tất cả' },
   { key: 'need_reply', label: 'Cần phản hồi' },
   { key: 'negative', label: 'Tiêu cực' },
 ] as const;
+
+type ReviewQueueFilter = typeof TABS[number]['key'];
+type ReviewModerationFilter = Review['status'] | 'all';
+
+const MODERATION_FILTERS: Array<{ key: ReviewModerationFilter; label: string }> = [
+  { key: 'all', label: 'Tất cả hiển thị' },
+  { key: 'approved', label: 'Đang hiển thị' },
+  { key: 'hidden', label: 'Đã ẩn' },
+  { key: 'pending', label: 'Chờ duyệt' },
+];
+
+const normalizeQueueFilter = (value: string | null): ReviewQueueFilter => {
+  if (value === 'need_reply' || value === 'negative') {
+    return value;
+  }
+
+  return 'all';
+};
+
+const normalizeModerationFilter = (value: string | null): ReviewModerationFilter => {
+  if (value === 'approved' || value === 'hidden' || value === 'pending') {
+    return value;
+  }
+
+  return 'all';
+};
 
 const PAGE_SIZE = 12;
 
@@ -90,10 +118,14 @@ const getModerationLabel = (status?: Review['status']) => {
 
 const VendorReviews = () => {
   const { addToast } = useToast();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'need_reply' | 'negative'>('all');
-  const [page, setPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const activeTab = normalizeQueueFilter(searchParams.get('status'));
+  const moderationFilter = normalizeModerationFilter(searchParams.get('moderation'));
+  const page = normalizePositiveInteger(searchParams.get('page'));
+  const keyword = (searchParams.get('q') || '').trim();
+
+  const [searchQuery, setSearchQuery] = useState(keyword);
   const [reviewsPage, setReviewsPage] = useState<VendorReviewsPage>(emptyReviewsPage);
   const [summary, setSummary] = useState<VendorReviewSummary>(emptyReviewSummary);
   const [loading, setLoading] = useState(true);
@@ -107,17 +139,77 @@ const VendorReviews = () => {
   const latestReviewsRequestIdRef = useRef(0);
   const canVendorReply = reviewService.canVendorReply();
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setDebouncedQuery(searchQuery.trim());
-    }, 280);
-    return () => window.clearTimeout(timer);
-  }, [searchQuery]);
+  const updateQuery = useCallback(
+    (mutate: (query: URLSearchParams) => void, replace = false) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          mutate(next);
+          return next;
+        },
+        { replace },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setPage = useCallback((nextPage: number) => {
+    updateQuery((query) => {
+      query.set('page', String(Math.max(1, nextPage)));
+    });
+  }, [updateQuery]);
+
+  const setQueueFilter = useCallback((filter: ReviewQueueFilter) => {
+    setSelected(new Set());
+    updateQuery((query) => {
+      if (filter === 'all') {
+        query.delete('status');
+      } else {
+        query.set('status', filter);
+      }
+      query.set('page', '1');
+    });
+  }, [updateQuery]);
+
+  const setModerationFilter = useCallback((filter: ReviewModerationFilter) => {
+    setSelected(new Set());
+    updateQuery((query) => {
+      if (filter === 'all') {
+        query.delete('moderation');
+      } else {
+        query.set('moderation', filter);
+      }
+      query.set('page', '1');
+    });
+  }, [updateQuery]);
 
   useEffect(() => {
-    setPage(1);
-    setSelected(new Set());
-  }, [activeTab, debouncedQuery]);
+    setSearchQuery(keyword);
+  }, [keyword]);
+
+  useEffect(() => {
+    if (searchQuery.trim() === keyword) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setSelected(new Set());
+      updateQuery(
+        (query) => {
+          const normalized = searchQuery.trim();
+          if (normalized) {
+            query.set('q', normalized);
+          } else {
+            query.delete('q');
+          }
+          query.set('page', '1');
+        },
+        true,
+      );
+    }, 280);
+
+    return () => window.clearTimeout(timer);
+  }, [keyword, searchQuery, updateQuery]);
 
   const tabFilters = useMemo(() => {
     if (activeTab === 'need_reply') return { needReply: true as const };
@@ -144,7 +236,8 @@ const VendorReviews = () => {
       const next = await reviewService.getVendorReviews({
         page,
         size: PAGE_SIZE,
-        q: debouncedQuery || undefined,
+        q: keyword || undefined,
+        status: moderationFilter,
         ...tabFilters,
       });
 
@@ -169,7 +262,7 @@ const VendorReviews = () => {
         setLoading(false);
       }
     }
-  }, [debouncedQuery, page, tabFilters]);
+  }, [keyword, moderationFilter, page, setPage, tabFilters]);
 
   useEffect(() => {
     void fetchSummary();
@@ -195,9 +288,8 @@ const VendorReviews = () => {
 
   const resetCurrentView = () => {
     setSearchQuery('');
-    setActiveTab('all');
-    setPage(1);
     setSelected(new Set());
+    setSearchParams(new URLSearchParams());
   };
 
   const submitReplies = async (ids: string[]) => {
@@ -288,7 +380,7 @@ const VendorReviews = () => {
       label: 'Tổng đánh giá',
       value: summary.total,
       sub: `Điểm trung bình: ${summary.average.toFixed(1)}`,
-      onClick: () => setActiveTab('all'),
+      onClick: () => setQueueFilter('all'),
     },
     {
       key: 'need_reply',
@@ -296,7 +388,7 @@ const VendorReviews = () => {
       value: summary.needReply,
       sub: 'Đánh giá chưa có phản hồi từ shop',
       tone: 'warning',
-      onClick: () => setActiveTab('need_reply'),
+      onClick: () => setQueueFilter('need_reply'),
     },
     {
       key: 'negative',
@@ -304,7 +396,7 @@ const VendorReviews = () => {
       value: summary.negative,
       sub: 'Tín hiệu cần chăm sóc ưu tiên',
       tone: 'info',
-      onClick: () => setActiveTab('negative'),
+      onClick: () => setQueueFilter('negative'),
     },
     {
       key: 'reply_rate',
@@ -312,7 +404,7 @@ const VendorReviews = () => {
       value: summary.total ? `${Math.round(((summary.total - summary.needReply) / summary.total) * 100)}%` : '0%',
       sub: 'Tỷ lệ đánh giá đã được shop chăm sóc',
       tone: 'success',
-      onClick: () => setActiveTab('all'),
+      onClick: () => setQueueFilter('all'),
     },
   ] as const;
 
@@ -327,6 +419,8 @@ const VendorReviews = () => {
     label: tab.label,
     count: tabCountMap[tab.key],
   }));
+  const moderationItems = MODERATION_FILTERS;
+  const hasViewContext = activeTab !== 'all' || moderationFilter !== 'all' || Boolean(keyword);
 
   return (
     <VendorLayout
@@ -335,12 +429,33 @@ const VendorReviews = () => {
     >
       <PanelStatsGrid items={[...statItems]} accentClassName="vendor-stat-button" />
 
-      <PanelTabs
-        items={tabItems}
-        activeKey={activeTab}
-        onChange={(key) => setActiveTab(key as 'all' | 'need_reply' | 'negative')}
-        accentClassName="vendor-active-tab"
-      />
+      <div className="admin-filter-toolbar vendor-filter-toolbar">
+        <PanelSearchField
+          placeholder="Tìm theo sản phẩm, nội dung, mã đơn..."
+          ariaLabel="Tìm đánh giá shop"
+          value={searchQuery}
+          onChange={setSearchQuery}
+        />
+        <PanelFilterSelect
+          label="Phản hồi"
+          ariaLabel="Lọc đánh giá theo phản hồi"
+          items={tabItems}
+          value={activeTab}
+          onChange={(key) => setQueueFilter(key as ReviewQueueFilter)}
+        />
+        <PanelFilterSelect
+          label="Hiển thị"
+          ariaLabel="Lọc đánh giá theo trạng thái hiển thị"
+          items={moderationItems}
+          value={moderationFilter}
+          onChange={(key) => setModerationFilter(key as ReviewModerationFilter)}
+        />
+        {hasViewContext ? (
+          <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+            Đặt lại
+          </button>
+        ) : null}
+      </div>
       <section className="admin-panels single">
         <div className="admin-panel">
           <div className="admin-panel-head">
@@ -351,11 +466,6 @@ const VendorReviews = () => {
               ) : null}
             </div>
             <div className="vendor-reviews-head-actions">
-              <PanelSearchField
-                placeholder="Tìm theo sản phẩm, nội dung, mã đơn..."
-                value={searchQuery}
-                onChange={setSearchQuery}
-              />
               {canVendorReply ? (
                 <button
                   className="admin-ghost-btn"
@@ -385,15 +495,15 @@ const VendorReviews = () => {
             />
           ) : reviews.length === 0 ? (
             <AdminStateBlock
-              type={debouncedQuery ? 'search-empty' : 'empty'}
-              title={debouncedQuery ? 'Không có đánh giá phù hợp' : 'Chưa có đánh giá cần xử lý'}
+              type={hasViewContext ? 'search-empty' : 'empty'}
+              title={hasViewContext ? 'Không có đánh giá phù hợp' : 'Chưa có đánh giá cần xử lý'}
               description={
-                debouncedQuery
+                hasViewContext
                   ? 'Thử đổi từ khóa hoặc tab để xem lại hàng đợi phản hồi của shop.'
                   : 'Khi khách để lại đánh giá, kênh người bán sẽ hiển thị tại đây.'
               }
-              actionLabel={debouncedQuery ? 'Đặt lại bộ lọc' : undefined}
-              onAction={debouncedQuery ? resetCurrentView : undefined}
+              actionLabel={hasViewContext ? 'Đặt lại bộ lọc' : undefined}
+              onAction={hasViewContext ? resetCurrentView : undefined}
             />
           ) : (
             <>

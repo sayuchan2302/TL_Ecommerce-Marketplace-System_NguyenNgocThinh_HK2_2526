@@ -5,10 +5,10 @@ import { AlertTriangle, Check, Eye, Truck, XCircle, PackageCheck } from 'lucide-
 import { Link, useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import {
+  PanelFilterSelect,
   PanelSearchField,
   PanelStatsGrid,
   PanelTableFooter,
-  PanelTabs,
 } from '../../components/Panel/PanelPrimitives';
 import {
   getVendorOrderStatusLabel,
@@ -562,14 +562,21 @@ const VendorOrders = () => {
       </div>
 
       <div className="admin-panels single">
-        <div className="admin-toolbar vendor-filter-toolbar">
+        <div className="admin-filter-toolbar vendor-filter-toolbar">
           <PanelSearchField
             placeholder="Tìm theo khách hàng, email, mã đơn..."
             ariaLabel="Tìm đơn hàng shop"
             value={searchQuery}
             onChange={setSearchQuery}
           />
-          <label className="vendor-date-field">
+          <PanelFilterSelect
+            label="Trạng thái"
+            ariaLabel="Lọc đơn theo trạng thái"
+            items={tabItems}
+            value={activeTab}
+            onChange={handleTabChange}
+          />
+          <label className="admin-date-field vendor-date-field">
             <span>Từ ngày</span>
             <input
               type="date"
@@ -578,7 +585,7 @@ const VendorOrders = () => {
               onChange={(event) => handleDateFilterChange('date_from', event.target.value)}
             />
           </label>
-          <label className="vendor-date-field">
+          <label className="admin-date-field vendor-date-field">
             <span>Đến ngày</span>
             <input
               type="date"
@@ -587,9 +594,11 @@ const VendorOrders = () => {
               onChange={(event) => handleDateFilterChange('date_to', event.target.value)}
             />
           </label>
-        </div>
-        <div className="admin-toolbar vendor-tabs-toolbar">
-          <PanelTabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} accentClassName="vendor-active-tab" />
+          {hasViewContext ? (
+            <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+              Đặt lại
+            </button>
+          ) : null}
         </div>
         <div className="admin-panel">
           

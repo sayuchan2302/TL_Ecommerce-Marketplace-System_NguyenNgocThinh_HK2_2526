@@ -13,6 +13,7 @@ export const useVendorProductsQueryState = ({ onScopeChange }: UseVendorProducts
   const activeTab = normalizeProductTab(searchParams.get('status'));
   const page = normalizePositiveInteger(searchParams.get('page'));
   const keyword = (searchParams.get('q') || '').trim();
+  const categoryId = (searchParams.get('category_id') || '').trim();
 
   const updateQuery = useCallback(
     (mutate: (query: URLSearchParams) => void, replace = false) => {
@@ -41,6 +42,19 @@ export const useVendorProductsQueryState = ({ onScopeChange }: UseVendorProducts
     });
   }, [onScopeChange, updateQuery]);
 
+  const handleCategoryChange = useCallback((categoryKey: string) => {
+    const nextCategoryId = categoryKey === 'all' ? '' : categoryKey;
+    onScopeChange?.();
+    updateQuery((query) => {
+      if (nextCategoryId) {
+        query.set('category_id', nextCategoryId);
+      } else {
+        query.delete('category_id');
+      }
+      query.set('page', '1');
+    });
+  }, [onScopeChange, updateQuery]);
+
   const setPage = useCallback((nextPage: number) => {
     updateQuery((query) => {
       query.set('page', String(Math.max(1, nextPage)));
@@ -56,8 +70,10 @@ export const useVendorProductsQueryState = ({ onScopeChange }: UseVendorProducts
     activeTab,
     page,
     keyword,
+    categoryId,
     updateQuery,
     handleTabChange,
+    handleCategoryChange,
     setPage,
     resetCurrentView,
   };

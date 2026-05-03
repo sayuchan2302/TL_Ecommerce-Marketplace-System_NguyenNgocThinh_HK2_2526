@@ -8,9 +8,10 @@ import {
   PanelDrawerFooter,
   PanelDrawerHeader,
   PanelDrawerSection,
+  PanelFilterSelect,
+  PanelSearchField,
   PanelStatsGrid,
   PanelTableFooter,
-  PanelTabs,
 } from '../../components/Panel/PanelPrimitives';
 import { AdminStateBlock, AdminTableSkeleton } from '../Admin/AdminStateBlocks';
 import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
@@ -202,10 +203,8 @@ const VendorPromotions = () => {
   );
 
   useEffect(() => {
-    if (searchInput !== keyword) {
-      setSearchInput(keyword);
-    }
-  }, [keyword, searchInput]);
+    setSearchInput(keyword);
+  }, [keyword]);
 
   useEffect(() => {
     if (searchInput.trim() === keyword) {
@@ -434,6 +433,12 @@ const VendorPromotions = () => {
     },
   ];
 
+  const statusItems = TABS.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    count: result.counts[tab.key],
+  }));
+  const hasViewContext = activeTab !== 'all' || Boolean(keyword);
   const allOnPageSelected = result.items.length > 0 && selected.size === result.items.length;
 
   return (
@@ -449,12 +454,26 @@ const VendorPromotions = () => {
     >
       <PanelStatsGrid items={statItems} accentClassName="vendor-stat-button" />
 
-      <PanelTabs
-        items={TABS}
-        activeKey={activeTab}
-        onChange={(key) => setTab(key as VoucherTab)}
-        accentClassName="vendor-active-tab"
-      />
+      <div className="admin-filter-toolbar vendor-filter-toolbar">
+        <PanelSearchField
+          placeholder="Tìm theo tên hoặc mã voucher..."
+          ariaLabel="Tìm voucher shop"
+          value={searchInput}
+          onChange={setSearchInput}
+        />
+        <PanelFilterSelect
+          label="Trạng thái"
+          ariaLabel="Lọc voucher theo trạng thái"
+          items={statusItems}
+          value={activeTab}
+          onChange={(key) => setTab(key as VoucherTab)}
+        />
+        {hasViewContext ? (
+          <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+            Đặt lại
+          </button>
+        ) : null}
+      </div>
 
       <section className="admin-panels single">
         <div className="admin-panel">
@@ -475,15 +494,15 @@ const VendorPromotions = () => {
             />
           ) : result.items.length === 0 ? (
             <AdminStateBlock
-              type={keyword ? 'search-empty' : 'empty'}
-              title={keyword ? 'Không có voucher phù hợp' : 'Chưa có voucher shop'}
+              type={hasViewContext ? 'search-empty' : 'empty'}
+              title={hasViewContext ? 'Không có voucher phù hợp' : 'Chưa có voucher shop'}
               description={
-                keyword
+                hasViewContext
                   ? 'Thử đổi từ khóa hoặc chuyển tab khác để xem danh sách ưu đãi.'
                   : 'Khi shop tạo voucher riêng, danh sách sẽ xuất hiện tại đây.'
               }
-              actionLabel={keyword ? 'Đặt lại bộ lọc' : 'Tạo voucher'}
-              onAction={keyword ? resetCurrentView : openCreate}
+              actionLabel={hasViewContext ? 'Đặt lại bộ lọc' : 'Tạo voucher'}
+              onAction={hasViewContext ? resetCurrentView : openCreate}
             />
           ) : (
             <>

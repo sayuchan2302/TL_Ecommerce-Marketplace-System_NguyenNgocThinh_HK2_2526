@@ -1558,32 +1558,71 @@
   min-width: min(320px, 100%);
 }
 
+.vendor-shell .vendor-filter-toolbar .admin-search:focus-within {
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+
+.vendor-filter-toolbar .admin-filter-select {
+  border-color: transparent;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfffd 100%);
+}
+
+.vendor-filter-toolbar .admin-date-field {
+  border-color: #dbe7df;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfffd 100%);
+}
+
+.vendor-filter-toolbar .admin-date-field:hover,
+.vendor-filter-toolbar .admin-search:hover {
+  border-color: var(--co-vendor-border-strong);
+  box-shadow: 0 6px 16px rgba(20, 83, 45, 0.08);
+}
+
+.vendor-filter-toolbar .admin-filter-select:hover,
+.vendor-filter-toolbar .admin-filter-select:focus-within {
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(20, 83, 45, 0.08);
+}
+
+.vendor-filter-toolbar :is(input, select):focus,
+.vendor-filter-toolbar :is(input, select):focus-visible {
+  outline: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .vendor-tabs-toolbar .admin-tabs {
   margin-bottom: 0;
 }
 
 .vendor-date-field {
-  min-height: 42px;
+  min-height: 52px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border: 1px solid var(--co-gray-200);
+  gap: 10px;
+  min-width: 220px;
+  padding: 0 14px;
+  border: 1px solid #dbe7df;
   border-radius: 12px;
-  background: #fff;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfffd 100%);
+  box-shadow: 0 1px 2px rgba(20, 83, 45, 0.04);
   color: var(--co-gray-600);
   font-size: 12px;
   font-weight: 700;
+  cursor: pointer;
 }
 
 .vendor-date-field input {
   min-width: 138px;
+  min-height: 42px;
   border: none;
   outline: none;
   color: var(--co-admin-text);
   font: inherit;
   font-size: 13px;
   background: transparent;
+  cursor: pointer;
 }
 
 .vendor-mobile-cards {
@@ -3229,6 +3268,8 @@
   }
 
   .vendor-filter-toolbar .admin-search,
+  .vendor-filter-toolbar .admin-filter-select,
+  .vendor-filter-toolbar .admin-filter-reset,
   .vendor-date-field {
     width: 100%;
     min-width: 0;
@@ -3241,6 +3282,11 @@
   .vendor-date-field input {
     min-width: 0;
     text-align: right;
+  }
+
+  .vendor-filter-toolbar .admin-filter-select select {
+    min-width: 0;
+    width: 100%;
   }
 
   .vendor-tabs-toolbar {

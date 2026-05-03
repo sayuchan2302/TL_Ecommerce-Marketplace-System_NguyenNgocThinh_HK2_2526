@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import VendorLayout from './VendorLayout';
 import { useToast } from '../../contexts/ToastContext';
-import { PanelSearchField, PanelTabs } from '../../components/Panel/PanelPrimitives';
+import { PanelFilterSelect, PanelSearchField } from '../../components/Panel/PanelPrimitives';
 import { AdminToast } from '../Admin/AdminStateBlocks';
 import { PRODUCT_TABS, PAGE_SIZE } from './vendorProducts.constants';
 import { useVendorProductsQueryState } from './useVendorProductsQueryState';
@@ -28,8 +28,10 @@ const VendorProducts = () => {
     activeTab,
     page,
     keyword,
+    categoryId,
     updateQuery,
     handleTabChange,
+    handleCategoryChange,
     setPage,
     resetCurrentView,
   } = useVendorProductsQueryState({
@@ -48,6 +50,7 @@ const VendorProducts = () => {
   } = useVendorProductsData({
     activeTab,
     keyword,
+    categoryId,
     page,
     updateQuery,
     pruneToVisibleIds: selection.pruneToVisibleIds,
@@ -137,7 +140,22 @@ const VendorProducts = () => {
           ? statusCounts.outOfStock
           : statusCounts.draft,
   }));
-  const hasViewContext = activeTab !== 'all' || Boolean(keyword);
+  const categoryItems = useMemo(() => {
+    const items = [
+      { key: 'all', label: 'Tất cả danh mục' },
+      ...editor.leafCategories.map((category) => ({
+        key: category.id,
+        label: category.label,
+      })),
+    ];
+
+    if (categoryId && !items.some((item) => item.key === categoryId)) {
+      items.push({ key: categoryId, label: 'Danh mục đã chọn' });
+    }
+
+    return items;
+  }, [categoryId, editor.leafCategories]);
+  const hasViewContext = activeTab !== 'all' || Boolean(keyword) || Boolean(categoryId);
 
   return (
     <VendorLayout
@@ -152,17 +170,32 @@ const VendorProducts = () => {
     >
       <VendorProductsStats statusCounts={statusCounts} onTabChange={handleTabChange} />
 
-      <div className="admin-toolbar vendor-filter-toolbar">
+      <div className="admin-filter-toolbar vendor-filter-toolbar">
         <PanelSearchField
           placeholder="Tìm sản phẩm, SKU..."
           ariaLabel="Tìm sản phẩm shop"
           value={searchQuery}
           onChange={setSearchQuery}
         />
-      </div>
-
-      <div className="admin-toolbar vendor-tabs-toolbar">
-        <PanelTabs items={tabItems} activeKey={activeTab} onChange={handleTabChange} accentClassName="vendor-active-tab" />
+        <PanelFilterSelect
+          label="Trạng thái"
+          ariaLabel="Lọc sản phẩm theo trạng thái"
+          items={tabItems}
+          value={activeTab}
+          onChange={handleTabChange}
+        />
+        <PanelFilterSelect
+          label="Danh mục"
+          ariaLabel="Lọc sản phẩm theo danh mục"
+          items={categoryItems}
+          value={categoryId || 'all'}
+          onChange={handleCategoryChange}
+        />
+        {hasViewContext ? (
+          <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+            Đặt lại
+          </button>
+        ) : null}
       </div>
 
       <section className="admin-panels single">

@@ -2,14 +2,16 @@ import './Vendor.css';
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Eye, PackageCheck, ShieldCheck, XCircle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import VendorLayout from './VendorLayout';
 import { AdminStateBlock } from '../Admin/AdminStateBlocks';
 import {
   PanelDrawerFooter,
   PanelDrawerHeader,
   PanelDrawerSection,
+  PanelFilterSelect,
+  PanelSearchField,
   PanelStatsGrid,
-  PanelTabs,
   PanelTableFooter,
 } from '../../components/Panel/PanelPrimitives';
 import Drawer from '../../components/Drawer/Drawer';
@@ -17,6 +19,7 @@ import { returnService, type ReturnRequest, type ReturnStatus } from '../../serv
 import { useToast } from '../../contexts/ToastContext';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import { toDisplayOrderCode, toDisplayReturnCode } from '../../utils/displayCode';
+import { normalizePositiveInteger } from './vendorHelpers';
 
 type VendorReturnTab = 'all' | 'needsAction' | 'inTransit' | 'toInspect' | 'disputed';
 
@@ -29,6 +32,14 @@ const TABS: Array<{ key: VendorReturnTab; label: string }> = [
   { key: 'toInspect', label: 'Chờ kiểm hàng' },
   { key: 'disputed', label: 'Tranh chấp' },
 ];
+
+const normalizeTab = (value: string | null): VendorReturnTab => {
+  if (value === 'needsAction' || value === 'inTransit' || value === 'toInspect' || value === 'disputed') {
+    return value;
+  }
+
+  return 'all';
+};
 
 const statusConfig: Record<ReturnRequest['status'], { label: string; className: string }> = {
   PENDING_VENDOR: { label: 'Chờ phản hồi', className: 'admin-pill pending' },
@@ -93,6 +104,12 @@ const formatDate = (value?: string) => {
 
 const VendorReturnDashboard = () => {
   const { addToast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const activeTab = normalizeTab(searchParams.get('status'));
+  const page = normalizePositiveInteger(searchParams.get('page'));
+  const keyword = (searchParams.get('q') || '').trim();
+
   const [rows, setRows] = useState<ReturnRequest[]>([]);
   const [tabCounts, setTabCounts] = useState<VendorTabCounts>(EMPTY_COUNTS);
   const [totalElements, setTotalElements] = useState(0);
@@ -100,11 +117,48 @@ const VendorReturnDashboard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<VendorReturnTab>('all');
-  const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState(keyword);
   const [detailItem, setDetailItem] = useState<ReturnRequest | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const updateQuery = useCallback(
+    (mutate: (query: URLSearchParams) => void, replace = false) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          mutate(next);
+          return next;
+        },
+        { replace },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setTab = useCallback((tab: VendorReturnTab) => {
+    setSelected(new Set());
+    updateQuery((query) => {
+      if (tab === 'all') {
+        query.delete('status');
+      } else {
+        query.set('status', tab);
+      }
+      query.set('page', '1');
+    });
+  }, [updateQuery]);
+
+  const setPage = useCallback((nextPage: number) => {
+    updateQuery((query) => {
+      query.set('page', String(Math.max(1, nextPage)));
+    });
+  }, [updateQuery]);
+
+  const resetCurrentView = useCallback(() => {
+    setSelected(new Set());
+    setSearchQuery('');
+    setSearchParams(new URLSearchParams());
+  }, [setSearchParams]);
 
   const fetchTabCounts = useCallback(async () => {
     try {
@@ -121,12 +175,41 @@ const VendorReturnDashboard = () => {
     }
   }, []);
 
+  useEffect(() => {
+    setSearchQuery(keyword);
+  }, [keyword]);
+
+  useEffect(() => {
+    if (searchQuery.trim() === keyword) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setSelected(new Set());
+      updateQuery(
+        (query) => {
+          const normalized = searchQuery.trim();
+          if (normalized) {
+            query.set('q', normalized);
+          } else {
+            query.delete('q');
+          }
+          query.set('page', '1');
+        },
+        true,
+      );
+    }, 260);
+
+    return () => window.clearTimeout(timer);
+  }, [keyword, searchQuery, updateQuery]);
+
   const fetchPageData = useCallback(async () => {
     try {
       setIsLoading(true);
       setLoadError(null);
       const response = await returnService.listVendor({
         statuses: TAB_STATUS_MAP[activeTab],
+        q: keyword || undefined,
         page: Math.max(page - 1, 0),
         size: PAGE_SIZE,
       });
@@ -147,7 +230,7 @@ const VendorReturnDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, page]);
+  }, [activeTab, keyword, page]);
 
   useEffect(() => {
     void fetchTabCounts();
@@ -161,11 +244,17 @@ const VendorReturnDashboard = () => {
     if (page > totalPages) {
       setPage(totalPages);
     }
-  }, [page, totalPages]);
+  }, [page, setPage, totalPages]);
 
   const safePage = Math.min(page, totalPages);
   const startIndex = totalElements === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
   const endIndex = Math.min(totalElements, safePage * PAGE_SIZE);
+  const statusItems = TABS.map((tab) => ({
+    key: tab.key,
+    label: tab.label,
+    count: tabCounts[tab.key],
+  }));
+  const hasViewContext = activeTab !== 'all' || Boolean(keyword);
 
   const handleAccept = async (request: ReturnRequest) => {
     try {
@@ -240,7 +329,7 @@ const VendorReturnDashboard = () => {
             value: tabCounts.needsAction,
             sub: 'Yêu cầu cần vendor ra quyết định',
             tone: tabCounts.needsAction > 0 ? 'warning' : '',
-            onClick: () => setActiveTab('needsAction'),
+            onClick: () => setTab('needsAction'),
           },
           {
             key: 'in-transit',
@@ -248,7 +337,7 @@ const VendorReturnDashboard = () => {
             value: tabCounts.inTransit,
             sub: 'Khách đã gửi hàng',
             tone: 'info',
-            onClick: () => setActiveTab('inTransit'),
+            onClick: () => setTab('inTransit'),
           },
           {
             key: 'to-inspect',
@@ -256,7 +345,7 @@ const VendorReturnDashboard = () => {
             value: tabCounts.toInspect,
             sub: 'Đã nhận hàng, chờ hoàn tiền',
             tone: tabCounts.toInspect > 0 ? 'warning' : 'info',
-            onClick: () => setActiveTab('toInspect'),
+            onClick: () => setTab('toInspect'),
           },
           {
             key: 'disputed',
@@ -264,21 +353,31 @@ const VendorReturnDashboard = () => {
             value: tabCounts.disputed,
             sub: 'Đã chuyển admin trọng tài',
             tone: tabCounts.disputed > 0 ? 'danger' : '',
-            onClick: () => setActiveTab('disputed'),
+            onClick: () => setTab('disputed'),
           },
         ]}
       />
 
-      <PanelTabs
-        items={TABS.map((tab) => ({
-          key: tab.key,
-          label: tab.label,
-          count: tabCounts[tab.key],
-        }))}
-        activeKey={activeTab}
-        onChange={(key) => setActiveTab(key as VendorReturnTab)}
-        accentClassName="vendor-active-tab"
-      />
+      <div className="admin-filter-toolbar vendor-filter-toolbar">
+        <PanelSearchField
+          placeholder="Tìm theo khách hàng, email, mã trả hàng..."
+          ariaLabel="Tìm yêu cầu hoàn trả"
+          value={searchQuery}
+          onChange={setSearchQuery}
+        />
+        <PanelFilterSelect
+          label="Trạng thái"
+          ariaLabel="Lọc hoàn trả theo trạng thái"
+          items={statusItems}
+          value={activeTab}
+          onChange={(key) => setTab(key as VendorReturnTab)}
+        />
+        {hasViewContext ? (
+          <button type="button" className="admin-filter-reset" onClick={resetCurrentView}>
+            Đặt lại
+          </button>
+        ) : null}
+      </div>
 
       <section className="admin-panels single">
         <div className="admin-panel">
@@ -302,9 +401,11 @@ const VendorReturnDashboard = () => {
             />
           ) : rows.length === 0 ? (
             <AdminStateBlock
-              type="empty"
-              title="Chưa có yêu cầu hoàn trả"
-              description="Khi khách gửi yêu cầu đổi trả, dữ liệu sẽ hiển thị ở đây."
+              type={hasViewContext ? 'search-empty' : 'empty'}
+              title={hasViewContext ? 'Không có yêu cầu hoàn trả phù hợp' : 'Chưa có yêu cầu hoàn trả'}
+              description={hasViewContext ? 'Thử đổi từ khóa hoặc trạng thái để xem lại hàng đợi hoàn trả.' : 'Khi khách gửi yêu cầu đổi trả, dữ liệu sẽ hiển thị ở đây.'}
+              actionLabel={hasViewContext ? 'Đặt lại bộ lọc' : undefined}
+              onAction={hasViewContext ? resetCurrentView : undefined}
             />
           ) : (
             <>

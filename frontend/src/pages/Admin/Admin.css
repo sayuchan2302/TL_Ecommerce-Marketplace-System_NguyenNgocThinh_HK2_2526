@@ -478,11 +478,27 @@ body {
   min-width: min(280px, 100%);
 }
 
+.admin-filter-toolbar .admin-search {
+  min-height: 52px;
+  border-color: #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  cursor: text;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.admin-filter-toolbar .admin-search:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
 .admin-filter-controls {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
   flex: 0 1 auto;
   flex-wrap: wrap;
   margin-left: auto;
@@ -495,23 +511,36 @@ body {
 .admin-filter-select {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 7px 10px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: #fff;
+  gap: 10px;
+  min-height: 52px;
+  min-width: 220px;
+  padding: 0 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   color: var(--co-admin-text-muted);
   font-size: 12px;
   font-weight: 700;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.admin-filter-select:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
 }
 
 .admin-filter-select-label {
   white-space: nowrap;
+  pointer-events: none;
 }
 
 .admin-filter-select select {
-  min-width: 150px;
+  min-width: 164px;
+  min-height: 42px;
   border: none;
   outline: none;
   box-shadow: none;
@@ -519,6 +548,8 @@ body {
   color: var(--co-admin-text);
   font: inherit;
   cursor: pointer;
+  flex: 1 1 auto;
+  padding: 0 2px;
 }
 
 .admin-filter-select select:focus,
@@ -530,24 +561,38 @@ body {
 .admin-date-field {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 7px 10px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: #fff;
+  gap: 10px;
+  min-height: 52px;
+  min-width: 220px;
+  padding: 0 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   color: var(--co-admin-text-muted);
   font-size: 12px;
   font-weight: 700;
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.admin-date-field:hover {
+  border-color: #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
 }
 
 .admin-date-field input {
+  min-height: 42px;
   border: none;
   outline: none;
   box-shadow: none;
   background: transparent;
   color: var(--co-admin-text);
   font: inherit;
+  cursor: pointer;
+  flex: 1 1 auto;
 }
 
 .admin-date-field input:focus,
@@ -581,7 +626,22 @@ body {
 
 .admin-filter-select:focus-within,
 .admin-date-field:focus-within {
-  border-color: transparent;
+  border-color: #cbd5e1;
+  box-shadow: none;
+  transform: none;
+}
+
+.admin-filter-toolbar .admin-search:focus-within,
+.admin-filter-toolbar .admin-filter-select:focus-within,
+.admin-filter-toolbar .admin-date-field:focus-within {
+  border-color: #cbd5e1;
+  box-shadow: none;
+}
+
+.admin-filter-toolbar :is(input, select):focus,
+.admin-filter-toolbar :is(input, select):focus-visible {
+  outline: none;
+  border-color: #cbd5e1;
   box-shadow: none;
 }
 
@@ -4749,6 +4809,11 @@ select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--co-admin-blue);
   outline-offset: 2px;
+}
+
+.admin-filter-toolbar :is(input, select):focus-visible {
+  outline: none;
+  outline-offset: 0;
 }
 
 .admin-icon-btn:focus-visible,

@@ -8,6 +8,7 @@ import type { ProductTab, VendorProductStatusCounts } from './vendorProducts.typ
 interface UseVendorProductsDataOptions {
   activeTab: ProductTab;
   keyword: string;
+  categoryId?: string;
   page: number;
   updateQuery: (mutate: (query: URLSearchParams) => void, replace?: boolean) => void;
   pruneToVisibleIds: (ids: string[]) => void;
@@ -26,6 +27,7 @@ interface OptimisticRemovalResult {
 export const useVendorProductsData = ({
   activeTab,
   keyword,
+  categoryId,
   page,
   updateQuery,
   pruneToVisibleIds,
@@ -48,6 +50,7 @@ export const useVendorProductsData = ({
       const query: VendorProductQuery = {
         status: activeTab,
         keyword: keyword || undefined,
+        categoryId: categoryId || undefined,
         page,
         size: PAGE_SIZE,
       };
@@ -75,7 +78,7 @@ export const useVendorProductsData = ({
         setLoading(false);
       }
     }
-  }, [activeTab, addToast, keyword, page, pruneToVisibleIds, updateQuery]);
+  }, [activeTab, addToast, categoryId, keyword, page, pruneToVisibleIds, updateQuery]);
 
   const removeProductsOptimistically = useCallback((ids: string[]): OptimisticRemovalResult => {
     const idSet = new Set(ids);
