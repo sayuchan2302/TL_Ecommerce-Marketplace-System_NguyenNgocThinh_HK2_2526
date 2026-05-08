@@ -412,9 +412,6 @@ const Search = () => {
                   previewUrl={imageSearchSession.previewUrl}
                   totalCandidates={imageSearchSession.totalCandidates}
                   isLoading={isImageSearchLoading || isAwaitingImageSearch}
-                  inferredCategory={imageSearchSession.inferredCategory}
-                  inferredCategoryScore={imageSearchSession.inferredCategoryScore}
-                  categoryFilterApplied={imageSearchSession.categoryFilterApplied}
                   pasteTargetRef={pasteTargetRef}
                   onPickImage={triggerImagePicker}
                   onFocusPasteTarget={focusPasteTarget}

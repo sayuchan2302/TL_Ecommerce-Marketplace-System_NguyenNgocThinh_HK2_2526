@@ -24,9 +24,6 @@ export interface SearchImageSession {
   fileName: string;
   previewUrl: string;
   totalCandidates: number;
-  inferredCategory?: string;
-  inferredCategoryScore?: number;
-  categoryFilterApplied?: string;
 }
 
 type SearchImageStatus = 'idle' | 'loading' | 'success';
@@ -118,10 +115,7 @@ export const useSearchImageFlow = ({
       setImageSearchSession({
         fileName: file.name,
         previewUrl,
-        totalCandidates: response.totalCandidates,
-        inferredCategory: response.inferredCategory,
-        inferredCategoryScore: response.inferredCategoryScore,
-        categoryFilterApplied: response.categoryFilterApplied,
+        totalCandidates: response.items.length,
       });
       setImageSearchStatus('success');
       return true;

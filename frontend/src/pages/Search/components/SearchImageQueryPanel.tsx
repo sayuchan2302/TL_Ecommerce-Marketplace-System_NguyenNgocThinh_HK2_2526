@@ -7,9 +7,6 @@ interface SearchImageQueryPanelProps {
   previewUrl: string;
   totalCandidates: number;
   isLoading?: boolean;
-  inferredCategory?: string;
-  inferredCategoryScore?: number;
-  categoryFilterApplied?: string;
   pasteTargetRef: RefObject<HTMLDivElement | null>;
   onPickImage: () => void;
   onFocusPasteTarget: () => void;
@@ -17,31 +14,17 @@ interface SearchImageQueryPanelProps {
   onPaste: ClipboardEventHandler<HTMLDivElement>;
 }
 
-const formatMetadataValue = (value: string) => value.trim();
-
-const formatConfidenceScore = (value: number) => value.toFixed(2);
-
 const SearchImageQueryPanel = ({
   fileName,
   previewUrl,
   totalCandidates,
   isLoading = false,
-  inferredCategory,
-  inferredCategoryScore,
-  categoryFilterApplied,
   pasteTargetRef,
   onPickImage,
   onFocusPasteTarget,
   onClear,
   onPaste,
-}: SearchImageQueryPanelProps) => {
-  const hasMetadata = Boolean(
-    inferredCategory
-    || typeof inferredCategoryScore === 'number'
-    || categoryFilterApplied,
-  );
-
-  return (
+}: SearchImageQueryPanelProps) => (
     <>
       <div className="search-visual-query">
         <div className="search-visual-query__preview">
@@ -57,28 +40,6 @@ const SearchImageQueryPanel = ({
             <div className="search-visual-query__status" role="status" aria-live="polite">
               <span className="search-visual-query__status-spinner" aria-hidden="true" />
               Hệ thống đang xử lý ảnh của bạn
-            </div>
-          )}
-          {hasMetadata && (
-            <div className="search-visual-query__metadata" aria-label="Thông tin nhận diện ảnh">
-              {inferredCategory && (
-                <div className="search-visual-query__metadata-item">
-                  <span className="search-visual-query__metadata-key">Danh mục nhận diện:</span>
-                  <span>{formatMetadataValue(inferredCategory)}</span>
-                </div>
-              )}
-              {typeof inferredCategoryScore === 'number' && (
-                <div className="search-visual-query__metadata-item">
-                  <span className="search-visual-query__metadata-key">Độ tin cậy:</span>
-                  <span>{formatConfidenceScore(inferredCategoryScore)}</span>
-                </div>
-              )}
-              {categoryFilterApplied && (
-                <div className="search-visual-query__metadata-item">
-                  <span className="search-visual-query__metadata-key">Chế độ lọc:</span>
-                  <span>{formatMetadataValue(categoryFilterApplied)}</span>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -112,7 +73,6 @@ const SearchImageQueryPanel = ({
         onPaste={onPaste}
       />
     </>
-  );
-};
+);
 
 export default SearchImageQueryPanel;
