@@ -289,6 +289,22 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     );
 
     @Query("""
+            SELECT oi.product.id AS productId,
+                   COALESCE(MAX(oi.productName), MAX(oi.product.name)) AS productName,
+                   COALESCE(MAX(oi.productImage), '') AS productImage,
+                   COALESCE(SUM(oi.quantity), 0) AS soldCount,
+                   COALESCE(SUM(oi.totalPrice), 0) AS grossRevenue
+            FROM OrderItem oi
+            JOIN oi.order o
+            WHERE o.status = 'DELIVERED'
+              AND oi.product.id IN :productIds
+            GROUP BY oi.product.id
+            """)
+    List<ProductSalesProjection> findDeliveredProductSalesByProductIds(
+            @Param("productIds") List<UUID> productIds
+    );
+
+    @Query("""
             SELECT CASE WHEN COUNT(oi) > 0 THEN true ELSE false END
             FROM OrderItem oi
             JOIN oi.order o

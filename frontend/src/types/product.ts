@@ -32,6 +32,7 @@ export interface Product {
   colors?: string[];
   sizes?: string[];
   stock: number;
+  sold?: number;
   status: string;
   statusType: ProductStatusType;
   variants?: ProductVariant[];

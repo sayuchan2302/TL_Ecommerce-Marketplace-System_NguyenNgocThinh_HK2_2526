@@ -32,6 +32,7 @@ interface ProductSectionProps {
   products: ProductSectionItem[];
   eyebrow?: ReactNode;
   viewAllLink?: string;
+  showViewAll?: boolean;
   staticCards?: boolean;
   showQuickView?: boolean;
   useSlider?: boolean;
@@ -56,6 +57,7 @@ const ProductSection = ({
   products,
   eyebrow,
   viewAllLink = '/search?scope=products',
+  showViewAll = true,
   staticCards = false,
   showQuickView = false,
   useSlider = true,
@@ -86,7 +88,7 @@ const ProductSection = ({
           {eyebrow ? <span className="section-eyebrow">{eyebrow}</span> : null}
           <h2 className="section-title">{title}</h2>
         </div>
-        <Link to={viewAllLink} className="view-all-link">{'Xem t\u1ea5t c\u1ea3'}</Link>
+        {showViewAll ? <Link to={viewAllLink} className="view-all-link">{'Xem t\u1ea5t c\u1ea3'}</Link> : null}
       </div>
       {subHeader ? <div className="section-subheader">{subHeader}</div> : null}
 

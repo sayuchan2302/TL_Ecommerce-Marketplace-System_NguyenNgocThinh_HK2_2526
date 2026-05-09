@@ -79,6 +79,7 @@ interface BackendProduct {
   storeSlug?: string;
   storeLogo?: string;
   isOfficialStore?: boolean;
+  soldCount?: number;
 }
 
 interface StoreMeta {
@@ -238,6 +239,7 @@ const mapBackendProduct = (product: BackendProduct): Product => {
     colors,
     sizes,
     stock: variants.reduce((sum, variant) => sum + (variant.stock || 0), 0),
+    sold: Math.max(0, Number(product.soldCount || 0)),
     status: product.status || 'ACTIVE',
     statusType: variants.some((variant) => (variant.stock || 0) <= 0)
       ? 'low'

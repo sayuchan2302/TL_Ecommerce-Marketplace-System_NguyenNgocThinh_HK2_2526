@@ -74,6 +74,7 @@ public class ProductService {
     public List<Product> findAll() {
         List<Product> products = productRepository.findAllPublicProducts();
         products.forEach(this::initializeForSerialization);
+        attachDeliveredSales(products);
         return products;
     }
 
@@ -82,6 +83,7 @@ public class ProductService {
         Product product = productRepository.findPublicById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
         initializeForSerialization(product);
+        attachDeliveredSales(product);
         return product;
     }
 
@@ -90,6 +92,7 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
         initializeForSerialization(product);
+        attachDeliveredSales(product);
         return product;
     }
 
@@ -100,6 +103,7 @@ public class ProductService {
                 .or(() -> productRepository.findPublicBySku(normalized))
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
         initializeForSerialization(product);
+        attachDeliveredSales(product);
         return product;
     }
 
@@ -109,6 +113,7 @@ public class ProductService {
         Product product = productRepository.findPublicBySku(normalizedSku)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
         initializeForSerialization(product);
+        attachDeliveredSales(product);
         return product;
     }
 
@@ -121,6 +126,7 @@ public class ProductService {
     public Page<Product> findByStoreId(UUID storeId, Pageable pageable) {
         Page<Product> page = productRepository.findByStoreId(storeId, pageable);
         page.getContent().forEach(this::initializeForSerialization);
+        attachDeliveredSales(page.getContent());
         return page;
     }
 
@@ -131,6 +137,7 @@ public class ProductService {
     public Page<Product> findActiveByStoreId(UUID storeId, Pageable pageable) {
         Page<Product> page = productRepository.findActiveByStoreId(storeId, pageable);
         page.getContent().forEach(this::initializeForSerialization);
+        attachDeliveredSales(page.getContent());
         return page;
     }
 
@@ -143,12 +150,14 @@ public class ProductService {
             UUID storeId = UUID.fromString(identifier);
             Page<Product> page = productRepository.findActiveByStoreId(storeId, pageable);
             page.getContent().forEach(this::initializeForSerialization);
+            attachDeliveredSales(page.getContent());
             return page;
         } catch (IllegalArgumentException ex) {
             Store store = storeRepository.findBySlug(identifier)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Store not found"));
             Page<Product> page = productRepository.findActiveByStoreId(store.getId(), pageable);
             page.getContent().forEach(this::initializeForSerialization);
+            attachDeliveredSales(page.getContent());
             return page;
         }
     }
@@ -168,6 +177,7 @@ public class ProductService {
     public Page<Product> searchByStoreId(UUID storeId, String keyword, Pageable pageable) {
         Page<Product> page = productRepository.searchProductsByStore(storeId, keyword, pageable);
         page.getContent().forEach(this::initializeForSerialization);
+        attachDeliveredSales(page.getContent());
         return page;
     }
 
@@ -750,6 +760,7 @@ public class ProductService {
         }
 
         List<UUID> productIds = products.stream()
+                .filter(product -> product != null)
                 .map(Product::getId)
                 .filter(id -> id != null)
                 .toList();
@@ -758,6 +769,48 @@ public class ProductService {
         }
 
         return orderRepository.findDeliveredProductSalesByStoreAndProductIds(storeId, productIds).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        OrderRepository.ProductSalesProjection::getProductId,
+                        row -> new ProductSalesSnapshot(
+                                row.getSoldCount() == null ? 0L : row.getSoldCount(),
+                                row.getGrossRevenue() == null ? BigDecimal.ZERO : row.getGrossRevenue()
+                        )
+                ));
+    }
+
+    private void attachDeliveredSales(Product product) {
+        if (product == null) {
+            return;
+        }
+        attachDeliveredSales(List.of(product));
+    }
+
+    private void attachDeliveredSales(List<Product> products) {
+        Map<UUID, ProductSalesSnapshot> salesByProductId = loadDeliveredSalesByProduct(products);
+        for (Product product : products) {
+            if (product == null) {
+                continue;
+            }
+            ProductSalesSnapshot snapshot = salesByProductId.get(product.getId());
+            product.setSoldCount(snapshot == null ? 0L : snapshot.soldCount());
+        }
+    }
+
+    private Map<UUID, ProductSalesSnapshot> loadDeliveredSalesByProduct(List<Product> products) {
+        if (products == null || products.isEmpty()) {
+            return Map.of();
+        }
+
+        List<UUID> productIds = products.stream()
+                .filter(product -> product != null)
+                .map(Product::getId)
+                .filter(id -> id != null)
+                .toList();
+        if (productIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return orderRepository.findDeliveredProductSalesByProductIds(productIds).stream()
                 .collect(java.util.stream.Collectors.toMap(
                         OrderRepository.ProductSalesProjection::getProductId,
                         row -> new ProductSalesSnapshot(

@@ -98,6 +98,10 @@ public class Product extends BaseEntity {
     @Builder.Default
     private Integer viewCount = 0;
 
+    @Transient
+    @Builder.Default
+    private Long soldCount = 0L;
+
     public enum Gender {
         MALE, FEMALE, UNISEX
     }

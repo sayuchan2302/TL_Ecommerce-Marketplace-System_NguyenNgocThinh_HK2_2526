@@ -42,7 +42,7 @@ const Wishlist = () => {
           <ProductSection
             title={`Sản phẩm yêu thích (${items.length})`}
             products={wishlistProducts}
-            viewAllLink="/search?scope=products"
+            showViewAll={false}
             showQuickView={false}
             useSlider={false}
             className="wishlist-product-section"
