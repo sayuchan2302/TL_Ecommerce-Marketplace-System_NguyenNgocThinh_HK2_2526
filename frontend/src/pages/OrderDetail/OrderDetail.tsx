@@ -21,6 +21,8 @@ import { orderService } from '../../services/orderService';
 import { reviewService, type EligibleReviewItem, type Review } from '../../services/reviewService';
 import ReviewModal from '../../components/ReviewModal/ReviewModal';
 import { formatPrice } from '../../utils/formatters';
+import { toDisplayOrderCode } from '../../utils/displayCode';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { CLIENT_TEXT } from '../../utils/texts';
 import type { Order } from '../../types';
 import './OrderDetail.css';
@@ -90,6 +92,8 @@ const OrderDetail = () => {
   const [reviewProduct, setReviewProduct] = useState<ReviewProduct | null>(null);
   const [orderReviews, setOrderReviews] = useState<Review[]>([]);
   const [isLoadingOrderReviews, setIsLoadingOrderReviews] = useState(false);
+  const pageOrderCode = order?.code || order?.id || id || '';
+  usePageTitle(pageOrderCode ? `Đơn hàng #${toDisplayOrderCode(pageOrderCode)}` : 'Chi tiết đơn hàng');
 
   const loadOrderReviews = useCallback(
     async (orderId: string, options?: { silent?: boolean }) => {

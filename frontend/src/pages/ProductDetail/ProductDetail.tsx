@@ -13,6 +13,7 @@ import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_DICTIONARY } from '../../utils/clientDictionary';
 import type { Product } from '../../types';
 import { normalizeStoreSlug } from '../../utils/storeIdentity';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import './ProductDetail.css';
 
 const t = CLIENT_TEXT.productDetail;
@@ -95,6 +96,7 @@ const ProductDetail = () => {
 
   const productId = id || '';
   const storeSlug = normalizeStoreSlug(product?.storeSlug);
+  usePageTitle(product?.name || 'Sản phẩm');
 
   useEffect(() => {
     window.scrollTo(0, 0);

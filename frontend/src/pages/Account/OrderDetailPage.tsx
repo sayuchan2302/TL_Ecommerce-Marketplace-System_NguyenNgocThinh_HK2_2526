@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { formatPrice } from '../../utils/formatters';
 import { toDisplayOrderCode } from '../../utils/displayCode';
 import { getOptimizedImageUrl } from '../../utils/getOptimizedImageUrl';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const OrderDetailPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,8 @@ const OrderDetailPage = () => {
   const { addToCart } = useCart();
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const pageOrderCode = order?.code || order?.id || id || '';
+  usePageTitle(pageOrderCode ? `Đơn hàng #${toDisplayOrderCode(pageOrderCode)}` : 'Chi tiết đơn hàng');
 
   useEffect(() => {
     let mounted = true;

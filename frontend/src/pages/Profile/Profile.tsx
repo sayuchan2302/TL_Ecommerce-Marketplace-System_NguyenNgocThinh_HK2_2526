@@ -36,6 +36,7 @@ import { storeFollowService, type FollowedStoreItem } from '../../services/store
 import { calculateTier, TIER_CONFIG, getProgressToNextTier, getSpendRequiredForNextTier, getNextTier } from '../../utils/tierUtils';
 import { formatPrice } from '../../utils/formatters';
 import { resolveDetailRouteKey } from '../../utils/displayCode';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import type { Address } from '../../types';
 import type { Order } from '../../types';
 import './Profile.css';
@@ -45,6 +46,14 @@ const tCommon = CLIENT_TEXT.common;
 
 type TabId = 'account' | 'orders' | 'vouchers' | 'addresses' | 'reviews' | 'notifications';
 const VALID_PROFILE_TABS: TabId[] = ['account', 'orders', 'vouchers', 'addresses', 'reviews', 'notifications'];
+const PROFILE_TAB_PAGE_TITLES: Record<TabId, string> = {
+  account: 'Tài khoản',
+  addresses: 'Sổ địa chỉ',
+  notifications: 'Thông báo',
+  orders: 'Đơn hàng của tôi',
+  reviews: 'Đánh giá của tôi',
+  vouchers: 'Ví voucher',
+};
 const NOTIFICATIONS_PREVIEW_LIMIT = 7;
 const VOUCHERS_PER_PAGE = 10;
 
@@ -174,6 +183,7 @@ const Profile = () => {
     const tabParam = searchParams.get('tab');
     return VALID_PROFILE_TABS.includes(tabParam as TabId) ? (tabParam as TabId) : 'account';
   }, [searchParams]);
+  usePageTitle(PROFILE_TAB_PAGE_TITLES[activeTab]);
 
   const handleTabChange = (tab: TabId) => {
     const nextParams = new URLSearchParams(searchParams);

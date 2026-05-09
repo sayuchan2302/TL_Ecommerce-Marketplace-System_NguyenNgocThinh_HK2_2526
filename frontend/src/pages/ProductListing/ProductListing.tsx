@@ -8,6 +8,7 @@ import { marketplaceService } from '../../services/marketplaceService';
 import type { Product } from '../../types';
 import './ProductListing.css';
 import { useClientViewState } from '../../hooks/useClientViewState';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import { CLIENT_TEXT } from '../../utils/texts';
 import { CLIENT_DICTIONARY } from '../../utils/clientDictionary';
 import {
@@ -15,6 +16,31 @@ import {
   formatGenderLabel,
   getPriceRangeLabel,
 } from '../../utils/productFilters';
+
+const CATEGORY_PAGE_TITLES: Record<string, string> = {
+  accessories: 'Phụ kiện',
+  men: 'Thời trang nam',
+  nam: 'Thời trang nam',
+  new: 'Sản phẩm mới',
+  nu: 'Thời trang nữ',
+  'phu-kien': 'Phụ kiện',
+  sale: 'Flash Sale',
+  women: 'Thời trang nữ',
+};
+
+const formatCategorySlug = (value: string) => {
+  try {
+    return decodeURIComponent(value)
+      .replace(/[-_]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')
+      .map((word) => (word ? `${word.charAt(0).toUpperCase()}${word.slice(1)}` : word))
+      .join(' ');
+  } catch {
+    return value;
+  }
+};
 
 const ProductListing = () => {
   const { id } = useParams<{ id: string }>();
@@ -36,6 +62,8 @@ const ProductListing = () => {
 
   const dictionary = CLIENT_DICTIONARY.listing;
   const currentCategoryName = id && categoryNames[id] ? categoryNames[id] : dictionary.header.title;
+  const pageCategoryTitle = id ? CATEGORY_PAGE_TITLES[id] || formatCategorySlug(id) : currentCategoryName;
+  usePageTitle(pageCategoryTitle || 'Danh mục');
 
   useEffect(() => {
     let cancelled = false;

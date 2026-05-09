@@ -16,6 +16,7 @@ import {
   getPendingVnpayCheckout,
   setPendingVnpayCheckout,
 } from '../../services/vnpayCheckoutStore';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 type Status = 'success' | 'failed' | 'pending';
 type Gateway = 'vnpay' | 'momo';
@@ -79,6 +80,24 @@ const PaymentResult = () => {
   }, [params]);
 
   const activeGateway: Gateway | null = hasVnpQuery ? 'vnpay' : (hasMomoQuery ? 'momo' : null);
+  const pageTitle = useMemo(() => {
+    const status = (params.get('status') || '').toLowerCase();
+
+    if (status === 'success' || status === 'paid') {
+      return 'Thanh toán thành công';
+    }
+
+    if (status === 'failed' || status === 'fail' || status === 'cancelled' || status === 'canceled') {
+      return 'Thanh toán thất bại';
+    }
+
+    if (status === 'pending' || status === 'processing' || activeGateway) {
+      return 'Đang xử lý thanh toán';
+    }
+
+    return 'Kết quả thanh toán';
+  }, [activeGateway, params]);
+  usePageTitle(pageTitle);
 
   const clearCartByMarker = useCallback((cartIds: string[]) => {
     const normalized = Array.from(new Set(cartIds.map((value) => value.trim()).filter(Boolean)));

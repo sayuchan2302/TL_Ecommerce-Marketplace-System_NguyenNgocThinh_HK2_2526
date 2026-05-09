@@ -23,6 +23,7 @@ import {
   type ProductFilterState,
 } from '../../utils/productFilters';
 import { useSearchImageFlow } from './hooks/useSearchImageFlow';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import './Search.css';
 
 const t = CLIENT_TEXT.search;
@@ -75,6 +76,26 @@ const Search = () => {
   const imageSearchToken = searchParams.get('imageSearch') || '';
   const imageCategory = (searchParams.get('imageCategory') || '').trim();
   const imageStore = (searchParams.get('imageStore') || '').trim();
+  const pageTitle = useMemo(() => {
+    if (imageSearchToken) {
+      return 'Tìm kiếm bằng ảnh';
+    }
+
+    if (isFlashSaleMode) {
+      return 'Flash Sale';
+    }
+
+    if (query && scope === 'stores') {
+      return `Tìm cửa hàng "${query}"`;
+    }
+
+    if (query) {
+      return `Tìm kiếm "${query}"`;
+    }
+
+    return 'Tìm kiếm';
+  }, [imageSearchToken, isFlashSaleMode, query, scope]);
+  usePageTitle(pageTitle);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [productResults, setProductResults] = useState<Product[]>([]);

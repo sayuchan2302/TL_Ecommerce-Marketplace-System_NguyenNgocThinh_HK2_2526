@@ -29,6 +29,7 @@ import { MARKETPLACE_DICTIONARY } from '../../utils/clientDictionary';
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import { toDisplayOrderCode } from '../../utils/displayCode';
 import { getOptimizedImageUrl } from '../../utils/getOptimizedImageUrl';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import '../../styles/orderDetailTheme.css';
 
 const formatVND = (n: number) => n.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' });
@@ -46,6 +47,12 @@ const AdminOrderDetailContent = ({ orderCode, routeId }: { orderCode: string; ro
   const [isEditingTracking, setIsEditingTracking] = useState(false);
   const [trackingInput, setTrackingInput] = useState('');
   const [isUpdatingTracking, setIsUpdatingTracking] = useState(false);
+  const pageOrderCode = order?.code || order?.id || routeId || orderCode;
+  usePageTitle(
+    pageOrderCode
+      ? `Quản trị sàn - Đơn hàng #${toDisplayOrderCode(pageOrderCode)}`
+      : 'Quản trị sàn - Chi tiết đơn hàng',
+  );
 
   const fulfillment = order?.fulfillment || 'pending';
   const paymentStatus = order?.paymentStatus || 'unpaid';

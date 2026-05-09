@@ -15,6 +15,7 @@ import AdminConfirmDialog from '../Admin/AdminConfirmDialog';
 import { copyTextToClipboard } from './vendorHelpers';
 import { toDisplayOrderCode } from '../../utils/displayCode';
 import { getOptimizedImageUrl } from '../../utils/getOptimizedImageUrl';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const emptyOrder: VendorOrderDetailData = {
   id: '',
@@ -50,6 +51,12 @@ const VendorOrderDetail = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [delayDialogOpen, setDelayDialogOpen] = useState(false);
   const [delayReason, setDelayReason] = useState('');
+  const pageOrderCode = order.code || id || '';
+  usePageTitle(
+    pageOrderCode
+      ? `Kênh người bán - Đơn hàng #${toDisplayOrderCode(pageOrderCode)}`
+      : 'Kênh người bán - Chi tiết đơn hàng',
+  );
 
   useEffect(() => {
     let active = true;

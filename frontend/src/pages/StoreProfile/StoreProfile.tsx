@@ -16,6 +16,7 @@ import { reviewService, type Review } from '../../services/reviewService';
 import { storeFollowService } from '../../services/storeFollowService';
 import { ApiError, hasBackendJwt } from '../../services/apiClient';
 import { useToast } from '../../contexts/ToastContext';
+import { usePageTitle } from '../../hooks/usePageTitle';
 import {
   BrowseTabContent,
   CategoriesTabContent,
@@ -148,6 +149,7 @@ const StoreProfilePage = () => {
   });
 
   const { addToast } = useToast();
+  usePageTitle(store?.name || 'Gian hàng');
 
   const setPanelNode = useCallback((tab: StoreTab, node: HTMLDivElement | null) => {
     panelNodesRef.current[tab] = node;

@@ -54,6 +54,7 @@ import { NotificationProvider } from './contexts/NotificationContext';
 import RouteLoader from './components/RouteLoader/RouteLoader';
 import PageFallback from './components/Transitions/PageFallback';
 import ScrollToTop from './components/ScrollToTop/ScrollToTop';
+import PageTitleManager from './components/PageTitleManager';
 const ChatWidget = lazy(() => import('./components/ChatWidget/ChatWidget'));
 
 const MainLayout = () => {
@@ -90,6 +91,7 @@ function App() {
                 <NotificationProvider>
                   <Router>
                     <ScrollToTop />
+                    <PageTitleManager />
                     <div className="app-container">
                       <Routes>
                         {/* All routes share standard layout (Header, Footer) */}
