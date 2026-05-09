@@ -4,6 +4,7 @@ import type { CustomerWalletVoucher } from '../../../services/customerVoucherSer
 import type { Review as CustomerReview } from '../../../services/reviewService';
 
 export type ProfileTabId = 'account' | 'orders' | 'vouchers' | 'addresses' | 'reviews' | 'notifications';
+export type ProfilePageChangeHandler = (nextPage: number | ((current: number) => number)) => void;
 
 export interface PendingProduct {
   productId: string;
@@ -39,6 +40,9 @@ export interface ProfileTabContentProps {
   orders: Order[];
   ordersLoading: boolean;
   ordersError: string | null;
+  orderPage: number;
+  ordersPerPage: number;
+  onOrderPageChange: ProfilePageChangeHandler;
   orderStatusLabelMap: Record<string, string>;
   onOpenOrderDetail: (order: Order) => void;
   onRequestCancelOrder: (orderId: string) => void;
@@ -47,7 +51,7 @@ export interface ProfileTabContentProps {
   voucherPage: number;
   totalVoucherPages: number;
   vouchersPerPage: number;
-  onVoucherPageChange: (updater: (current: number) => number) => void;
+  onVoucherPageChange: ProfilePageChangeHandler;
   getVoucherMeta: (voucher: CustomerWalletVoucher) => VoucherMeta;
   isMarketplaceVoucher: (voucher: CustomerWalletVoucher) => boolean;
   addressesLoading: boolean;
@@ -62,14 +66,18 @@ export interface ProfileTabContentProps {
   completedReviews: CustomerReview[];
   reviewsLoading: boolean;
   reviewsError: string | null;
+  pendingReviewPage: number;
+  completedReviewPage: number;
+  reviewsPerPage: number;
+  onPendingReviewPageChange: ProfilePageChangeHandler;
+  onCompletedReviewPageChange: ProfilePageChangeHandler;
   getOrderDisplayCode: (orderId: string, orderCode?: string) => string;
   onOpenReviewModal: (product: PendingProduct) => void;
   notifications: Notification[];
-  displayedNotifications: Notification[];
   unreadCount: number;
-  showAllNotifications: boolean;
-  hasMoreNotifications: boolean;
-  onShowAllNotifications: (show: boolean) => void;
+  notificationPage: number;
+  notificationsPerPage: number;
+  onNotificationPageChange: ProfilePageChangeHandler;
   onMarkAllNotificationsRead: () => void;
   onNotificationClick: (notification: Notification) => void;
   onDeleteNotification: (notificationId: string) => void;

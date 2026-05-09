@@ -1,5 +1,6 @@
 ﻿import { Tag } from 'lucide-react';
 import EmptyState from '../../../../components/EmptyState/EmptyState';
+import ProfilePagination from '../ProfilePagination';
 import type { ProfileTabContentProps } from '../ProfileTabContent.types';
 
 const VouchersTab = ({
@@ -65,32 +66,14 @@ const VouchersTab = ({
         })
       )}
     </div>
-    {vouchers.length > vouchersPerPage ? (
-      <div className="voucher-pagination">
-        <span className="voucher-pagination-meta">
-          Hiển thị {(voucherPage - 1) * vouchersPerPage + 1}-{Math.min(voucherPage * vouchersPerPage, vouchers.length)} trên {vouchers.length} voucher
-        </span>
-        <div className="voucher-pagination-actions">
-          <button
-            type="button"
-            className="voucher-page-btn"
-            onClick={() => onVoucherPageChange((current) => Math.max(1, current - 1))}
-            disabled={voucherPage === 1}
-          >
-            Trước
-          </button>
-          <span className="voucher-page-indicator">{voucherPage}/{totalVoucherPages}</span>
-          <button
-            type="button"
-            className="voucher-page-btn"
-            onClick={() => onVoucherPageChange((current) => Math.min(totalVoucherPages, current + 1))}
-            disabled={voucherPage === totalVoucherPages}
-          >
-            Sau
-          </button>
-        </div>
-      </div>
-    ) : null}
+    <ProfilePagination
+      page={voucherPage}
+      totalItems={vouchers.length}
+      totalPages={totalVoucherPages}
+      itemsPerPage={vouchersPerPage}
+      itemLabel="voucher"
+      onPageChange={onVoucherPageChange}
+    />
   </div>
 );
 

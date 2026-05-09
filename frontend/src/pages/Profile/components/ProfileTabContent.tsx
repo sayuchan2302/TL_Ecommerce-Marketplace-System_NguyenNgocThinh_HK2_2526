@@ -26,6 +26,9 @@ const ProfileTabContent = (props: ProfileTabContentProps) => {
           orders={props.orders}
           ordersLoading={props.ordersLoading}
           ordersError={props.ordersError}
+          orderPage={props.orderPage}
+          ordersPerPage={props.ordersPerPage}
+          onOrderPageChange={props.onOrderPageChange}
           orderStatusLabelMap={props.orderStatusLabelMap}
           onOpenOrderDetail={props.onOpenOrderDetail}
           onRequestCancelOrder={props.onRequestCancelOrder}
@@ -64,6 +67,11 @@ const ProfileTabContent = (props: ProfileTabContentProps) => {
           completedReviews={props.completedReviews}
           reviewsLoading={props.reviewsLoading}
           reviewsError={props.reviewsError}
+          pendingReviewPage={props.pendingReviewPage}
+          completedReviewPage={props.completedReviewPage}
+          reviewsPerPage={props.reviewsPerPage}
+          onPendingReviewPageChange={props.onPendingReviewPageChange}
+          onCompletedReviewPageChange={props.onCompletedReviewPageChange}
           getOrderDisplayCode={props.getOrderDisplayCode}
           onOpenReviewModal={props.onOpenReviewModal}
         />
@@ -72,11 +80,10 @@ const ProfileTabContent = (props: ProfileTabContentProps) => {
       return (
         <NotificationsTab
           notifications={props.notifications}
-          displayedNotifications={props.displayedNotifications}
           unreadCount={props.unreadCount}
-          showAllNotifications={props.showAllNotifications}
-          hasMoreNotifications={props.hasMoreNotifications}
-          onShowAllNotifications={props.onShowAllNotifications}
+          notificationPage={props.notificationPage}
+          notificationsPerPage={props.notificationsPerPage}
+          onNotificationPageChange={props.onNotificationPageChange}
           onMarkAllNotificationsRead={props.onMarkAllNotificationsRead}
           onNotificationClick={props.onNotificationClick}
           onDeleteNotification={props.onDeleteNotification}

@@ -1,6 +1,8 @@
 ﻿import { Link } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
 import { Package } from 'lucide-react';
 import EmptyState from '../../../../components/EmptyState/EmptyState';
+import ProfilePagination from '../ProfilePagination';
 import type { ProfileTabContentProps } from '../ProfileTabContent.types';
 
 const orderFilterOptions = ['Tất cả', 'Chờ xác nhận', 'Đang giao', 'Đã giao', 'Đã hủy'];
@@ -19,6 +21,9 @@ const OrdersTab = ({
   orders,
   ordersLoading,
   ordersError,
+  orderPage,
+  ordersPerPage,
+  onOrderPageChange,
   orderStatusLabelMap,
   onOpenOrderDetail,
   onRequestCancelOrder,
@@ -28,13 +33,35 @@ const OrdersTab = ({
   | 'orders'
   | 'ordersLoading'
   | 'ordersError'
+  | 'orderPage'
+  | 'ordersPerPage'
+  | 'onOrderPageChange'
   | 'orderStatusLabelMap'
   | 'onOpenOrderDetail'
   | 'onRequestCancelOrder'
 >) => {
-  const filteredOrders = orderFilter === 'Tất cả'
-    ? orders
-    : orders.filter((order) => order.status === statusMap[orderFilter]);
+  const filteredOrders = useMemo(
+    () => orderFilter === 'Tất cả'
+      ? orders
+      : orders.filter((order) => order.status === statusMap[orderFilter]),
+    [orderFilter, orders],
+  );
+  const totalOrderPages = Math.max(1, Math.ceil(filteredOrders.length / ordersPerPage));
+  const safeOrderPage = Math.min(orderPage, totalOrderPages);
+  const pagedOrders = useMemo(() => {
+    const start = (safeOrderPage - 1) * ordersPerPage;
+    return filteredOrders.slice(start, start + ordersPerPage);
+  }, [filteredOrders, ordersPerPage, safeOrderPage]);
+
+  useEffect(() => {
+    onOrderPageChange(1);
+  }, [orderFilter, onOrderPageChange]);
+
+  useEffect(() => {
+    if (orderPage > totalOrderPages) {
+      onOrderPageChange(totalOrderPages);
+    }
+  }, [orderPage, onOrderPageChange, totalOrderPages]);
 
   return (
     <div className="tab-pane">
@@ -68,7 +95,7 @@ const OrdersTab = ({
             actionLink="/"
           />
         ) : (
-          filteredOrders.map((order) => (
+          pagedOrders.map((order) => (
             <div key={order.id} className="order-card">
               <div className="order-card-header">
                 <div className="order-card-meta">
@@ -121,6 +148,17 @@ const OrdersTab = ({
           ))
         )}
       </div>
+
+      {!ordersLoading && !ordersError && filteredOrders.length > 0 ? (
+        <ProfilePagination
+          page={safeOrderPage}
+          totalItems={filteredOrders.length}
+          totalPages={totalOrderPages}
+          itemsPerPage={ordersPerPage}
+          itemLabel="đơn hàng"
+          onPageChange={onOrderPageChange}
+        />
+      ) : null}
     </div>
   );
 };

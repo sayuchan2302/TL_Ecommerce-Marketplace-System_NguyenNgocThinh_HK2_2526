@@ -54,7 +54,9 @@ const PROFILE_TAB_PAGE_TITLES: Record<TabId, string> = {
   reviews: 'Đánh giá của tôi',
   vouchers: 'Ví voucher',
 };
-const NOTIFICATIONS_PREVIEW_LIMIT = 7;
+const ORDERS_PER_PAGE = 5;
+const REVIEWS_PER_PAGE = 5;
+const NOTIFICATIONS_PER_PAGE = 7;
 const VOUCHERS_PER_PAGE = 10;
 
 const mapEligibleReview = (item: EligibleReviewItem): PendingProduct => {
@@ -279,10 +281,13 @@ const Profile = () => {
     [orderCodeMap],
   );
   const [orderFilter, setOrderFilter] = useState('Tất cả');
+  const [orderPage, setOrderPage] = useState(1);
 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [reviewProduct, setReviewProduct] = useState<PendingProduct | null>(null);
   const [reviewFilter, setReviewFilter] = useState<'pending' | 'completed'>('pending');
+  const [pendingReviewPage, setPendingReviewPage] = useState(1);
+  const [completedReviewPage, setCompletedReviewPage] = useState(1);
   const [pendingReviews, setPendingReviews] = useState<PendingProduct[]>([]);
   const [completedReviews, setCompletedReviews] = useState<CustomerReview[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -291,19 +296,7 @@ const Profile = () => {
   const [followingStores, setFollowingStores] = useState<FollowedStoreItem[]>([]);
   const [followingStoresLoading, setFollowingStoresLoading] = useState(false);
   const [followingStoresError, setFollowingStoresError] = useState<string | null>(null);
-  const [showAllNotifications, setShowAllNotifications] = useState(false);
-
-  const displayedNotifications = useMemo(
-    () => (showAllNotifications ? notifications : notifications.slice(0, NOTIFICATIONS_PREVIEW_LIMIT)),
-    [notifications, showAllNotifications],
-  );
-  const hasMoreNotifications = notifications.length > NOTIFICATIONS_PREVIEW_LIMIT;
-
-  useEffect(() => {
-    if (activeTab !== 'notifications' && showAllNotifications) {
-      setShowAllNotifications(false);
-    }
-  }, [activeTab, showAllNotifications]);
+  const [notificationPage, setNotificationPage] = useState(1);
 
   const handleOpenReviewModal = (product: PendingProduct) => {
     setReviewProduct(product);
@@ -879,6 +872,9 @@ const Profile = () => {
                 orders={orders}
                 ordersLoading={ordersLoading}
                 ordersError={ordersError}
+                orderPage={orderPage}
+                ordersPerPage={ORDERS_PER_PAGE}
+                onOrderPageChange={setOrderPage}
                 orderStatusLabelMap={tCommon.status as Record<string, string>}
                 onOpenOrderDetail={openOrderDetail}
                 onRequestCancelOrder={setPendingCancelOrderId}
@@ -902,14 +898,18 @@ const Profile = () => {
                 completedReviews={completedReviews}
                 reviewsLoading={reviewsLoading}
                 reviewsError={reviewsError}
+                pendingReviewPage={pendingReviewPage}
+                completedReviewPage={completedReviewPage}
+                reviewsPerPage={REVIEWS_PER_PAGE}
+                onPendingReviewPageChange={setPendingReviewPage}
+                onCompletedReviewPageChange={setCompletedReviewPage}
                 getOrderDisplayCode={getOrderDisplayCode}
                 onOpenReviewModal={handleOpenReviewModal}
                 notifications={notifications}
-                displayedNotifications={displayedNotifications}
                 unreadCount={unreadCount}
-                showAllNotifications={showAllNotifications}
-                hasMoreNotifications={hasMoreNotifications}
-                onShowAllNotifications={setShowAllNotifications}
+                notificationPage={notificationPage}
+                notificationsPerPage={NOTIFICATIONS_PER_PAGE}
+                onNotificationPageChange={setNotificationPage}
                 onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
                 onNotificationClick={handleNotificationClick}
                 onDeleteNotification={handleDeleteNotification}
