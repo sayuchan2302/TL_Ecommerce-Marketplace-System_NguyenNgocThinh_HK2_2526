@@ -12,6 +12,7 @@ import vn.edu.hcmuaf.fit.marketplace.entity.ProductImage;
 import vn.edu.hcmuaf.fit.marketplace.entity.ProductVariant;
 import vn.edu.hcmuaf.fit.marketplace.entity.Store;
 import vn.edu.hcmuaf.fit.marketplace.entity.User;
+import vn.edu.hcmuaf.fit.marketplace.exception.ForbiddenException;
 import vn.edu.hcmuaf.fit.marketplace.exception.ResourceNotFoundException;
 import vn.edu.hcmuaf.fit.marketplace.repository.CartRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.ProductRepository;
@@ -31,6 +32,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class CartService {
+
+    private static final String OWN_STORE_PURCHASE_MESSAGE = "Khong the mua san pham tu gian hang cua chinh ban.";
 
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
@@ -122,10 +125,12 @@ public class CartService {
 
     @Transactional
     public Cart addItem(UUID userId, CartItemRequest request) {
+        User user = findUser(userId);
         Cart cart = getCartByUserId(userId);
 
         Product product = productRepository.findPublicById(request.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+        ensureNotOwnStoreProduct(user, product);
 
         final ProductVariant variant;
         if (request.getVariantId() != null) {
@@ -175,6 +180,7 @@ public class CartService {
         if (quantity <= 0) {
             cart.getItems().remove(item);
         } else {
+            ensureNotOwnStoreProduct(findUser(userId), item.getProduct());
             item.setQuantity(quantity);
         }
 
@@ -298,5 +304,19 @@ public class CartService {
                 .map(ProductImage::getUrl)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private User findUser(UUID userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    private void ensureNotOwnStoreProduct(User user, Product product) {
+        if (user == null || product == null || user.getStoreId() == null || product.getStoreId() == null) {
+            return;
+        }
+        if (user.getStoreId().equals(product.getStoreId())) {
+            throw new ForbiddenException(OWN_STORE_PURCHASE_MESSAGE);
+        }
     }
 }

@@ -21,6 +21,7 @@ import vn.edu.hcmuaf.fit.marketplace.entity.ProductVariant;
 import vn.edu.hcmuaf.fit.marketplace.entity.Store;
 import vn.edu.hcmuaf.fit.marketplace.entity.User;
 import vn.edu.hcmuaf.fit.marketplace.entity.Voucher;
+import vn.edu.hcmuaf.fit.marketplace.exception.ForbiddenException;
 import vn.edu.hcmuaf.fit.marketplace.repository.AddressRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.CouponRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.CustomerVoucherRepository;
@@ -207,6 +208,8 @@ class OrderServiceTest {
                 .id(userId)
                 .email("buyer@example.com")
                 .password("secret")
+                .role(User.Role.VENDOR)
+                .storeId(UUID.randomUUID())
                 .build();
 
         Address address = Address.builder()
@@ -282,6 +285,127 @@ class OrderServiceTest {
         assertEquals(0, response.getVendorPayout().compareTo(new BigDecimal("174000.00")));
         assertEquals(3, variant.getStockQuantity());
         assertEquals(3, product.getStockQuantity());
+    }
+
+    @Test
+    void createRejectsProductFromUsersOwnStoreBeforeReservingStock() {
+        UUID userId = UUID.randomUUID();
+        UUID addressId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+
+        User user = User.builder()
+                .id(userId)
+                .email("vendor@example.com")
+                .password("secret")
+                .role(User.Role.VENDOR)
+                .storeId(storeId)
+                .build();
+        Address address = Address.builder()
+                .id(addressId)
+                .user(user)
+                .fullName("Vendor")
+                .phone("0900000000")
+                .province("HCM")
+                .district("Q1")
+                .ward("Ben Nghe")
+                .detail("1 Test Street")
+                .build();
+        Product product = Product.builder()
+                .id(productId)
+                .name("Own Store Shirt")
+                .storeId(storeId)
+                .basePrice(new BigDecimal("100000"))
+                .stockQuantity(5)
+                .build();
+        OrderRequest request = OrderRequest.builder()
+                .addressId(addressId)
+                .paymentMethod("COD")
+                .items(List.of(
+                        OrderRequest.OrderItemRequest.builder()
+                                .productId(productId)
+                                .quantity(2)
+                                .build()
+                ))
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(addressRepository.findById(addressId)).thenReturn(Optional.of(address));
+        when(productRepository.findPublicByIdForUpdate(productId)).thenReturn(Optional.of(product));
+
+        ForbiddenException ex = assertThrows(ForbiddenException.class, () -> orderService.create(userId, request));
+
+        assertEquals("Khong the mua san pham tu gian hang cua chinh ban.", ex.getMessage());
+        assertEquals(5, product.getStockQuantity());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(productVariantRepository, never()).findByProductIdAndIsActiveTrue(any());
+    }
+
+    @Test
+    void createRejectsMultiStoreCheckoutWhenAnyItemBelongsToUsersOwnStore() {
+        UUID userId = UUID.randomUUID();
+        UUID addressId = UUID.randomUUID();
+        UUID otherProductId = UUID.randomUUID();
+        UUID ownProductId = UUID.randomUUID();
+        UUID otherStoreId = UUID.randomUUID();
+
+        User user = User.builder()
+                .id(userId)
+                .email("vendor@example.com")
+                .password("secret")
+                .role(User.Role.VENDOR)
+                .storeId(storeId)
+                .build();
+        Address address = Address.builder()
+                .id(addressId)
+                .user(user)
+                .fullName("Vendor")
+                .phone("0900000000")
+                .province("HCM")
+                .district("Q1")
+                .ward("Ben Nghe")
+                .detail("1 Test Street")
+                .build();
+        Product otherProduct = Product.builder()
+                .id(otherProductId)
+                .name("Other Store Shirt")
+                .storeId(otherStoreId)
+                .basePrice(new BigDecimal("100000"))
+                .stockQuantity(10)
+                .build();
+        Product ownProduct = Product.builder()
+                .id(ownProductId)
+                .name("Own Store Pants")
+                .storeId(storeId)
+                .basePrice(new BigDecimal("200000"))
+                .stockQuantity(7)
+                .build();
+        OrderRequest request = OrderRequest.builder()
+                .addressId(addressId)
+                .paymentMethod("COD")
+                .items(List.of(
+                        OrderRequest.OrderItemRequest.builder()
+                                .productId(otherProductId)
+                                .quantity(2)
+                                .build(),
+                        OrderRequest.OrderItemRequest.builder()
+                                .productId(ownProductId)
+                                .quantity(1)
+                                .build()
+                ))
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(addressRepository.findById(addressId)).thenReturn(Optional.of(address));
+        when(productRepository.findPublicByIdForUpdate(otherProductId)).thenReturn(Optional.of(otherProduct));
+        when(productRepository.findPublicByIdForUpdate(ownProductId)).thenReturn(Optional.of(ownProduct));
+
+        ForbiddenException ex = assertThrows(ForbiddenException.class, () -> orderService.create(userId, request));
+
+        assertEquals("Khong the mua san pham tu gian hang cua chinh ban.", ex.getMessage());
+        assertEquals(10, otherProduct.getStockQuantity());
+        assertEquals(7, ownProduct.getStockQuantity());
+        verify(orderRepository, never()).save(any(Order.class));
+        verify(productVariantRepository, never()).findByProductIdAndIsActiveTrue(any());
     }
 
     @Test

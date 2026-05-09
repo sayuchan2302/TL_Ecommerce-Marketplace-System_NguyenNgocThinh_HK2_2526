@@ -85,6 +85,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 const FREE_SHIPPING_THRESHOLD = 500000;
 const DEFAULT_SHIPPING_FEE = 30000;
+const OWN_STORE_PURCHASE_MESSAGE = 'Khong the mua san pham tu gian hang cua chinh ban.';
 
 const buildLoginRedirectTarget = () => {
   if (typeof window === 'undefined') return '/login';
@@ -187,10 +188,11 @@ const toErrorMessage = (error: unknown, fallback: string) => {
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const { addToast } = useToast();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const hasBackendSession = Boolean(token && authService.isBackendJwtToken(token));
+  const userStoreId = String(user?.storeId || '').trim();
 
   const enqueueMutation = useCallback((task: () => Promise<void>) => {
     mutationQueueRef.current = mutationQueueRef.current
@@ -247,6 +249,11 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       addToast('San pham chua dong bo backend, khong the them vao gio hang.', 'error');
       return;
     }
+    const itemStoreId = String(newItem.storeId || '').trim();
+    if (userStoreId && itemStoreId && userStoreId === itemStoreId) {
+      addToast(OWN_STORE_PURCHASE_MESSAGE, 'error');
+      return;
+    }
 
     const variantId = String(newItem.backendVariantId || '').trim() || undefined;
     const quantity = Math.max(1, Math.min(toPositiveQuantity(newItem.quantity), 10));
@@ -270,7 +277,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
         addToast(toErrorMessage(error, 'Khong the them vao gio hang.'), 'error');
       }
     });
-  }, [addToast, enqueueMutation, ensureAuthenticated]);
+  }, [addToast, enqueueMutation, ensureAuthenticated, userStoreId]);
 
   const removeFromCart = useCallback((cartId: string) => {
     const normalized = String(cartId || '').trim();

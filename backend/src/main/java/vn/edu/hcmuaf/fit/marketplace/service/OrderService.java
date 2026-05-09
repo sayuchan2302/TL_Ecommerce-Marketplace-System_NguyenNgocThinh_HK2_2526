@@ -203,6 +203,7 @@ public class OrderService {
     private static final String ORDER_LOG_EVENT_CREATED = "ORDER_CREATED";
     private static final String ORDER_LOG_EVENT_STATUS_CHANGED = "STATUS_CHANGED";
     private static final String ORDER_LOG_EVENT_TRACKING_UPDATED = "TRACKING_UPDATED";
+    private static final String OWN_STORE_PURCHASE_MESSAGE = "Khong the mua san pham tu gian hang cua chinh ban.";
 
     private record PreparedOrderItem(
             Product product,
@@ -216,6 +217,11 @@ public class OrderService {
             String productImage,
             UUID flashSaleItemId,
             BigDecimal flashSaleUnitPrice
+    ) {}
+
+    private record CheckoutProductLine(
+            OrderRequest.OrderItemRequest request,
+            Product product
     ) {}
 
     private record FlashSaleAllocation(
@@ -1210,7 +1216,7 @@ public class OrderService {
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported payment method: " + request.getPaymentMethod());
         }
-        List<PreparedOrderItem> preparedItems = prepareOrderItems(request.getItems());
+        List<PreparedOrderItem> preparedItems = prepareOrderItems(request.getItems(), user.getStoreId());
         Map<UUID, StoreOrderGroup> groupedByStore = groupItemsByStore(preparedItems);
         if (request.getCustomerVoucherId() != null
                 && request.getCouponCode() != null
@@ -1748,26 +1754,13 @@ public class OrderService {
                 .build();
     }
 
-    private List<PreparedOrderItem> prepareOrderItems(List<OrderRequest.OrderItemRequest> items) {
+    private List<PreparedOrderItem> prepareOrderItems(List<OrderRequest.OrderItemRequest> items, UUID buyerStoreId) {
+        List<CheckoutProductLine> checkoutLines = resolveCheckoutProductLines(items, buyerStoreId);
         List<PreparedOrderItem> preparedItems = new ArrayList<>();
 
-        for (OrderRequest.OrderItemRequest itemReq : items) {
-            if (itemReq == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order item is required");
-            }
-            if (itemReq.getProductId() == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product ID is required");
-            }
-            Product product = productRepository.findPublicByIdForUpdate(itemReq.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
-
-            if (product.getStoreId() == null) {
-                throw new ForbiddenException("Marketplace checkout only supports vendor-owned products");
-            }
-
-            if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quantity must be greater than 0");
-            }
+        for (CheckoutProductLine line : checkoutLines) {
+            OrderRequest.OrderItemRequest itemReq = line.request();
+            Product product = line.product();
 
             ProductVariant variant = resolveVariantForCheckout(product, itemReq.getVariantId());
             reserveStock(product, variant, itemReq.getQuantity());
@@ -1794,6 +1787,45 @@ public class OrderService {
         }
 
         return preparedItems;
+    }
+
+    private List<CheckoutProductLine> resolveCheckoutProductLines(
+            List<OrderRequest.OrderItemRequest> items,
+            UUID buyerStoreId
+    ) {
+        List<CheckoutProductLine> checkoutLines = new ArrayList<>();
+
+        for (OrderRequest.OrderItemRequest itemReq : items) {
+            if (itemReq == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Order item is required");
+            }
+            if (itemReq.getProductId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Product ID is required");
+            }
+            if (itemReq.getQuantity() == null || itemReq.getQuantity() <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quantity must be greater than 0");
+            }
+
+            Product product = productRepository.findPublicByIdForUpdate(itemReq.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+            if (product.getStoreId() == null) {
+                throw new ForbiddenException("Marketplace checkout only supports vendor-owned products");
+            }
+            ensureNotOwnStoreProduct(buyerStoreId, product);
+            checkoutLines.add(new CheckoutProductLine(itemReq, product));
+        }
+
+        return checkoutLines;
+    }
+
+    private void ensureNotOwnStoreProduct(UUID buyerStoreId, Product product) {
+        if (buyerStoreId == null || product == null || product.getStoreId() == null) {
+            return;
+        }
+        if (buyerStoreId.equals(product.getStoreId())) {
+            throw new ForbiddenException(OWN_STORE_PURCHASE_MESSAGE);
+        }
     }
 
     private ProductVariant resolveVariantForCheckout(Product product, UUID variantId) {

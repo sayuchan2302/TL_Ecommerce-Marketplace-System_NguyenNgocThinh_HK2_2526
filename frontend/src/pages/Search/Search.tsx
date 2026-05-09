@@ -412,11 +412,8 @@ const Search = () => {
                   previewUrl={imageSearchSession.previewUrl}
                   totalCandidates={imageSearchSession.totalCandidates}
                   isLoading={isImageSearchLoading || isAwaitingImageSearch}
-                  pasteTargetRef={pasteTargetRef}
                   onPickImage={triggerImagePicker}
-                  onFocusPasteTarget={focusPasteTarget}
                   onClear={() => clearImageSearchState(true)}
-                  onPaste={(event) => void handlePasteTargetPaste(event)}
                 />
               )}
 
