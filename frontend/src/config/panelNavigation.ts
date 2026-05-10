@@ -12,6 +12,7 @@ export const adminPanelNav: PanelNavItem[] = [
   { label: 'Tài chính', to: '/admin/financials' },
   { label: 'Voucher toàn sàn', to: '/admin/promotions' },
   { label: 'Bot và AI', to: '/admin/bot-ai' },
+  { label: 'Image Vision', to: '/admin/image-vision' },
 ];
 
 export const vendorPanelNav: PanelNavItem[] = [

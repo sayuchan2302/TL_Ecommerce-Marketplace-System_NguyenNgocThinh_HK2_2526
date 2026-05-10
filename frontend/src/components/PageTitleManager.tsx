@@ -40,6 +40,7 @@ const STATIC_ROUTE_TITLES: StaticRouteTitle[] = [
   { path: '/admin/financials', title: 'Quản trị sàn - Tài chính' },
   { path: '/admin/promotions', title: 'Quản trị sàn - Voucher toàn sàn' },
   { path: '/admin/bot-ai', title: 'Quản trị sàn - Bot và AI' },
+  { path: '/admin/image-vision', title: 'Quản trị sàn - Image Vision' },
   { path: '/vendor/dashboard', title: 'Kênh người bán - Dashboard' },
   { path: '/vendor/storefront', title: 'Kênh người bán - Gian hàng' },
   { path: '/vendor/products', title: 'Kênh người bán - Sản phẩm' },

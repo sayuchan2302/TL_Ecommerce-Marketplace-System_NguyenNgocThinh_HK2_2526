@@ -17,6 +17,7 @@ const AdminReviews = lazy(() => import('./AdminReviews'));
 const StoreApprovals = lazy(() => import('./StoreApprovals'));
 const AdminFinancials = lazy(() => import('./AdminFinancials'));
 const AdminBotAI = lazy(() => import('./AdminBotAI'));
+const AdminImageVision = lazy(() => import('./AdminImageVision'));
 const AdminReturns = lazy(() => import('./AdminReturns'));
 const AdminProductGovernance = lazy(() => import('./AdminProductGovernance'));
 
@@ -134,6 +135,7 @@ const AdminWorkspace = () => {
                 <Route path="product-governance" element={<AdminProductGovernance />} />
                 <Route path="financials" element={<AdminFinancials />} />
                 <Route path="bot-ai" element={<AdminBotAI />} />
+                <Route path="image-vision" element={<AdminImageVision />} />
                 <Route path="returns" element={<AdminReturns />} />
 
                 <Route path="products" element={<Navigate to="/admin/categories" replace />} />
