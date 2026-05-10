@@ -396,6 +396,11 @@
   cursor: pointer;
 }
 
+.search-visual-query__button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .search-visual-query__button--ghost {
   color: var(--co-gray-700);
 }

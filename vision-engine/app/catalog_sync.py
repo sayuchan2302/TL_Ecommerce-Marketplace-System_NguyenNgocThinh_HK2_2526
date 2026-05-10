@@ -4,7 +4,10 @@ from collections import defaultdict
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from io import BytesIO
+import ipaddress
 import logging
+import posixpath
+from urllib.parse import unquote, urljoin, urlparse
 from threading import Lock
 from uuid import NAMESPACE_URL, UUID, uuid5
 import warnings
@@ -21,6 +24,9 @@ from .openclip_service import OpenClipService
 CATALOG_ENDPOINT = "/api/internal/vision/catalog"
 DEACTIVATED_PRODUCTS_ENDPOINT = "/api/internal/vision/catalog/deactivated-products"
 DOWNLOAD_CHUNK_SIZE = 64 * 1024
+INTERNAL_PRODUCT_UPLOAD_PREFIX = "/uploads/products/"
+GAP_IMAGE_HOST = "www.gap.com"
+GAP_IMAGE_PATH_PREFIX = "/webcontent/"
 logger = logging.getLogger("uvicorn.error")
 
 
@@ -204,12 +210,18 @@ class CatalogSyncService:
         return [str(product_id).strip() for product_id in payload if str(product_id).strip()]
 
     def _download_image(self, image_url: str) -> Image.Image:
+        download_url = self._resolve_download_url(image_url)
         response = self.http.get(
-            image_url,
+            download_url,
             stream=True,
+            allow_redirects=False,
             timeout=(settings.connect_timeout_seconds, settings.image_download_timeout_seconds),
         )
         try:
+            status_code = getattr(response, "status_code", 200)
+            if isinstance(status_code, int) and 300 <= status_code < 400:
+                raise CatalogSyncError("disallowed_image_redirect", "Catalog image redirects are not allowed")
+
             response.raise_for_status()
             max_bytes = max(1, settings.max_catalog_image_download_bytes)
             content_length = response.headers.get("Content-Length")
@@ -238,6 +250,64 @@ class CatalogSyncService:
             return self._decode_downloaded_image(bytes(payload))
         finally:
             response.close()
+
+    def _resolve_download_url(self, image_url: str) -> str:
+        candidate = (image_url or "").strip()
+        if not candidate:
+            raise CatalogSyncError("disallowed_image_url", "Catalog image URL is empty")
+
+        parsed = urlparse(candidate)
+        if not parsed.scheme and not parsed.netloc:
+            if self._is_internal_product_upload_path(parsed.path):
+                return urljoin(settings.marketplace_base_url.rstrip("/") + "/", candidate.lstrip("/"))
+            raise CatalogSyncError("disallowed_image_url", "Only product upload paths are allowed as relative URLs")
+
+        if parsed.scheme.lower() not in {"http", "https"}:
+            raise CatalogSyncError("disallowed_image_url", "Catalog image URL scheme is not allowed")
+
+        host = parsed.hostname
+        if not host:
+            raise CatalogSyncError("disallowed_image_url", "Catalog image URL host is missing")
+        if self._is_local_or_private_host(host):
+            raise CatalogSyncError("disallowed_image_url", "Catalog image URL host is not public")
+        if self._is_gap_dataset_image(parsed):
+            return candidate
+
+        raise CatalogSyncError("disallowed_image_url", "Catalog image URL host is not in the image allowlist")
+
+    def _is_internal_product_upload_path(self, path: str) -> bool:
+        decoded_path = unquote(path or "")
+        normalized_path = posixpath.normpath(decoded_path)
+        return normalized_path.startswith(INTERNAL_PRODUCT_UPLOAD_PREFIX)
+
+    def _is_gap_dataset_image(self, parsed_url) -> bool:
+        return (
+            parsed_url.scheme.lower() == "https"
+            and (parsed_url.hostname or "").lower() == GAP_IMAGE_HOST
+            and self._is_safe_path_prefix(parsed_url.path, GAP_IMAGE_PATH_PREFIX)
+        )
+
+    def _is_safe_path_prefix(self, path: str, prefix: str) -> bool:
+        decoded_path = unquote(path or "")
+        normalized_path = posixpath.normpath(decoded_path)
+        return normalized_path.startswith(prefix)
+
+    def _is_local_or_private_host(self, host: str) -> bool:
+        normalized_host = host.strip().lower().rstrip(".")
+        if normalized_host in {"localhost", "host.docker.internal"}:
+            return True
+        try:
+            ip_address = ipaddress.ip_address(normalized_host)
+        except ValueError:
+            return False
+        return (
+            ip_address.is_loopback
+            or ip_address.is_private
+            or ip_address.is_link_local
+            or ip_address.is_multicast
+            or ip_address.is_reserved
+            or ip_address.is_unspecified
+        )
 
     def _decode_downloaded_image(self, payload: bytes) -> Image.Image:
         original_max_pixels = Image.MAX_IMAGE_PIXELS

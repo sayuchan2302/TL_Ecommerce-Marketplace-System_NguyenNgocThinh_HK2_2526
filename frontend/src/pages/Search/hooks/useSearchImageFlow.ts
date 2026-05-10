@@ -62,6 +62,7 @@ export const useSearchImageFlow = ({
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const consumedImageTokenRef = useRef<string | null>(null);
   const pasteTargetRef = useRef<HTMLDivElement | null>(null);
+  const isImageSearchSubmittingRef = useRef(false);
   const isImageSearchMode = imageSearchStatus !== 'idle' && Boolean(imageSearchSession);
   const isImageSearchLoading = imageSearchStatus === 'loading';
   const isAwaitingImageSearch = Boolean(imageSearchToken)
@@ -83,12 +84,17 @@ export const useSearchImageFlow = ({
   }, [clearSearchResults]);
 
   const handleImageSearch = useCallback(async (file: File) => {
+    if (isImageSearchSubmittingRef.current) {
+      return false;
+    }
+
     const validation = validateImageSearchFile(file);
     if (!validation.ok) {
       setImageSearchError(validation.message);
       return false;
     }
 
+    isImageSearchSubmittingRef.current = true;
     setIsSearching(true);
     setImageSearchError(null);
     const previewUrl = URL.createObjectURL(file);
@@ -115,7 +121,7 @@ export const useSearchImageFlow = ({
       setImageSearchSession({
         fileName: file.name,
         previewUrl,
-        totalCandidates: response.items.length,
+        totalCandidates: response.totalCandidates || response.items.length,
       });
       setImageSearchStatus('success');
       return true;
@@ -131,6 +137,7 @@ export const useSearchImageFlow = ({
       );
       return false;
     } finally {
+      isImageSearchSubmittingRef.current = false;
       setIsSearching(false);
     }
   }, [
@@ -153,6 +160,10 @@ export const useSearchImageFlow = ({
   }, [handleImageSearch]);
 
   const handleClipboardImage = useCallback(async (clipboardData: DataTransfer | null) => {
+    if (isImageSearchSubmittingRef.current) {
+      return false;
+    }
+
     const file = extractImageFileFromClipboard(clipboardData);
     if (!file) {
       return false;
@@ -171,6 +182,10 @@ export const useSearchImageFlow = ({
   }, [handleClipboardImage]);
 
   const triggerImagePicker = useCallback(() => {
+    if (isImageSearchSubmittingRef.current) {
+      return;
+    }
+
     imageInputRef.current?.click();
   }, []);
 
@@ -200,6 +215,9 @@ export const useSearchImageFlow = ({
 
       const file = extractImageFileFromClipboard(event.clipboardData ?? null);
       if (!file) {
+        return;
+      }
+      if (isImageSearchSubmittingRef.current) {
         return;
       }
 

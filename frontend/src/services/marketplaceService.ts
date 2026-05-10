@@ -649,9 +649,14 @@ export const marketplaceService = {
       });
     }
 
+    const items = (payload.items || []).map(mapProductCard);
+    const totalCandidates = Number.isFinite(payload.totalCandidates)
+      ? Math.max(0, Number(payload.totalCandidates))
+      : items.length;
+
     return {
-      items: (payload.items || []).map(mapProductCard),
-      totalCandidates: Math.max(0, Number(payload.totalCandidates || 0)),
+      items,
+      totalCandidates,
       mode: (payload.mode || '').trim() || undefined,
       indexVersion: (payload.indexVersion || '').trim() || undefined,
       inferredCategory: (payload.inferredCategory || '').trim() || undefined,

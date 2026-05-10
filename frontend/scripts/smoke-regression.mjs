@@ -84,7 +84,9 @@ async function run() {
       const page = await context.newPage();
 
       await page.goto(BASE_URL, { waitUntil: 'networkidle', timeout: TIMEOUT });
-      const homeHasCoreUI = await page.getByText(/COOLMATE/i).first().isVisible({ timeout: TIMEOUT }).catch(() => false);
+      const homeHasCoreUI = await page.locator('.header-logo img.logo-image[src*="/brand/pho-mac-logo"]').first()
+        .isVisible({ timeout: TIMEOUT })
+        .catch(() => false);
       assert(homeHasCoreUI, 'Home does not render header/logo.');
       pass('Home');
 

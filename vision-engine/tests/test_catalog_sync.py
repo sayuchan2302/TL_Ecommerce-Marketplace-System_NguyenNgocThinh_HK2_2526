@@ -28,6 +28,7 @@ class CatalogSyncServiceTests(unittest.TestCase):
     def test_download_image_rejects_large_content_length_header(self) -> None:
         service = CatalogSyncService(clip_service=Mock())
         response = Mock()
+        response.status_code = 200
         response.headers = {"Content-Length": "9999"}
         response.iter_content.return_value = iter([self._build_png_bytes()])
         response.raise_for_status.return_value = None
@@ -36,10 +37,64 @@ class CatalogSyncServiceTests(unittest.TestCase):
 
         with patch("app.catalog_sync.settings.max_catalog_image_download_bytes", 100):
             with self.assertRaises(CatalogSyncError) as context:
-                service._download_image("https://example.com/image.png")
+                service._download_image("https://www.gap.com/webcontent/0000/image.png")
 
         self.assertEqual(context.exception.reason, "download_too_large")
         response.close.assert_called_once()
+
+    def test_download_image_rejects_redirects(self) -> None:
+        service = CatalogSyncService(clip_service=Mock())
+        response = Mock()
+        response.status_code = 302
+        response.headers = {"Location": "http://127.0.0.1/admin"}
+        response.close.return_value = None
+        service.http.get = Mock(return_value=response)
+
+        with self.assertRaises(CatalogSyncError) as context:
+            service._download_image("https://www.gap.com/webcontent/0000/image.png")
+
+        self.assertEqual(context.exception.reason, "disallowed_image_redirect")
+        response.raise_for_status.assert_not_called()
+        response.close.assert_called_once()
+
+    def test_resolve_download_url_accepts_relative_product_upload(self) -> None:
+        service = CatalogSyncService(clip_service=Mock())
+
+        with patch("app.catalog_sync.settings.marketplace_base_url", "http://localhost:8080"):
+            resolved = service._resolve_download_url("/uploads/products/example.png")
+
+        self.assertEqual(resolved, "http://localhost:8080/uploads/products/example.png")
+
+    def test_resolve_download_url_accepts_gap_dataset_image(self) -> None:
+        service = CatalogSyncService(clip_service=Mock())
+
+        resolved = service._resolve_download_url("https://www.gap.com/webcontent/0056/983/758/cn56983758.jpg")
+
+        self.assertEqual(resolved, "https://www.gap.com/webcontent/0056/983/758/cn56983758.jpg")
+
+    def test_resolve_download_url_rejects_private_host(self) -> None:
+        service = CatalogSyncService(clip_service=Mock())
+
+        with self.assertRaises(CatalogSyncError) as context:
+            service._resolve_download_url("http://127.0.0.1:8080/uploads/products/example.png")
+
+        self.assertEqual(context.exception.reason, "disallowed_image_url")
+
+    def test_resolve_download_url_rejects_file_scheme(self) -> None:
+        service = CatalogSyncService(clip_service=Mock())
+
+        with self.assertRaises(CatalogSyncError) as context:
+            service._resolve_download_url("file:///etc/passwd")
+
+        self.assertEqual(context.exception.reason, "disallowed_image_url")
+
+    def test_resolve_download_url_rejects_unknown_external_host(self) -> None:
+        service = CatalogSyncService(clip_service=Mock())
+
+        with self.assertRaises(CatalogSyncError) as context:
+            service._resolve_download_url("https://example.com/product.png")
+
+        self.assertEqual(context.exception.reason, "disallowed_image_url")
 
     def test_decode_downloaded_image_rejects_large_decoded_pixels(self) -> None:
         service = CatalogSyncService(clip_service=Mock())

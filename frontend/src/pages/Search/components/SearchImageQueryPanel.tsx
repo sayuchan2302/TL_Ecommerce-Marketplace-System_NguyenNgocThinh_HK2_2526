@@ -35,7 +35,12 @@ const SearchImageQueryPanel = ({
       )}
     </div>
     <div className="search-visual-query__actions">
-      <button type="button" className="search-visual-query__button" onClick={onPickImage}>
+      <button
+        type="button"
+        className="search-visual-query__button"
+        onClick={onPickImage}
+        disabled={isLoading}
+      >
         <ImagePlus size={16} aria-hidden="true" />
         Chọn ảnh khác
       </button>
@@ -43,6 +48,7 @@ const SearchImageQueryPanel = ({
         type="button"
         className="search-visual-query__button search-visual-query__button--ghost"
         onClick={onClear}
+        disabled={isLoading}
       >
         <RotateCcw size={16} aria-hidden="true" />
         Xóa tìm kiếm ảnh
