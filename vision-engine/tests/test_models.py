@@ -69,12 +69,22 @@ class VisionCatalogModelTests(unittest.TestCase):
                 "inferred_category": "tat",
                 "inferred_category_score": 0.31,
                 "category_filter_applied": "hard",
+                "returned_candidates": 2,
+                "grouped_candidates": 5,
+                "threshold_filtered_candidates": 3,
+                "top_score": 0.91,
+                "score_floor": 0.42,
             }
         )
 
         self.assertEqual(response.inferred_category, "tat")
         self.assertEqual(response.inferred_category_score, 0.31)
         self.assertEqual(response.category_filter_applied, "hard")
+        self.assertEqual(response.returned_candidates, 2)
+        self.assertEqual(response.grouped_candidates, 5)
+        self.assertEqual(response.threshold_filtered_candidates, 3)
+        self.assertEqual(response.top_score, 0.91)
+        self.assertEqual(response.score_floor, 0.42)
 
 
 if __name__ == "__main__":

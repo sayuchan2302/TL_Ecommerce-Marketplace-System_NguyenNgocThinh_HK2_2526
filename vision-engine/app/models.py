@@ -44,6 +44,11 @@ class SearchResponse(BaseModel):
     inferred_category: str | None = None
     inferred_category_score: float | None = None
     category_filter_applied: str | None = None
+    returned_candidates: int | None = None
+    grouped_candidates: int | None = None
+    threshold_filtered_candidates: int | None = None
+    top_score: float | None = None
+    score_floor: float | None = None
 
 
 class IndexInfoResponse(BaseModel):
@@ -108,3 +113,18 @@ class SyncCatalogResponse(BaseModel):
     sync_token: str
     index_version: str
     failures: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class SyncCatalogJobStartResponse(BaseModel):
+    job_id: str
+    status: str
+    started_at: datetime
+
+
+class SyncCatalogJobStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None = None
+    result: SyncCatalogResponse | None = None
+    error: str | None = None

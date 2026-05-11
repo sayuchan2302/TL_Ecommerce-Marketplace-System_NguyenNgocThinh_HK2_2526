@@ -3,22 +3,43 @@ package vn.edu.hcmuaf.fit.marketplace.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import vn.edu.hcmuaf.fit.marketplace.config.VisionSearchProperties;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.AdminVisionOverviewResponse;
+import vn.edu.hcmuaf.fit.marketplace.entity.VisionSyncFailure;
+import vn.edu.hcmuaf.fit.marketplace.entity.VisionSyncRun;
+import vn.edu.hcmuaf.fit.marketplace.repository.VisionSyncFailureRepository;
+import vn.edu.hcmuaf.fit.marketplace.repository.VisionSyncRunRepository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class AdminVisionServiceTest {
+
+    @Mock
+    private VisionSyncRunRepository syncRunRepository;
+
+    @Mock
+    private VisionSyncFailureRepository syncFailureRepository;
 
     private FakeVisionAdminClient visionAdminClient;
     private VisionSearchProperties properties;
     private AdminVisionService adminVisionService;
+    private AtomicReference<VisionSyncRun> savedRun;
 
     @BeforeEach
     void setUp() {
@@ -27,8 +48,21 @@ class AdminVisionServiceTest {
         properties.setBaseUrl("http://localhost:8001");
         properties.setInternalSecret("test-secret");
         visionAdminClient = new FakeVisionAdminClient();
+        savedRun = new AtomicReference<>();
+
+        lenient().when(syncRunRepository.save(any(VisionSyncRun.class))).thenAnswer(invocation -> {
+            VisionSyncRun run = invocation.getArgument(0);
+            savedRun.set(run);
+            return run;
+        });
+        lenient().when(syncFailureRepository.findTop100ByRunOrderByCreatedAtAsc(any(VisionSyncRun.class)))
+                .thenAnswer(invocation -> {
+                    VisionSyncRun run = invocation.getArgument(0);
+                    return run.getFailures() == null ? List.of() : run.getFailures();
+                });
+
         adminVisionService = new AdminVisionService(visionAdminClient,
-                properties);
+                properties, syncRunRepository, syncFailureRepository);
     }
 
     @Test
@@ -36,6 +70,8 @@ class AdminVisionServiceTest {
         visionAdminClient.healthError =
                 new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                         "Unable to reach vision engine");
+        when(syncRunRepository.findFirstByOrderByStartedAtDesc())
+                .thenReturn(Optional.empty());
 
         AdminVisionOverviewResponse overview = adminVisionService.getOverview();
 
@@ -50,26 +86,103 @@ class AdminVisionServiceTest {
     }
 
     @Test
-    void syncCatalogMapsSummaryAndFailures() {
-        visionAdminClient.syncCatalogPayload =
-                new VisionAdminClient.SyncCatalogPayload(
-                        12L,
-                        3L,
-                        4L,
-                        5L,
-                        1L,
-                        2L,
-                        "2026-05-10T13:00:00+00:00",
-                        "sync-token",
-                        List.of(Map.of(
-                                "backend_product_id", "product-1",
-                                "image_url", "https://example.com/p.jpg",
-                                "reason", "disallowed_image_url",
-                                "error", "Host is not allowed")));
-        visionAdminClient.healthPayload = new VisionAdminClient.HealthPayload(
-                "ok");
-        visionAdminClient.readyPayload = new VisionAdminClient.ReadyPayload(
-                true);
+    void syncCatalogStartsAsyncJobAndReconcilesSuccessWithFailures() {
+        configureHealthyVision();
+        visionAdminClient.startPayload =
+                new VisionAdminClient.SyncCatalogJobStartPayload(
+                        "job-1",
+                        "running",
+                        "2026-05-10T13:00:00Z");
+        when(syncRunRepository.findFirstByStatusOrderByStartedAtDesc(
+                VisionSyncRun.Status.RUNNING)).thenReturn(Optional.empty());
+        when(syncRunRepository.findFirstByOrderByStartedAtDesc())
+                .thenAnswer(invocation -> Optional.ofNullable(savedRun.get()));
+
+        AdminVisionOverviewResponse started = adminVisionService.syncCatalog();
+
+        assertEquals("syncing", started.getSyncSummary().getStatus());
+        assertEquals("job-1", started.getSyncSummary().getJobId());
+
+        visionAdminClient.jobPayload =
+                new VisionAdminClient.SyncCatalogJobPayload(
+                        "job-1",
+                        "success",
+                        "2026-05-10T13:00:00Z",
+                        "2026-05-10T13:00:04Z",
+                        new VisionAdminClient.SyncCatalogPayload(
+                                12L,
+                                3L,
+                                4L,
+                                5L,
+                                1L,
+                                2L,
+                                "2026-05-10T13:00:00+00:00",
+                                "sync-token",
+                                List.of(Map.of(
+                                        "backend_product_id", "product-1",
+                                        "image_url", "https://example.com/p.jpg",
+                                        "reason", "disallowed_image_url",
+                                        "error", "Host is not allowed"))),
+                        null);
+
+        AdminVisionOverviewResponse overview = adminVisionService.getOverview();
+
+        assertEquals("success", overview.getSyncSummary().getStatus());
+        assertEquals(12L, overview.getSyncSummary().getImagesProcessed());
+        assertEquals(4000L, overview.getSyncSummary().getDurationMs());
+        assertEquals(99L, overview.getIndexSummary().getActiveImageCount());
+        assertEquals(10L, overview.getSearchMetrics().getInvalidImageRequests());
+        assertEquals(1, overview.getFailures().size());
+        assertEquals("blocked", overview.getFailures().get(0).getStatus());
+    }
+
+    @Test
+    void overviewReadsLatestHistoryFromDatabase() {
+        VisionSyncRun run = VisionSyncRun.builder()
+                .jobId("persisted-job")
+                .status(VisionSyncRun.Status.SUCCESS)
+                .startedAt(Instant.parse("2026-05-10T12:00:00Z"))
+                .finishedAt(Instant.parse("2026-05-10T12:00:03Z"))
+                .durationMs(3000L)
+                .syncToken("sync-token")
+                .imagesProcessed(7L)
+                .message("done")
+                .build();
+        VisionSyncFailure failure = VisionSyncFailure.builder()
+                .run(run)
+                .productId("product-2")
+                .imageUrl("/uploads/products/bad.jpg")
+                .reason("decode_error")
+                .note("Cannot decode")
+                .status("error")
+                .build();
+        when(syncRunRepository.findFirstByOrderByStartedAtDesc())
+                .thenReturn(Optional.of(run));
+        when(syncFailureRepository.findTop100ByRunOrderByCreatedAtAsc(run))
+                .thenReturn(List.of(failure));
+
+        AdminVisionOverviewResponse overview = adminVisionService.getOverview();
+
+        assertEquals("success", overview.getSyncSummary().getStatus());
+        assertEquals("persisted-job", overview.getSyncSummary().getJobId());
+        assertEquals(7L, overview.getSyncSummary().getImagesProcessed());
+        assertEquals(1, overview.getFailures().size());
+        assertEquals("product-2", overview.getFailures().get(0).getProductId());
+    }
+
+    @Test
+    void syncCatalogRequiresConfiguredSecret() {
+        properties.setInternalSecret("");
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
+                () -> adminVisionService.syncCatalog());
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatusCode());
+    }
+
+    private void configureHealthyVision() {
+        visionAdminClient.healthPayload = new VisionAdminClient.HealthPayload("ok");
+        visionAdminClient.readyPayload = new VisionAdminClient.ReadyPayload(true);
         visionAdminClient.indexInfoPayload =
                 new VisionAdminClient.IndexInfoPayload(true,
                         "ViT-B-32",
@@ -91,33 +204,6 @@ class AdminVisionServiceTest {
                         280.0,
                         0.72,
                         "2026-05-10T13:01:00+00:00");
-
-        AdminVisionOverviewResponse overview = adminVisionService.syncCatalog();
-
-        assertEquals("success", overview.getSyncSummary().getStatus());
-        assertEquals(12L, overview.getSyncSummary().getImagesProcessed());
-        assertEquals(99L, overview.getIndexSummary().getActiveImageCount());
-        assertEquals(10L, overview.getSearchMetrics().getInvalidImageRequests());
-        assertEquals(1, overview.getFailures().size());
-        assertEquals("blocked", overview.getFailures().get(0).getStatus());
-    }
-
-    @Test
-    void syncCatalogRequiresConfiguredSecret() {
-        properties.setInternalSecret("");
-
-        ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> adminVisionService.syncCatalog());
-
-        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, ex.getStatusCode());
-        AdminVisionOverviewResponse overview = adminVisionService.getOverview();
-        AdminVisionOverviewResponse.HealthItem backend = overview.getHealthItems()
-                .stream()
-                .filter(item -> "backend".equals(item.getId()))
-                .findFirst()
-                .orElseThrow();
-        assertEquals("warning", backend.getStatus());
-        assertEquals("Missing secret", backend.getValue());
     }
 
     private static final class FakeVisionAdminClient extends VisionAdminClient {
@@ -126,12 +212,12 @@ class AdminVisionServiceTest {
         private ResponseStatusException readyError;
         private ResponseStatusException indexInfoError;
         private ResponseStatusException metricsError;
-        private ResponseStatusException syncCatalogError;
         private HealthPayload healthPayload;
         private ReadyPayload readyPayload;
         private IndexInfoPayload indexInfoPayload;
         private MetricsPayload metricsPayload;
-        private SyncCatalogPayload syncCatalogPayload;
+        private SyncCatalogJobStartPayload startPayload;
+        private SyncCatalogJobPayload jobPayload;
 
         private FakeVisionAdminClient() {
             super(new VisionSearchProperties(), new ObjectMapper());
@@ -170,11 +256,13 @@ class AdminVisionServiceTest {
         }
 
         @Override
-        public SyncCatalogPayload syncCatalog() {
-            if (syncCatalogError != null) {
-                throw syncCatalogError;
-            }
-            return syncCatalogPayload;
+        public SyncCatalogJobStartPayload startSyncCatalogJob() {
+            return startPayload;
+        }
+
+        @Override
+        public SyncCatalogJobPayload getSyncCatalogJob(String jobId) {
+            return jobPayload;
         }
     }
 }

@@ -34,6 +34,11 @@ class VisionSearchClientTest {
                   "inferred_category": "tat",
                   "inferred_category_score": 0.31,
                   "category_filter_applied": "hard",
+                  "returned_candidates": 2,
+                  "grouped_candidates": 5,
+                  "threshold_filtered_candidates": 3,
+                  "top_score": 0.91,
+                  "score_floor": 0.42,
                   "extra_field": "ignored"
                 }
                 """);
@@ -43,6 +48,11 @@ class VisionSearchClientTest {
         assertEquals("tat", result.inferredCategory());
         assertEquals(0.31, result.inferredCategoryScore());
         assertEquals("hard", result.categoryFilterApplied());
+        assertEquals(2, result.returnedCandidates());
+        assertEquals(5, result.groupedCandidates());
+        assertEquals(3, result.thresholdFilteredCandidates());
+        assertEquals(0.91, result.topScore());
+        assertEquals(0.42, result.scoreFloor());
     }
 
     @Test

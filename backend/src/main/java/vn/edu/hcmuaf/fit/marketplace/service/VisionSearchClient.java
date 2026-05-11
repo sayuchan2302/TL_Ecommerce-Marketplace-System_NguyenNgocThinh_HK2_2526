@@ -227,13 +227,28 @@ public class VisionSearchClient {
                 payload == null ? null : payload.indexVersion,
                 payload == null ? null : payload.inferredCategory,
                 payload == null ? null : payload.inferredCategoryScore,
-                payload == null ? null : payload.categoryFilterApplied);
+                payload == null ? null : payload.categoryFilterApplied,
+                payload == null ? null : payload.returnedCandidates,
+                payload == null ? null : payload.groupedCandidates,
+                payload == null ? null : payload.thresholdFilteredCandidates,
+                payload == null ? null : payload.topScore,
+                payload == null ? null : payload.scoreFloor);
     }
 
     public record VisionSearchResult(List<VisionCandidate> candidates,
             int totalCandidates, String indexVersion,
             String inferredCategory, Double inferredCategoryScore,
-            String categoryFilterApplied) {
+            String categoryFilterApplied, Integer returnedCandidates,
+            Integer groupedCandidates, Integer thresholdFilteredCandidates,
+            Double topScore, Double scoreFloor) {
+        public VisionSearchResult(List<VisionCandidate> candidates,
+                int totalCandidates, String indexVersion,
+                String inferredCategory, Double inferredCategoryScore,
+                String categoryFilterApplied) {
+            this(candidates, totalCandidates, indexVersion, inferredCategory,
+                    inferredCategoryScore, categoryFilterApplied, null, null,
+                    null, null, null);
+        }
     }
 
     public record VisionCandidate(
@@ -263,6 +278,21 @@ public class VisionSearchClient {
 
         @JsonProperty("category_filter_applied")
         private String categoryFilterApplied;
+
+        @JsonProperty("returned_candidates")
+        private Integer returnedCandidates;
+
+        @JsonProperty("grouped_candidates")
+        private Integer groupedCandidates;
+
+        @JsonProperty("threshold_filtered_candidates")
+        private Integer thresholdFilteredCandidates;
+
+        @JsonProperty("top_score")
+        private Double topScore;
+
+        @JsonProperty("score_floor")
+        private Double scoreFloor;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

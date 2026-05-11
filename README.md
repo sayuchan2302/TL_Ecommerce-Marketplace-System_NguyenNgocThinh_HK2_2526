@@ -165,4 +165,5 @@ vision-engine/.venv/Scripts/python.exe vision-engine/tests/test_catalog_sync.py
 
 - Do not keep `create-drop` enabled after OpenCLIP sync unless you want to reset products and sync again.
 - If image search returns empty results after product changes, run the OpenCLIP sync command again.
+- Image Vision smoke checklist: `docs/vision-hardening-smoke-test.md`.
 - Full API docs are available in Swagger while backend is running.

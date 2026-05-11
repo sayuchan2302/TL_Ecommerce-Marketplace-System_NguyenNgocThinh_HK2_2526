@@ -1,6 +1,7 @@
 package vn.edu.hcmuaf.fit.marketplace.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,6 +28,7 @@ public class AdminVisionController {
 
     @PostMapping("/sync-catalog")
     public ResponseEntity<AdminVisionOverviewResponse> syncCatalog() {
-        return ResponseEntity.ok(adminVisionService.syncCatalog());
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(adminVisionService.syncCatalog());
     }
 }

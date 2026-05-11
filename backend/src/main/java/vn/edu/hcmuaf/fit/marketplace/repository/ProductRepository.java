@@ -213,6 +213,22 @@ public interface ProductRepository extends JpaRepository<Product, UUID>, JpaSpec
             """)
     List<Product> findPublicMarketplaceProductsByIds(@Param("ids") List<UUID> ids);
 
+    @Query("""
+            SELECT DISTINCT p FROM Product p
+            LEFT JOIN FETCH p.category
+            LEFT JOIN FETCH p.images
+            WHERE p.id IN :ids
+              AND p.status = 'ACTIVE'
+              AND (p.approvalStatus = 'APPROVED' OR p.approvalStatus IS NULL)
+              AND p.storeId IS NOT NULL
+              AND p.storeId IN (
+                  SELECT s.id FROM Store s
+                  WHERE s.approvalStatus = 'APPROVED'
+                    AND s.status = 'ACTIVE'
+              )
+            """)
+    List<Product> findPublicMarketplaceProductsByIdsWithImages(@Param("ids") List<UUID> ids);
+
     @EntityGraph(attributePaths = {"category"})
     @Query("""
             SELECT DISTINCT p FROM Product p

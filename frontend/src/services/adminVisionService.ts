@@ -35,7 +35,11 @@ export interface VisionSearchMetrics {
 
 export interface VisionSyncSummary {
   status: VisionSyncState;
+  jobId?: string | null;
   lastSyncedAt?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  durationMs?: number | null;
   imagesProcessed: number;
   embeddingsInserted: number;
   embeddingsUpdated: number;

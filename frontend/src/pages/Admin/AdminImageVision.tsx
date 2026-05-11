@@ -162,6 +162,35 @@ const AdminImageVision = () => {
     void loadOverview('initial');
   }, [loadOverview]);
 
+  useEffect(() => {
+    if (syncState !== 'syncing') {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const pollOverview = async () => {
+      try {
+        const nextOverview = await adminVisionService.getOverview();
+        if (!cancelled) {
+          applyOverview(nextOverview);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setErrorMessage(getErrorMessage(error));
+        }
+      }
+    };
+
+    const timer = window.setInterval(() => {
+      void pollOverview();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [applyOverview, syncState]);
+
   const data = overview ?? fallbackOverview;
   const syncSummary = syncState === 'syncing'
     ? { ...data.syncSummary, status: 'syncing' as const, message: 'Đang đồng bộ catalog' }

@@ -52,6 +52,7 @@ app:
     base-dir: ${APP_UPLOAD_BASE_DIR:backend/upload}
     max-avatar-size-bytes: ${APP_UPLOAD_MAX_AVATAR_SIZE_BYTES:3145728}
     max-product-image-size-bytes: ${APP_UPLOAD_MAX_PRODUCT_IMAGE_SIZE_BYTES:5242880}
+    max-product-image-pixels: ${APP_UPLOAD_MAX_PRODUCT_IMAGE_PIXELS:20000000}
     max-store-image-size-bytes: ${APP_UPLOAD_MAX_STORE_IMAGE_SIZE_BYTES:5242880}
     max-category-image-size-bytes: ${APP_UPLOAD_MAX_CATEGORY_IMAGE_SIZE_BYTES:5242880}
     max-review-image-size-bytes: ${APP_UPLOAD_MAX_REVIEW_IMAGE_SIZE_BYTES:5242880}
@@ -79,6 +80,10 @@ app:
     read-timeout-ms: ${APP_VISION_READ_TIMEOUT_MS:20000}
     max-candidates: ${APP_VISION_MAX_CANDIDATES:120}
     max-upload-size-bytes: ${APP_VISION_MAX_UPLOAD_SIZE_BYTES:5242880}
+    rate-limit-enabled: ${APP_VISION_RATE_LIMIT_ENABLED:true}
+    rate-limit-per-minute: ${APP_VISION_RATE_LIMIT_PER_MINUTE:6}
+    rate-limit-per-hour: ${APP_VISION_RATE_LIMIT_PER_HOUR:30}
+    trust-proxy-headers: ${APP_TRUST_PROXY_HEADERS:false}
   notifications:
     promotion:
       timezone: ${APP_PROMOTION_NOTIFICATION_TIMEZONE:Asia/Ho_Chi_Minh}

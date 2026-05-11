@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -21,6 +22,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.ApiErrorResponse;
+import vn.edu.hcmuaf.fit.marketplace.security.ImageSearchRateLimitFilter;
 import vn.edu.hcmuaf.fit.marketplace.security.JwtAuthenticationFilter;
 
 import java.util.Arrays;
@@ -32,10 +34,15 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ImageSearchRateLimitFilter imageSearchRateLimitFilter;
     private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, ObjectMapper objectMapper) {
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            ImageSearchRateLimitFilter imageSearchRateLimitFilter,
+            ObjectMapper objectMapper) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.imageSearchRateLimitFilter = imageSearchRateLimitFilter;
         this.objectMapper = objectMapper;
     }
 
@@ -167,9 +174,18 @@ public class SecurityConfig {
                         // ─── Default: require authentication ───────────────────────────────
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(imageSearchRateLimitFilter, JwtAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public FilterRegistrationBean<ImageSearchRateLimitFilter> imageSearchRateLimitFilterRegistration(
+            ImageSearchRateLimitFilter filter) {
+        FilterRegistrationBean<ImageSearchRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean

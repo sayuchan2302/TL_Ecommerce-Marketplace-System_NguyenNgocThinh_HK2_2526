@@ -20,6 +20,11 @@ public class MarketplaceImageSearchResponse {
     private String inferredCategory;
     private Double inferredCategoryScore;
     private String categoryFilterApplied;
+    private Integer returnedCandidates;
+    private Integer groupedCandidates;
+    private Integer thresholdFilteredCandidates;
+    private Double topScore;
+    private Double scoreFloor;
     private List<ImageSearchMatch> matches;
 
     @Data

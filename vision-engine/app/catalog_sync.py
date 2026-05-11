@@ -50,6 +50,9 @@ class CatalogSyncService:
     def close(self) -> None:
         self.http.close()
 
+    def is_running(self) -> bool:
+        return self._run_lock.locked()
+
     def run_full_sync(self) -> SyncCatalogResponse:
         if not self._run_lock.acquire(blocking=False):
             raise CatalogSyncInProgressError("Catalog sync is already running")

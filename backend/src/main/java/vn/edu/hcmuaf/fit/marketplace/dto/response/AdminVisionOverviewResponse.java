@@ -65,7 +65,11 @@ public class AdminVisionOverviewResponse {
     @AllArgsConstructor
     public static class SyncSummary {
         private String status;
+        private String jobId;
         private String lastSyncedAt;
+        private String startedAt;
+        private String finishedAt;
+        private Long durationMs;
         private Long imagesProcessed;
         private Long embeddingsInserted;
         private Long embeddingsUpdated;

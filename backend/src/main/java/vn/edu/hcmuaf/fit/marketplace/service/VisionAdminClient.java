@@ -50,6 +50,16 @@ public class VisionAdminClient {
                 SyncCatalogPayload.class);
     }
 
+    public SyncCatalogJobStartPayload startSyncCatalogJob() {
+        return exchange("/v1/admin/sync-catalog/jobs", "POST", true,
+                SyncCatalogJobStartPayload.class);
+    }
+
+    public SyncCatalogJobPayload getSyncCatalogJob(String jobId) {
+        return exchange("/v1/admin/sync-catalog/jobs/" + jobId, "GET", true,
+                SyncCatalogJobPayload.class);
+    }
+
     private <T> T exchange(String path, String method, boolean useSecret,
             Class<T> responseType) {
         ensureConfigured(useSecret);
@@ -123,6 +133,7 @@ public class VisionAdminClient {
             String responseBody) {
         HttpStatus status = switch (statusCode) {
         case 409 -> HttpStatus.CONFLICT;
+        case 404 -> HttpStatus.NOT_FOUND;
         case 503 -> HttpStatus.SERVICE_UNAVAILABLE;
         case 504 -> HttpStatus.GATEWAY_TIMEOUT;
         default -> HttpStatus.BAD_GATEWAY;
@@ -192,6 +203,23 @@ public class VisionAdminClient {
             @JsonProperty("sync_token") String syncToken,
             @JsonProperty("index_version") String indexVersion,
             List<Map<String, Object>> failures) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SyncCatalogJobStartPayload(
+            @JsonProperty("job_id") String jobId,
+            String status,
+            @JsonProperty("started_at") String startedAt) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record SyncCatalogJobPayload(
+            @JsonProperty("job_id") String jobId,
+            String status,
+            @JsonProperty("started_at") String startedAt,
+            @JsonProperty("finished_at") String finishedAt,
+            SyncCatalogPayload result,
+            String error) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

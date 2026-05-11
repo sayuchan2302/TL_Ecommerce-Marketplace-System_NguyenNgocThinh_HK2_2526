@@ -23,6 +23,7 @@ const buildUrl = (path: string) => {
 
 const parseErrorMessage = async (response: Response) => {
   const fallbackByStatus: Record<number, string> = {
+    429: 'Ban dang tim kiem bang anh qua nhanh. Vui long thu lai sau.',
     400: 'Dữ liệu gửi lên chưa hợp lệ.',
     401: 'Hết phiên đăng nhập. Vui lòng đăng nhập lại.',
     403: 'Bạn không có quyền thực hiện thao tác này.',

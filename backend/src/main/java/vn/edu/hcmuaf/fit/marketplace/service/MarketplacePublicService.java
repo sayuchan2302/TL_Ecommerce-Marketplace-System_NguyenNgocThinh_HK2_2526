@@ -215,11 +215,15 @@ public class MarketplacePublicService {
                     .inferredCategory(rawResult.inferredCategory())
                     .inferredCategoryScore(rawResult.inferredCategoryScore())
                     .categoryFilterApplied(rawResult.categoryFilterApplied())
+                    .returnedCandidates(rawResult.returnedCandidates())
+                    .groupedCandidates(rawResult.groupedCandidates())
+                    .thresholdFilteredCandidates(rawResult.thresholdFilteredCandidates())
+                    .topScore(rawResult.topScore())
+                    .scoreFloor(rawResult.scoreFloor())
                     .matches(List.of()).build();
         }
 
-        List<Product> products = productRepository
-                .findPublicMarketplaceProductsByIds(rankedIds);
+        List<Product> products = loadPublicProductsForImageSearch(rankedIds);
         Map<UUID, Product> productsById = products.stream()
                 .filter(product -> product.getId() != null).collect(
                         Collectors.toMap(Product::getId, product -> product,
@@ -262,6 +266,11 @@ public class MarketplacePublicService {
                 .inferredCategory(rawResult.inferredCategory())
                 .inferredCategoryScore(rawResult.inferredCategoryScore())
                 .categoryFilterApplied(rawResult.categoryFilterApplied())
+                .returnedCandidates(rawResult.returnedCandidates())
+                .groupedCandidates(rawResult.groupedCandidates())
+                .thresholdFilteredCandidates(rawResult.thresholdFilteredCandidates())
+                .topScore(rawResult.topScore())
+                .scoreFloor(rawResult.scoreFloor())
                 .matches(matches).build();
     }
 
@@ -645,6 +654,39 @@ public class MarketplacePublicService {
             storesById.putIfAbsent(store.getId(), store);
         }
         return storesById;
+    }
+
+    private List<Product> loadPublicProductsForImageSearch(List<UUID> rankedIds) {
+        if (rankedIds == null || rankedIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Product> products = productRepository
+                .findPublicMarketplaceProductsByIdsWithImages(rankedIds);
+        if (products.isEmpty()) {
+            return products;
+        }
+
+        List<UUID> productIds = products.stream()
+                .map(Product::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        List<ProductVariant> variants = productVariantRepository
+                .findByProductIdIn(productIds);
+        Map<UUID, List<ProductVariant>> variantsByProductId = (variants == null
+                ? List.<ProductVariant>of()
+                : variants)
+                .stream()
+                .filter(variant -> variant.getProduct() != null
+                        && variant.getProduct().getId() != null)
+                .collect(Collectors.groupingBy(
+                        variant -> variant.getProduct().getId(),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        products.forEach(product -> product.setVariants(new ArrayList<>(
+                variantsByProductId.getOrDefault(product.getId(), List.of()))));
+        return products;
     }
 
     private MarketplaceStoreCardResponse toStoreCardResponse(Store store) {

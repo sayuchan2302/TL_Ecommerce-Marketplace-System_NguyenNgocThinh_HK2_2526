@@ -5,9 +5,17 @@ import logging
 from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 
 from .catalog_sync import CatalogSyncInProgressError, CatalogSyncService
+from .catalog_sync_jobs import CatalogSyncJobInProgressError, SyncCatalogJobNotFoundError, SyncCatalogJobService
 from .config import settings
 from .db import bootstrap_database, close_database_pool, get_connection, initialize_database_pool
-from .models import IndexInfoResponse, SearchMetricsResponse, SearchResponse, SyncCatalogResponse
+from .models import (
+    IndexInfoResponse,
+    SearchMetricsResponse,
+    SearchResponse,
+    SyncCatalogJobStartResponse,
+    SyncCatalogJobStatusResponse,
+    SyncCatalogResponse,
+)
 from .openclip_service import OpenClipService
 from .search_metrics import SearchMetricsCollector
 from .search_service import ImageSearchService, SearchValidationError, format_score
@@ -16,6 +24,7 @@ from .search_service import ImageSearchService, SearchValidationError, format_sc
 app = FastAPI(title=settings.app_name)
 clip_service: OpenClipService | None = None
 catalog_sync_service: CatalogSyncService | None = None
+catalog_sync_job_service: SyncCatalogJobService | None = None
 image_search_service: ImageSearchService | None = None
 logger = logging.getLogger("uvicorn.error")
 search_metrics = SearchMetricsCollector()
@@ -23,17 +32,23 @@ search_metrics = SearchMetricsCollector()
 
 @app.on_event("startup")
 def startup_event() -> None:
-    global clip_service, catalog_sync_service, image_search_service
+    global clip_service, catalog_sync_service, catalog_sync_job_service, image_search_service
     bootstrap_database()
     initialize_database_pool()
     clip_service = OpenClipService()
     catalog_sync_service = CatalogSyncService(clip_service)
     image_search_service = ImageSearchService(clip_service)
     image_search_service.refresh_index_info()
+    catalog_sync_job_service = SyncCatalogJobService(
+        catalog_sync_service,
+        on_success=image_search_service.refresh_index_info,
+    )
 
 
 @app.on_event("shutdown")
 def shutdown_event() -> None:
+    if catalog_sync_job_service is not None:
+        catalog_sync_job_service.close()
     if catalog_sync_service is not None:
         catalog_sync_service.close()
     close_database_pool()
@@ -87,6 +102,31 @@ def sync_catalog(x_vision_internal_secret: str | None = Header(default=None)) ->
     if image_search_service is not None:
         image_search_service.refresh_index_info()
     return response
+
+
+@app.post("/v1/admin/sync-catalog/jobs", response_model=SyncCatalogJobStartResponse)
+def start_sync_catalog_job(x_vision_internal_secret: str | None = Header(default=None)) -> SyncCatalogJobStartResponse:
+    _ensure_internal_secret(x_vision_internal_secret)
+    if catalog_sync_job_service is None:
+        raise HTTPException(status_code=503, detail="OpenCLIP model is not ready")
+    try:
+        return catalog_sync_job_service.start()
+    except CatalogSyncJobInProgressError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/v1/admin/sync-catalog/jobs/{job_id}", response_model=SyncCatalogJobStatusResponse)
+def get_sync_catalog_job(
+    job_id: str,
+    x_vision_internal_secret: str | None = Header(default=None),
+) -> SyncCatalogJobStatusResponse:
+    _ensure_internal_secret(x_vision_internal_secret)
+    if catalog_sync_job_service is None:
+        raise HTTPException(status_code=503, detail="OpenCLIP model is not ready")
+    try:
+        return catalog_sync_job_service.get(job_id)
+    except SyncCatalogJobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Sync catalog job not found") from exc
 
 
 @app.get("/v1/metrics", response_model=SearchMetricsResponse)
@@ -197,6 +237,11 @@ async def search_image(
         inferred_category=result.inferred_category,
         inferred_category_score=result.inferred_category_score,
         category_filter_applied=result.category_filter_applied,
+        returned_candidates=len(result.candidates),
+        grouped_candidates=result.grouped_candidate_count,
+        threshold_filtered_candidates=result.threshold_filtered_count,
+        top_score=result.top_score,
+        score_floor=result.score_floor,
     )
 
 

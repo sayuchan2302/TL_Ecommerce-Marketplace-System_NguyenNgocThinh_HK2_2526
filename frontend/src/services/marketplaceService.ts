@@ -72,6 +72,11 @@ export interface MarketplaceImageSearchData {
   inferredCategory?: string;
   inferredCategoryScore?: number;
   categoryFilterApplied?: string;
+  returnedCandidates?: number;
+  groupedCandidates?: number;
+  thresholdFilteredCandidates?: number;
+  topScore?: number;
+  scoreFloor?: number;
   matches?: MarketplaceImageSearchMatch[];
 }
 
@@ -207,6 +212,11 @@ interface MarketplaceImageSearchPayload {
   inferredCategory?: string;
   inferredCategoryScore?: number;
   categoryFilterApplied?: string;
+  returnedCandidates?: number;
+  groupedCandidates?: number;
+  thresholdFilteredCandidates?: number;
+  topScore?: number;
+  scoreFloor?: number;
   matches?: Array<{
     productId?: string;
     rank?: number;
@@ -664,6 +674,17 @@ export const marketplaceService = {
         ? Number(payload.inferredCategoryScore)
         : undefined,
       categoryFilterApplied: (payload.categoryFilterApplied || '').trim() || undefined,
+      returnedCandidates: Number.isFinite(payload.returnedCandidates)
+        ? Math.max(0, Number(payload.returnedCandidates))
+        : undefined,
+      groupedCandidates: Number.isFinite(payload.groupedCandidates)
+        ? Math.max(0, Number(payload.groupedCandidates))
+        : undefined,
+      thresholdFilteredCandidates: Number.isFinite(payload.thresholdFilteredCandidates)
+        ? Math.max(0, Number(payload.thresholdFilteredCandidates))
+        : undefined,
+      topScore: Number.isFinite(payload.topScore) ? Number(payload.topScore) : undefined,
+      scoreFloor: Number.isFinite(payload.scoreFloor) ? Number(payload.scoreFloor) : undefined,
       matches,
     };
   },

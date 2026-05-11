@@ -105,10 +105,17 @@ class MarketplacePublicServiceImageSearchTest {
                 "sync-2026-04-27",
                 "tat",
                 0.31,
-                "hard"
+                "hard",
+                3,
+                4,
+                1,
+                0.91,
+                0.42
         ));
-        when(productRepository.findPublicMarketplaceProductsByIds(List.of(secondId, staleId, firstId)))
+        when(productRepository.findPublicMarketplaceProductsByIdsWithImages(List.of(secondId, staleId, firstId)))
                 .thenReturn(List.of(first, second));
+        when(productVariantRepository.findByProductIdIn(List.of(firstId, secondId)))
+                .thenReturn(List.of());
         when(storeRepository.findAllById(any()))
                 .thenReturn(List.of(store));
 
@@ -129,6 +136,11 @@ class MarketplacePublicServiceImageSearchTest {
         assertEquals("tat", response.getInferredCategory());
         assertEquals(0.31, response.getInferredCategoryScore());
         assertEquals("hard", response.getCategoryFilterApplied());
+        assertEquals(3, response.getReturnedCandidates());
+        assertEquals(4, response.getGroupedCandidates());
+        assertEquals(1, response.getThresholdFilteredCandidates());
+        assertEquals(0.91, response.getTopScore());
+        assertEquals(0.42, response.getScoreFloor());
         assertNotNull(response.getMatches());
         assertEquals(2, response.getMatches().size());
         assertEquals(secondId, response.getMatches().get(0).getProductId());

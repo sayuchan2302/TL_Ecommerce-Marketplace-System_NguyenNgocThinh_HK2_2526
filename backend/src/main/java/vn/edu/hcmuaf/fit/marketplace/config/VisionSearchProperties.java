@@ -17,5 +17,8 @@ public class VisionSearchProperties {
     private int readTimeoutMs = 20000;
     private int maxCandidates = 120;
     private long maxUploadSizeBytes = 5_242_880L;
+    private boolean rateLimitEnabled = true;
+    private int rateLimitPerMinute = 6;
+    private int rateLimitPerHour = 30;
+    private boolean trustProxyHeaders = false;
 }
-
