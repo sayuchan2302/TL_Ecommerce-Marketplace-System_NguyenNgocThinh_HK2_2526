@@ -1,83 +1,152 @@
-# Fashion Marketplace
+# 🛍️ Fashion Marketplace
 
-Full-stack fashion marketplace with a Spring Boot backend, React frontend, PostgreSQL database, and optional OpenCLIP image search service.
+> Full-stack fashion marketplace built with **Spring Boot**, **React**, **PostgreSQL**, and an optional **OpenCLIP image search engine**.
 
-## Stack
+This project is prepared for a student thesis/demo flow and can be deployed as three services: backend API, frontend web app, and vision-engine.
 
-- Backend: Java 21, Spring Boot, Spring Security, Spring Data JPA, WebSocket
-- Frontend: React 19, TypeScript, Vite, Tailwind CSS
-- Database: PostgreSQL 16+
-- Image search: FastAPI, OpenCLIP, pgvector
+---
 
-## Project Layout
+## ✨ Highlights
+
+- 🛒 Marketplace flow: browse products, cart, checkout, orders, reviews, stores, vouchers, flash sale.
+- 🔐 Role-based system: customer, vendor, admin.
+- 🖼️ Image search with OpenCLIP + pgvector.
+- 🧠 Admin Image Vision dashboard with async catalog sync, sync history, health state, and metrics.
+- 🛡️ Safer image uploads with file signature and image size validation.
+- 🚦 Public image-search rate limit to reduce abuse.
+- 💳 VNPay and MoMo sandbox-ready payment configuration.
+- 🤖 Optional chatbot integration.
+
+---
+
+## 🧱 Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Java 21, Spring Boot 3.2, Spring Security, Spring Data JPA, WebSocket |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS |
+| Database | PostgreSQL 16+ |
+| Image Search | FastAPI, OpenCLIP, pgvector |
+| Docs/API | Swagger UI, Springdoc OpenAPI |
+
+---
+
+## 📁 Project Structure
 
 ```text
-backend/        Spring Boot API
-frontend/       React + Vite app
-vision-engine/  OpenCLIP image search service
+backend/        Spring Boot API and business logic
+frontend/       React + Vite web client
+vision-engine/  FastAPI OpenCLIP image-search service
 crawl/          Product crawler utilities
+docs/           Smoke-test and project notes
 ```
 
-## Setup
+---
 
-Requirements:
+## ✅ Requirements
 
 - Java 21
 - Node.js 20+
-- PostgreSQL 16+
+- PostgreSQL 16+ with pgvector extension available
+- Python 3.11+ for `vision-engine`
+- Optional: Docker, if running the vision service by compose
 
-Install frontend dependencies:
+---
 
-```bash
-npm ci --prefix frontend
+## ⚙️ Environment Setup
+
+Copy example env files:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+Copy-Item frontend/.env.example frontend/.env
+Copy-Item vision-engine/.env.local.example vision-engine/.env
 ```
 
-Create the database:
+Create local database:
 
 ```sql
 CREATE DATABASE marketplace_db;
 ```
 
-Copy env files:
+### 🔑 Backend `.env`
 
-```bash
-cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-cp vision-engine/.env.local.example vision-engine/.env
-```
-
-Stable backend config after initial setup:
+Keep these values stable after the first seed:
 
 ```env
 DB_URL=jdbc:postgresql://localhost:5432/marketplace_db
 DB_USERNAME=postgres
 DB_PASSWORD=your_password
 JPA_DDL_AUTO=update
-JWT_SECRET=your_long_random_secret
+JWT_SECRET=change_me_to_a_long_random_string_at_least_32_chars
 
 APP_SEED_ENABLED=false
 APP_SEED_GAP_ENABLED=false
 APP_SEED_GAP_CLEAN_BEFORE_IMPORT=false
+
+APP_VISION_ENABLED=true
+APP_VISION_BASE_URL=http://localhost:8001
 APP_VISION_INTERNAL_SECRET=vision-local-test-secret
+APP_VISION_RATE_LIMIT_ENABLED=true
 ```
 
-Frontend config:
+> ⚠️ Do not keep `JPA_DDL_AUTO=create-drop` after initial seeding, or product IDs and synced image embeddings will be reset.
+
+### 🌐 Frontend `.env`
 
 ```env
 VITE_API_URL=http://localhost:8080
 ```
 
-Vision config must use the same database and secret:
+### 🖼️ Vision Engine `.env`
 
 ```env
+MARKETPLACE_BASE_URL=http://localhost:8080
 VISION_DATABASE_URL=postgresql://postgres:your_password@localhost:5432/marketplace_db
 VISION_INTERNAL_SECRET=vision-local-test-secret
-MARKETPLACE_BASE_URL=http://localhost:8080
 ```
 
-## First Seed And Image Sync
+> 🔐 `APP_VISION_INTERNAL_SECRET` and `VISION_INTERNAL_SECRET` must match.
 
-Do this once for local development.
+---
+
+## 🚀 Local Development
+
+Install frontend dependencies:
+
+```powershell
+npm.cmd ci --prefix frontend
+```
+
+Install vision-engine dependencies once:
+
+```powershell
+.\vision-engine\scripts\install-local.ps1
+```
+
+Run backend:
+
+```powershell
+backend\mvnw.cmd -f backend/pom.xml spring-boot:run
+```
+
+Run frontend:
+
+```powershell
+npm.cmd run dev --prefix frontend
+```
+
+Run vision-engine:
+
+```powershell
+.\vision-engine\scripts\run-local.ps1
+```
+
+---
+
+## 🌱 First Seed + Image Sync
+
+Use this once for local demo data.
 
 1. Temporarily set in `backend/.env`:
 
@@ -88,7 +157,7 @@ APP_SEED_GAP_ENABLED=true
 APP_SEED_GAP_CLEAN_BEFORE_IMPORT=true
 ```
 
-2. Start backend and wait until seed + GAP import finish.
+2. Start backend and wait until seeding finishes.
 3. Start `vision-engine`.
 4. Sync OpenCLIP catalog:
 
@@ -99,7 +168,7 @@ Invoke-RestMethod `
   -Headers @{ "X-Vision-Internal-Secret" = "vision-local-test-secret" }
 ```
 
-5. Change `backend/.env` back to stable mode:
+5. Return backend to stable mode:
 
 ```env
 JPA_DDL_AUTO=update
@@ -108,62 +177,141 @@ APP_SEED_GAP_ENABLED=false
 APP_SEED_GAP_CLEAN_BEFORE_IMPORT=false
 ```
 
-After this, backend restarts keep product IDs stable. OpenCLIP only needs another sync when product/image data changes.
+After this, only sync again when product or image data changes.
 
-## Run
+---
 
-Backend:
+## 🧪 Verification
 
-```bash
-backend\mvnw.cmd -f backend/pom.xml spring-boot:run
-```
-
-Frontend:
-
-```bash
-npm run dev --prefix frontend
-```
-
-Vision engine:
+Backend tests:
 
 ```powershell
-./vision-engine/scripts/install-local.ps1
-./vision-engine/scripts/run-local.ps1
+backend\mvnw.cmd -f backend/pom.xml test
 ```
 
-## URLs
+Frontend build:
 
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:5173 |
-| Backend API | http://localhost:8080 |
-| Swagger | http://localhost:8080/swagger-ui.html |
-| Vision engine | http://localhost:8001 |
-
-## Checks
-
-```bash
-npm run lint --prefix frontend
-npm run build --prefix frontend
-npm run smoke --prefix frontend
+```powershell
+npm.cmd run build --prefix frontend
 ```
 
-Backend compile:
-
-```bash
-backend\mvnw.cmd -f backend/pom.xml -DskipTests compile
-```
-
-Vision test:
+Vision-engine tests:
 
 ```powershell
 $env:PYTHONDONTWRITEBYTECODE='1'
-vision-engine/.venv/Scripts/python.exe vision-engine/tests/test_catalog_sync.py
+vision-engine\.venv\Scripts\python.exe -m unittest discover -s vision-engine/tests -p "test_*.py"
 ```
 
-## Notes
+Frontend smoke regression:
 
-- Do not keep `create-drop` enabled after OpenCLIP sync unless you want to reset products and sync again.
-- If image search returns empty results after product changes, run the OpenCLIP sync command again.
-- Image Vision smoke checklist: `docs/vision-hardening-smoke-test.md`.
-- Full API docs are available in Swagger while backend is running.
+```powershell
+npm.cmd run smoke --prefix frontend
+```
+
+---
+
+## 🏭 Production Deployment Checklist
+
+### 1. Prepare
+
+- ✅ Run backend tests, frontend build, and vision-engine tests.
+- ✅ Set strong secrets for `JWT_SECRET`, `APP_VISION_INTERNAL_SECRET`, and `VISION_INTERNAL_SECRET`.
+- ✅ Keep `APP_SEED_ENABLED=false` and `APP_SEED_GAP_ENABLED=false`.
+- ✅ Keep `JPA_DDL_AUTO=update` for this solo/student deployment flow.
+- ✅ Configure payment return URLs for the real deployed frontend domain.
+- ✅ Point `VITE_API_URL` to the deployed backend URL.
+- ✅ Use persistent storage for `APP_UPLOAD_BASE_DIR`.
+
+### 2. Build
+
+Backend package:
+
+```powershell
+backend\mvnw.cmd -f backend/pom.xml clean package
+```
+
+Run packaged backend:
+
+```powershell
+java -jar backend\target\marketplace-1.0.0.jar
+```
+
+Frontend production build:
+
+```powershell
+npm.cmd run build --prefix frontend
+```
+
+Deploy the generated static files from:
+
+```text
+frontend/dist/
+```
+
+Vision-engine Docker option:
+
+```powershell
+docker compose -f docker-compose.vision.yml up -d --build
+```
+
+### 3. Deploy Services
+
+Recommended service order:
+
+1. PostgreSQL database
+2. Backend API
+3. Vision-engine
+4. Frontend static site
+5. Admin image catalog sync
+
+### 4. Smoke Test
+
+Replace `localhost` with real deployed domains when testing production.
+
+- Backend health: `http://localhost:8080/actuator/health`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Vision health: `http://localhost:8001/health`
+- Vision readiness: `http://localhost:8001/ready`
+- Frontend: `http://localhost:5173`
+- Admin Image Vision checklist: `docs/vision-hardening-smoke-test.md`
+
+### 5. Rollback Notes
+
+- Keep a database backup before production deployment.
+- Keep previous backend jar or container image.
+- If image search fails, disable it temporarily with `APP_VISION_ENABLED=false`; marketplace browsing still works.
+- If seeded data is already synced, never switch production back to `create-drop`.
+
+---
+
+## 🔗 Useful URLs
+
+| Service | Local URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Backend API | http://localhost:8080 |
+| Swagger UI | http://localhost:8080/swagger-ui.html |
+| Backend Health | http://localhost:8080/actuator/health |
+| Vision Engine | http://localhost:8001 |
+| Vision Health | http://localhost:8001/health |
+
+---
+
+## 📌 Project Notes
+
+- Image search requires `vision-engine`, OpenCLIP model files, and pgvector-backed embeddings.
+- Public image search is rate-limited by user ID or IP address.
+- Product image upload rejects fake image files and oversized images.
+- Admin catalog sync is async and persists history in PostgreSQL.
+- Full API details are available in Swagger while backend is running.
+
+---
+
+## 🎓 Thesis Demo Flow
+
+1. Login as admin and verify dashboard.
+2. Run Image Vision catalog sync.
+3. Search products by uploaded image.
+4. Browse product details and add to cart.
+5. Checkout with sandbox payment configuration.
+6. Show vendor/admin management screens and sync history.
