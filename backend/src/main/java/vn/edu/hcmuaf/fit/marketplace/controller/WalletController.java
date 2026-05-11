@@ -1,10 +1,12 @@
 package vn.edu.hcmuaf.fit.marketplace.controller;
 
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import vn.edu.hcmuaf.fit.marketplace.dto.request.PayoutRequestCreateRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.PayoutRequestResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.WalletResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.WalletTransactionResponse;
@@ -97,16 +99,17 @@ public class WalletController {
     @PreAuthorize("hasRole('VENDOR')")
     public ResponseEntity<PayoutRequestResponse> createPayoutRequest(
             @RequestHeader("Authorization") String authHeader,
-            @RequestBody Map<String, String> payload
+            @Valid @RequestBody PayoutRequestCreateRequest requestBody
     ) {
         UserContext ctx = authContext.requireVendor(authHeader);
-        BigDecimal amount = new BigDecimal(payload.get("amount"));
-        String bankAccountName = payload.get("bankAccountName");
-        String bankAccountNumber = payload.get("bankAccountNumber");
-        String bankName = payload.get("bankName");
 
         PayoutRequest request = walletService.createPayoutRequest(
-                ctx.getStoreId(), amount, bankAccountName, bankAccountNumber, bankName);
+                ctx.getStoreId(),
+                requestBody.getAmount(),
+                requestBody.getBankAccountName(),
+                requestBody.getBankAccountNumber(),
+                requestBody.getBankName()
+        );
 
         return ResponseEntity.ok(toPayoutResponse(request));
     }

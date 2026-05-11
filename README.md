@@ -79,6 +79,9 @@ DB_USERNAME=postgres
 DB_PASSWORD=your_password
 JPA_DDL_AUTO=update
 JWT_SECRET=change_me_to_a_long_random_string_at_least_32_chars
+APP_CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+APP_SWAGGER_ENABLED=false
+APP_ACTUATOR_EXPOSURE=health
 
 APP_SEED_ENABLED=false
 APP_SEED_GAP_ENABLED=false
@@ -96,11 +99,15 @@ APP_VISION_RATE_LIMIT_ENABLED=true
 
 ```env
 VITE_API_URL=http://localhost:8080
+VITE_ENABLE_ORDER_SEED_DATA=false
+VITE_ENABLE_ORDER_LOCAL_CACHE=false
 ```
 
 ### 🖼️ Vision Engine `.env`
 
 ```env
+APP_NAME=vision-engine
+ENVIRONMENT=development
 MARKETPLACE_BASE_URL=http://localhost:8080
 VISION_DATABASE_URL=postgresql://postgres:your_password@localhost:5432/marketplace_db
 VISION_INTERNAL_SECRET=vision-local-test-secret
@@ -216,6 +223,9 @@ npm.cmd run smoke --prefix frontend
 
 - ✅ Run backend tests, frontend build, and vision-engine tests.
 - ✅ Set strong secrets for `JWT_SECRET`, `APP_VISION_INTERNAL_SECRET`, and `VISION_INTERNAL_SECRET`.
+- ✅ Set `APP_CORS_ALLOWED_ORIGINS` to the deployed frontend domain, not `*`.
+- ✅ Keep `APP_SWAGGER_ENABLED=false` in public production; enable only for local/staging when needed.
+- ✅ Keep `APP_ACTUATOR_EXPOSURE=health` unless the app is behind trusted internal access.
 - ✅ Keep `APP_SEED_ENABLED=false` and `APP_SEED_GAP_ENABLED=false`.
 - ✅ Keep `JPA_DDL_AUTO=update` for this solo/student deployment flow.
 - ✅ Configure payment return URLs for the real deployed frontend domain.
@@ -269,7 +279,7 @@ Recommended service order:
 Replace `localhost` with real deployed domains when testing production.
 
 - Backend health: `http://localhost:8080/actuator/health`
-- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Swagger UI, local/staging only with `APP_SWAGGER_ENABLED=true`: `http://localhost:8080/swagger-ui.html`
 - Vision health: `http://localhost:8001/health`
 - Vision readiness: `http://localhost:8001/ready`
 - Frontend: `http://localhost:5173`
@@ -290,7 +300,7 @@ Replace `localhost` with real deployed domains when testing production.
 |---|---|
 | Frontend | http://localhost:5173 |
 | Backend API | http://localhost:8080 |
-| Swagger UI | http://localhost:8080/swagger-ui.html |
+| Swagger UI | http://localhost:8080/swagger-ui.html, only when `APP_SWAGGER_ENABLED=true` |
 | Backend Health | http://localhost:8080/actuator/health |
 | Vision Engine | http://localhost:8001 |
 | Vision Health | http://localhost:8001/health |
@@ -303,7 +313,7 @@ Replace `localhost` with real deployed domains when testing production.
 - Public image search is rate-limited by user ID or IP address.
 - Product image upload rejects fake image files and oversized images.
 - Admin catalog sync is async and persists history in PostgreSQL.
-- Full API details are available in Swagger while backend is running.
+- Swagger/OpenAPI is disabled by default for public production and should be enabled only for local or staging checks.
 
 ---
 

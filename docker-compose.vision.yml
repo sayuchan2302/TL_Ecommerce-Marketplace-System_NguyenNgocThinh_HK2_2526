@@ -6,7 +6,7 @@ services:
     env_file:
       - ./vision-engine/.env
     ports:
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

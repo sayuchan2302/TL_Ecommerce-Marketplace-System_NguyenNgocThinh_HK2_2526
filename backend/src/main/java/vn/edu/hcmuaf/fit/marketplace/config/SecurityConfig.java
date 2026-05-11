@@ -26,7 +26,9 @@ import vn.edu.hcmuaf.fit.marketplace.security.ImageSearchRateLimitFilter;
 import vn.edu.hcmuaf.fit.marketplace.security.JwtAuthenticationFilter;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 
 @Configuration
 @EnableWebSecurity
@@ -36,14 +38,17 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final ImageSearchRateLimitFilter imageSearchRateLimitFilter;
     private final ObjectMapper objectMapper;
+    private final AppSecurityProperties securityProperties;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
             ImageSearchRateLimitFilter imageSearchRateLimitFilter,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            AppSecurityProperties securityProperties) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.imageSearchRateLimitFilter = imageSearchRateLimitFilter;
         this.objectMapper = objectMapper;
+        this.securityProperties = securityProperties;
     }
 
     @Bean
@@ -90,8 +95,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/bot/token").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/api/bot/token").permitAll()
                         .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").hasRole("SUPER_ADMIN")
+                        .requestMatchers("/actuator/**").hasRole("SUPER_ADMIN")
                         
                         // ─── Commission Tiers: public read, admin write ──────────────────────
                         .requestMatchers(HttpMethod.GET, "/api/commission-tiers").permitAll()
@@ -191,10 +197,20 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // DEV: allow all origins for Postman/Thunder Client/curl testing
-        configuration.setAllowedOriginPatterns(List.of("*"));
+        List<String> allowedOriginPatterns = cleanList(securityProperties.getCorsAllowedOriginPatterns());
+        if (allowedOriginPatterns.isEmpty()) {
+            configuration.setAllowedOrigins(cleanList(securityProperties.getCorsAllowedOrigins()));
+        } else {
+            configuration.setAllowedOriginPatterns(allowedOriginPatterns);
+        }
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "Accept",
+                "Origin",
+                "X-Requested-With"
+        ));
         configuration.setExposedHeaders(List.of("Authorization"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
@@ -224,5 +240,16 @@ public class SecurityConfig {
         response.setContentType("application/json;charset=UTF-8");
         ApiErrorResponse body = ApiErrorResponse.of(status, message, path);
         objectMapper.writeValue(response.getWriter(), body);
+    }
+
+    private List<String> cleanList(Collection<String> values) {
+        if (values == null) {
+            return List.of();
+        }
+        return values.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .toList();
     }
 }
