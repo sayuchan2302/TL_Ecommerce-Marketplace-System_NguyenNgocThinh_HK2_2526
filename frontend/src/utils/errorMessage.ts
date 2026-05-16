@@ -81,7 +81,7 @@ export const getReasonToast = (
   reason?: string | null,
 ): { message: string; type: 'success' | 'error' | 'info' } | null => {
   if ((reason || '').toLowerCase() === 'password-reset-success') {
-    return { message: 'Dat lai mat khau thanh cong. Vui long dang nhap lai.', type: 'success' };
+    return { message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.', type: 'success' };
   }
 
   const message = getReasonToastMessage(reason);
