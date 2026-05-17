@@ -18,6 +18,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByEmailIgnoreCase(String email);
 
+    Optional<User> findByGoogleSubject(String googleSubject);
+
     boolean existsByEmail(String email);
 
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.cart WHERE u.id = :id")

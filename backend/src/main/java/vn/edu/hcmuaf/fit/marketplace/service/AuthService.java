@@ -2,6 +2,7 @@ package vn.edu.hcmuaf.fit.marketplace.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -10,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import vn.edu.hcmuaf.fit.marketplace.dto.request.GoogleLoginRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.LoginRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.RegisterRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.AuthResponse;
@@ -19,6 +22,10 @@ import vn.edu.hcmuaf.fit.marketplace.entity.User;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.UserRepository;
 import vn.edu.hcmuaf.fit.marketplace.security.JwtService;
+
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.Objects;
 
 @Service
 public class AuthService {
@@ -31,16 +38,20 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final UserDetailsService userDetailsService;
     private final StoreRepository storeRepository;
+    private final GoogleIdTokenVerifier googleIdTokenVerifier;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
                        JwtService jwtService, AuthenticationManager authenticationManager,
-                       UserDetailsService userDetailsService, StoreRepository storeRepository) {
+                       UserDetailsService userDetailsService, StoreRepository storeRepository,
+                       GoogleIdTokenVerifier googleIdTokenVerifier) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.authenticationManager = authenticationManager;
         this.userDetailsService = userDetailsService;
         this.storeRepository = storeRepository;
+        this.googleIdTokenVerifier = googleIdTokenVerifier;
     }
 
     @Transactional
@@ -68,16 +79,7 @@ public class AuthService {
 
         userRepository.save(user);
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
-        String token = jwtService.generateTokenWithUserContext(
-                user.getId().toString(),
-                user.getRole().name(),
-                user.getStoreId() != null ? user.getStoreId().toString() : null,
-                userDetails
-        );
-        String refreshToken = jwtService.generateRefreshToken(userDetails);
-
-        return buildAuthResponse(user, token, refreshToken);
+        return issueAuthResponse(user);
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -93,16 +95,19 @@ public class AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
-        String token = jwtService.generateTokenWithUserContext(
-                user.getId().toString(),
-                user.getRole().name(),
-                user.getStoreId() != null ? user.getStoreId().toString() : null,
-                userDetails
-        );
-        String refreshToken = jwtService.generateRefreshToken(userDetails);
+        return issueAuthResponse(user);
+    }
 
-        return buildAuthResponse(user, token, refreshToken);
+    @Transactional
+    public AuthResponse loginWithGoogle(GoogleLoginRequest request) {
+        GoogleUserInfo googleUser = googleIdTokenVerifier.verify(request.getCredential());
+        User user = resolveGoogleUser(googleUser);
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is inactive");
+        }
+
+        return issueAuthResponse(user);
     }
 
     public AuthResponse refreshToken(String refreshToken) {
@@ -140,6 +145,86 @@ public class AuthService {
         }
     }
 
+    private User resolveGoogleUser(GoogleUserInfo googleUser) {
+        return userRepository.findByGoogleSubject(googleUser.subject())
+                .map(user -> resolveLinkedGoogleUser(user, googleUser))
+                .orElseGet(() -> resolveByGoogleEmail(googleUser));
+    }
+
+    private User resolveLinkedGoogleUser(User user, GoogleUserInfo googleUser) {
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is inactive");
+        }
+        userRepository.findByEmailIgnoreCase(googleUser.email())
+                .filter(other -> !Objects.equals(other.getId(), user.getId()))
+                .ifPresent(other -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Google account is linked to another user");
+                });
+        return applyGoogleProfileIfNeeded(user, googleUser, false);
+    }
+
+    private User resolveByGoogleEmail(GoogleUserInfo googleUser) {
+        return userRepository.findByEmailIgnoreCase(googleUser.email())
+                .map(user -> linkExistingUser(user, googleUser))
+                .orElseGet(() -> createGoogleUser(googleUser));
+    }
+
+    private User linkExistingUser(User user, GoogleUserInfo googleUser) {
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is inactive");
+        }
+        if (hasText(user.getGoogleSubject()) && !user.getGoogleSubject().equals(googleUser.subject())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email is linked to another Google account");
+        }
+
+        boolean changed = !Objects.equals(user.getGoogleSubject(), googleUser.subject());
+        user.setGoogleSubject(googleUser.subject());
+        return applyGoogleProfileIfNeeded(user, googleUser, changed);
+    }
+
+    private User createGoogleUser(GoogleUserInfo googleUser) {
+        User user = User.builder()
+                .email(googleUser.email())
+                .googleSubject(googleUser.subject())
+                .password(generateRandomPasswordHash())
+                .name(defaultGoogleName(googleUser))
+                .avatar(null)
+                .role(User.Role.CUSTOMER)
+                .gender(User.Gender.OTHER)
+                .loyaltyPoints(0L)
+                .isActive(true)
+                .build();
+
+        Cart cart = Cart.builder()
+                .user(user)
+                .build();
+        user.setCart(cart);
+
+        return userRepository.save(user);
+    }
+
+    private User applyGoogleProfileIfNeeded(User user, GoogleUserInfo googleUser, boolean changed) {
+        // Avatar is displayed as initials, no need to update from Google
+        if (!hasText(user.getName()) && hasText(googleUser.name())) {
+            user.setName(googleUser.name());
+            changed = true;
+        }
+        return changed ? userRepository.save(user) : user;
+    }
+
+    private AuthResponse issueAuthResponse(User user) {
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        String token = jwtService.generateTokenWithUserContext(
+                user.getId().toString(),
+                user.getRole().name(),
+                user.getStoreId() != null ? user.getStoreId().toString() : null,
+                userDetails
+        );
+        String refreshToken = jwtService.generateRefreshToken(userDetails);
+
+        return buildAuthResponse(user, token, refreshToken);
+    }
+
     private AuthResponse buildAuthResponse(User user, String token, String refreshToken) {
         boolean approvedVendor = false;
         if (user.getStoreId() != null) {
@@ -154,9 +239,30 @@ public class AuthService {
                 .refreshToken(refreshToken)
                 .email(user.getEmail())
                 .name(user.getName())
+                .avatar(user.getAvatar())
                 .role(user.getRole().name())
                 .storeId(user.getStoreId())
                 .approvedVendor(approvedVendor)
                 .build();
     }
+
+    private String generateRandomPasswordHash() {
+        byte[] bytes = new byte[32];
+        secureRandom.nextBytes(bytes);
+        String randomSecret = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        return passwordEncoder.encode(randomSecret);
+    }
+
+    private String defaultGoogleName(GoogleUserInfo googleUser) {
+        if (hasText(googleUser.name())) {
+            return googleUser.name();
+        }
+        int atIndex = googleUser.email().indexOf('@');
+        return atIndex > 0 ? googleUser.email().substring(0, atIndex) : googleUser.email();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
 }

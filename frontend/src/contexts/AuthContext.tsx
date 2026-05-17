@@ -9,6 +9,7 @@ interface AuthContextValue {
   token: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string) => Promise<void>;
   refreshSession: (next: AuthResponse) => void;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: (reason?: string) => void;
@@ -62,6 +63,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setSession(res);
   }, []);
 
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    const res = await authService.loginWithGoogle(credential);
+    setSession(res);
+  }, []);
+
   const refreshSession = useCallback((next: AuthResponse) => {
     setSession(next);
   }, []);
@@ -83,11 +89,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       token: session?.token || null,
       isAuthenticated: Boolean(session?.token),
       login,
+      loginWithGoogle,
       refreshSession,
       register,
       logout,
     }),
-    [session, login, refreshSession, register, logout],
+    [session, login, loginWithGoogle, refreshSession, register, logout],
   );
 
   return (

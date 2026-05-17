@@ -5,11 +5,12 @@ import './Auth.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { getReasonToast, getUiErrorMessage } from '../../utils/errorMessage';
+import GoogleLoginButton from './GoogleLoginButton';
 
 const handledReasonKeys = new Set<string>();
 
 const Login = () => {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,6 +19,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const redirectTo = useMemo(() => {
     const query = new URLSearchParams(location.search);
@@ -80,6 +82,19 @@ const Login = () => {
     }
   };
 
+  const handleGoogleCredential = async (credential: string) => {
+    try {
+      setGoogleLoading(true);
+      await loginWithGoogle(credential);
+      addToast('Đăng nhập Google thành công', 'success');
+      navigate(redirectTo, { replace: true });
+    } catch (error: unknown) {
+      addToast(getUiErrorMessage(error, 'Đăng nhập Google thất bại'), 'error');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <div className="auth-page">
       <div className="auth-card">
@@ -125,6 +140,10 @@ const Login = () => {
             <button type="submit" className="auth-btn" disabled={loading}>
               {loading ? <><Loader2 size={18} className="auth-spinner" /> Đang đăng nhập...</> : 'Đăng nhập'}
             </button>
+            <div className="auth-divider">
+              <span>Hoặc tiếp tục với</span>
+            </div>
+            <GoogleLoginButton disabled={loading || googleLoading} onCredential={handleGoogleCredential} />
             <div className="auth-secondary">
               Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link>
             </div>

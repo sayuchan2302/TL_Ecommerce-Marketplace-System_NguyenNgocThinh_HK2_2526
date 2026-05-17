@@ -14,6 +14,7 @@ interface BackendAuthResponse {
   refreshToken?: string;
   email?: string;
   name?: string;
+  avatar?: string;
   role?: string;
   storeId?: string;
   approvedVendor?: boolean;
@@ -88,6 +89,7 @@ const mapBackendAuthResponse = (payload: BackendAuthResponse): AuthResponse => {
     : 'CUSTOMER';
   const name = payload.name?.trim() || payload.email?.split('@')[0] || 'User';
   const email = payload.email?.trim() || String(claims?.sub || '');
+  const avatar = payload.avatar?.trim() || getInitials(name);
   const userId = typeof claims?.userId === 'string' ? claims.userId : `u_${Date.now()}`;
 
   return {
@@ -97,7 +99,7 @@ const mapBackendAuthResponse = (payload: BackendAuthResponse): AuthResponse => {
       id: userId,
       name,
       email,
-      avatar: getInitials(name),
+      avatar,
       role,
       storeId: payload.storeId,
       isApprovedVendor: payload.approvedVendor ?? (role === 'VENDOR'),
@@ -129,6 +131,33 @@ const loginWithBackend = async (email: string, password: string): Promise<AuthRe
       throw error;
     }
     throw new Error('Dang nhap that bai');
+  }
+};
+
+const loginWithGoogleBackend = async (credential: string): Promise<AuthResponse | null> => {
+  if (!API_BASE) {
+    throw new Error('VITE_API_URL is empty. Please configure backend API URL.');
+  }
+
+  try {
+    const response = await fetch(buildApiUrl('/api/auth/google'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential }),
+    });
+
+    if (!response.ok) {
+      const message = await parseBackendError(response);
+      throw new Error(message);
+    }
+
+    const payload = await parseJsonSafely<BackendAuthResponse>(response);
+    return payload?.token ? mapBackendAuthResponse(payload) : null;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Đăng nhập Google thất bại');
   }
 };
 
@@ -282,6 +311,22 @@ export const authService = {
     const backendSession = await loginWithBackend(email, password);
     if (!backendSession) {
       throw new Error('Dang nhap that bai. Vui long kiem tra lai tai khoan/mat khau.');
+    }
+    persist(backendSession);
+    if (backendSession.user.role === 'VENDOR' || backendSession.user.role === 'SUPER_ADMIN') {
+      persistAdmin(backendSession);
+    }
+    return backendSession;
+  },
+
+  async loginWithGoogle(credential: string): Promise<AuthResponse> {
+    if (!credential) {
+      throw new Error('Thiếu mã xác thực Google');
+    }
+
+    const backendSession = await loginWithGoogleBackend(credential);
+    if (!backendSession) {
+      throw new Error('Đăng nhập Google thất bại. Vui lòng thử lại.');
     }
     persist(backendSession);
     if (backendSession.user.role === 'VENDOR' || backendSession.user.role === 'SUPER_ADMIN') {

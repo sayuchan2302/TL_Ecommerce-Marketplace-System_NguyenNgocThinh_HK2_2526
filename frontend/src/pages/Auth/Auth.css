@@ -65,6 +65,37 @@
   margin-top: 8px;
 }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.google-login-slot {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.google-login-slot > div {
+  width: min(100%, 360px);
+}
+
+.google-login-slot.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .auth-btn {
   width: 100%;
   padding: 12px 14px;
