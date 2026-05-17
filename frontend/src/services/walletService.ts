@@ -5,6 +5,7 @@ export interface VendorWallet {
   storeId: string;
   storeName: string;
   storeSlug: string | null;
+  storeLogo: string | null;
   availableBalance: number;
   frozenBalance: number;
   reservedBalance: number;

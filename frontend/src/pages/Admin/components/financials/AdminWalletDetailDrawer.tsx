@@ -1,7 +1,8 @@
-import { ArrowUpRight, WalletCards, X } from 'lucide-react';
+import { ArrowUpRight, ExternalLink, WalletCards, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import Drawer from '../../../../components/Drawer/Drawer';
 import type { VendorWallet } from '../../../../services/walletService';
-import { formatCurrency, toStoreRef } from './adminFinancialPresentation';
+import { formatCurrency } from './adminFinancialPresentation';
 
 type Props = {
   record: VendorWallet | null;
@@ -25,19 +26,38 @@ const AdminWalletDetailDrawer = ({ record, onClose, onOpenReleaseConfirm }: Prop
 
         <div className="drawer-body">
           <section className="drawer-section">
-            <h4>Tổng quan ví điện tử</h4>
+            <h4>Thông tin gian hàng</h4>
             <div className="financial-drawer-hero">
               <div className="financial-avatar">
                 <WalletCards size={22} />
               </div>
-              <div>
-                <div className="admin-bold">Store: {toStoreRef(record)}</div>
-                <div className="admin-muted">{record.storeName}</div>
+              <div style={{ flex: 1 }}>
+                <div className="admin-bold">{record.storeName}</div>
+                {record.storeSlug && (
+                  <div className="admin-muted">@{record.storeSlug}</div>
+                )}
               </div>
+              <Link
+                to={`/admin/stores?search=${record.storeId}`}
+                className="admin-ghost-btn"
+                style={{ gap: 4, padding: '6px 10px' }}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ExternalLink size={14} />
+                Xem gian hàng
+              </Link>
+            </div>
+          </section>
+
+          <section className="drawer-section">
+            <h4>Trạng thái ví</h4>
+            <div className="financial-drawer-hero">
               <span
                 className={`admin-pill ${
                   record.reservedBalance > 0 ? 'pending' : record.availableBalance > 0 ? 'success' : 'neutral'
                 }`}
+                style={{ fontSize: 14, padding: '8px 14px' }}
               >
                 {record.reservedBalance > 0
                   ? 'Chờ duyệt rút'
@@ -45,31 +65,48 @@ const AdminWalletDetailDrawer = ({ record, onClose, onOpenReleaseConfirm }: Prop
                     ? 'Có thể rút'
                     : 'Trống'}
               </span>
+              {record.reservedBalance > 0 && (
+                <div className="admin-muted" style={{ fontSize: 13 }}>
+                  {formatCurrency(record.reservedBalance)} đang chờ duyệt rút
+                </div>
+              )}
             </div>
           </section>
 
           <section className="drawer-section">
-            <h4>Bảng tóm tắt ví</h4>
+            <h4>Số dư ví</h4>
             <div className="financial-signal-grid">
               <div className="financial-signal-card">
                 <span className="admin-muted small">Khả dụng</span>
-                <strong style={{ color: '#0d9488' }}>{formatCurrency(record.availableBalance)}</strong>
+                <strong style={{ color: '#0d9488', fontSize: 18 }}>{formatCurrency(record.availableBalance)}</strong>
               </div>
               <div className="financial-signal-card">
                 <span className="admin-muted small">Đóng băng</span>
-                <strong style={{ color: '#d97706' }}>{formatCurrency(record.frozenBalance)}</strong>
+                <strong style={{ color: '#d97706', fontSize: 18 }}>{formatCurrency(record.frozenBalance)}</strong>
               </div>
               <div className="financial-signal-card">
                 <span className="admin-muted small">Chờ duyệt rút</span>
-                <strong style={{ color: '#0f766e' }}>{formatCurrency(record.reservedBalance)}</strong>
+                <strong style={{ color: '#0f766e', fontSize: 18 }}>{formatCurrency(record.reservedBalance)}</strong>
               </div>
               <div className="financial-signal-card">
                 <span className="admin-muted small">Tổng</span>
-                <strong>{formatCurrency(record.totalBalance)}</strong>
+                <strong style={{ fontSize: 18 }}>{formatCurrency(record.totalBalance)}</strong>
               </div>
+            </div>
+          </section>
+
+          <section className="drawer-section">
+            <h4>Thông tin cập nhật</h4>
+            <div className="financial-signal-grid" style={{ gridTemplateColumns: '1fr' }}>
               <div className="financial-signal-card">
-                <span className="admin-muted small">Cập nhật lúc</span>
-                <strong>{new Date(record.lastUpdated).toLocaleString('vi-VN')}</strong>
+                <span className="admin-muted small">Cập nhật lần cuối</span>
+                <strong>{new Date(record.lastUpdated).toLocaleString('vi-VN', { 
+                  day: '2-digit', 
+                  month: '2-digit', 
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</strong>
               </div>
             </div>
           </section>

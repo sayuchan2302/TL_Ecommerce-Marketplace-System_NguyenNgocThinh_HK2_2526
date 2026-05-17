@@ -29,6 +29,7 @@ interface GoogleAccountsId {
       locale?: string;
     },
   ) => void;
+  prompt?: () => void;
 }
 
 declare global {

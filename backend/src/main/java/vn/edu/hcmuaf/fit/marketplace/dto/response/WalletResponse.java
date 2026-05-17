@@ -14,6 +14,7 @@ public class WalletResponse {
     private UUID storeId;
     private String storeName;
     private String storeSlug;
+    private String storeLogo;
     private BigDecimal availableBalance;
     private BigDecimal frozenBalance;
     private BigDecimal reservedBalance;

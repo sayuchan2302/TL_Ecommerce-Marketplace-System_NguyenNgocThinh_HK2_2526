@@ -76,6 +76,7 @@
   background: #f8fafc;
   border-left: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: -18px 0 42px rgba(15, 23, 42, 0.18);
+  overflow-x: hidden;
 }
 
 .store-drawer .drawer-header {
@@ -94,6 +95,7 @@
 .store-drawer .drawer-body {
   padding: 16px 16px 18px;
   gap: 12px;
+  overflow-x: hidden;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(248, 250, 252, 1) 100%);
 }

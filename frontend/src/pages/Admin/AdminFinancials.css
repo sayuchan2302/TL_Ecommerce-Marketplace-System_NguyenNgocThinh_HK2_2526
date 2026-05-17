@@ -32,23 +32,40 @@
   min-width: 0;
 }
 
-.financial-store-cell {
-  display: flex;
+.store-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
+}
+
+.store-copy {
+  min-width: 0;
+  display: flex;
   flex-direction: column;
   gap: 3px;
 }
 
-.financial-store-cell .admin-bold,
-.financial-store-ref {
+.store-copy .admin-bold,
+.store-copy .admin-muted {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.financial-store-ref {
-  display: block;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+.store-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--co-admin-text);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .financial-money {
@@ -84,6 +101,11 @@
 .financial-drawer {
   width: min(680px, 100vw);
   max-width: 680px;
+  overflow-x: hidden;
+}
+
+.financial-drawer .drawer-body {
+  overflow-x: hidden;
 }
 
 .financial-drawer-hero {

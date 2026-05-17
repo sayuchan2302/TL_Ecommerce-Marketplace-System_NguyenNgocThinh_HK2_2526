@@ -17,6 +17,7 @@ import {
 } from '../../components/Panel/PanelPrimitives';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { adminReviewService, type Review, type ReviewStatus } from './adminReviewService';
+import { listAdminOrders } from './adminOrderService';
 import AdminConfirmDialog from './AdminConfirmDialog';
 import Drawer from '../../components/Drawer/Drawer';
 import { toDisplayOrderCode } from '../../utils/displayCode';
@@ -35,8 +36,8 @@ const ReviewStatusBadge = ({ status }: { status?: ReviewStatus | string | null }
   return <span className={pillClass}>{label}</span>;
 };
 
-const RatingStars = ({ rating, size = 14 }: { rating: number; size?: number }) => (
-  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+const RatingStars = ({ rating, size = 13 }: { rating: number; size?: number }) => (
+  <div className="review-rating-stars">
     {[1, 2, 3, 4, 5].map((star) => (
       <Star
         key={star}
@@ -75,16 +76,9 @@ const formatDateTime = (iso?: string | null) => {
   });
 };
 
-const getInitials = (name: string) => {
-  const parts = name.trim().split(' ').filter(Boolean);
-  if (parts.length === 0) return 'NA';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-};
-
 const AdminReviews = () => {
   const { toast, pushToast } = useAdminToast();
-  const [allReviews, setAllReviews] = useState<Review[]>([]);
+  const [allReviews, setAllReviews] = useState<(Review & { productMeta?: string })[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [drawerReview, setDrawerReview] = useState<Review | null>(null);
@@ -96,8 +90,23 @@ const AdminReviews = () => {
     const fetchReviews = async () => {
       setIsLoading(true);
       try {
-        const res = await adminReviewService.getAll({ size: 1000 });
-        if (active) setAllReviews(res.content);
+        const [res, orders] = await Promise.all([
+          adminReviewService.getAll({ size: 1000 }),
+          listAdminOrders(),
+        ]);
+        
+        const orderMap = new Map(orders.map((o) => [o.code, o]));
+        
+        const enhanced = (res.content || []).map((review) => {
+          const order = orderMap.get(review.orderCode || '');
+          const matchingItem = order?.items.find((item) => item.name === review.productName);
+          return {
+            ...review,
+            productMeta: matchingItem?.size || 'Chưa có biến thể',
+          };
+        });
+
+        if (active) setAllReviews(enhanced);
       } catch {
         if (active) pushToast('Không tải được đánh giá.');
       } finally {
@@ -143,7 +152,7 @@ const AdminReviews = () => {
     totalPages,
     startIndex,
     endIndex,
-  } = useAdminListState<Review>({
+  } = useAdminListState<Review & { productMeta?: string }>({
     items: filteredByStatus,
     pageSize: 8,
     searchValue: view.search,
@@ -318,7 +327,7 @@ const AdminReviews = () => {
             />
           ) : (
             <>
-              <div className="admin-table admin-responsive-table" role="table" aria-label="Bảng đánh giá">
+              <div className="admin-table admin-responsive-table admin-reviews-table" role="table" aria-label="Bảng đánh giá">
                 <div className="admin-table-row admin-table-head reviews" role="row">
                   <div role="columnheader">
                     <input
@@ -332,7 +341,7 @@ const AdminReviews = () => {
                   <div role="columnheader">STT</div>
                   <div role="columnheader">Sản phẩm</div>
                   <div role="columnheader">Khách hàng</div>
-                  <div role="columnheader">Đánh giá</div>
+                  <div role="columnheader">Sao</div>
                   <div role="columnheader">Ngày</div>
                   <div role="columnheader">Trạng thái</div>
                   <div role="columnheader" style={{ textAlign: 'right', paddingRight: '12px' }}>
@@ -364,22 +373,20 @@ const AdminReviews = () => {
                     <div role="cell" className="admin-mono">
                       {startIndex + index}
                     </div>
-                    <div role="cell">
-                      <div className="admin-customer">
-                        <img src={review.productImage} alt={review.productName} />
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span className="admin-bold">{review.productName}</span>
-                        </div>
+                    <div role="cell" className="order-product-cell">
+                      <img src={review.productImage} alt={review.productName} className="order-product-thumb" />
+                      <div className="order-product-copy">
+                        <p className="admin-bold order-product-name">{review.productName}</p>
+                        <p className="admin-muted order-product-meta">{review.productMeta}</p>
                       </div>
                     </div>
                     <div role="cell" className="customer-info-cell">
-                      <div className="customer-avatar initials">{getInitials(review.customerName)}</div>
                       <div className="customer-text">
                         <p className="admin-bold customer-name">{review.customerName}</p>
                         <p className="admin-muted customer-email">{review.customerEmail}</p>
                       </div>
                     </div>
-                    <div role="cell">
+                    <div role="cell" className="review-rating-cell">
                       <RatingStars rating={review.rating} />
                     </div>
                     <div role="cell" className="order-date admin-muted">

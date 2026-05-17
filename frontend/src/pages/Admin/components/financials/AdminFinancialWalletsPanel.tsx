@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { CheckCircle2, Eye } from 'lucide-react';
+import { CheckCircle2, Eye, Store } from 'lucide-react';
 import { AdminStateBlock } from '../../AdminStateBlocks';
 import { PanelTableFooter } from '../../../../components/Panel/PanelPrimitives';
 import type { VendorWallet } from '../../../../services/walletService';
@@ -123,9 +123,14 @@ const AdminFinancialWalletsPanel = ({
               <div role="cell" className="admin-mono">
                 {(page - 1) * PAGE_SIZE + index + 1}
               </div>
-              <div role="cell" className="financial-store-cell">
-                <div className="admin-bold">{record.storeName}</div>
-                <small className="admin-muted financial-store-ref">{toStoreRef(record)}</small>
+              <div role="cell" className="store-cell">
+                <div className="store-avatar">
+                  {record.storeLogo ? <img src={record.storeLogo} alt={record.storeName} /> : <Store size={18} />}
+                </div>
+                <div className="store-copy">
+                  <div className="admin-bold">{record.storeName}</div>
+                  <div className="admin-muted small">{record.storeSlug}</div>
+                </div>
               </div>
               <div role="cell" className={moneyClass(record.totalBalance, 'total')}>
                 {formatCurrency(record.totalBalance)}

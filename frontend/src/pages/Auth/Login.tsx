@@ -162,7 +162,7 @@ const Login = () => {
               <button
                 type="button"
                 className="social-btn google-btn"
-                onClick={() => window.google?.accounts?.id?.prompt()}
+                onClick={() => window.google?.accounts?.id?.prompt?.()}
                 disabled={loading || googleLoading}
               >
                 <svg viewBox="0 0 24 24" width="18" height="18">

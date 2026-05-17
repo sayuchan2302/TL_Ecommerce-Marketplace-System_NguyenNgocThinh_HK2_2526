@@ -21,7 +21,7 @@ declare global {
 const FacebookLoginButton = ({ disabled = false, onAccessToken }: FacebookLoginButtonProps) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const onAccessTokenRef = useRef(onAccessToken);
-  const [sdkLoaded, setSdkLoaded] = useState(false);
+  const [sdkLoaded, setSdkLoaded] = useState(() => Boolean(window.FB));
 
   useEffect(() => {
     onAccessTokenRef.current = onAccessToken;
@@ -36,7 +36,6 @@ const FacebookLoginButton = ({ disabled = false, onAccessToken }: FacebookLoginB
     }
 
     if (window.FB) {
-      setSdkLoaded(true);
       return;
     }
 

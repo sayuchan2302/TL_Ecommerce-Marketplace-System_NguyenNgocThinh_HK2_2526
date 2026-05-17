@@ -35,6 +35,7 @@ interface AdminOrderRow {
   email: string;
   phone: string;
   avatar: string;
+  productImage: string;
   productName: string;
   productMeta: string;
   productExtra: string | null;
@@ -61,6 +62,7 @@ const mapOrderRecordToRow = (order: AdminOrderRecord): AdminOrderRow => {
     email: order.customerInfo.email,
     phone: order.customerInfo.phone,
     avatar: order.avatar,
+    productImage: firstItem?.image || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=100&h=120&fit=crop',
     productName: firstItem?.name || 'Chưa có sản phẩm',
     productMeta: productMeta || 'Chưa có biến thể',
     productExtra: order.items.length > 1 ? `+${order.items.length - 1} sản phẩm khác` : null,
@@ -412,8 +414,8 @@ const AdminOrders = () => {
                   />
                 </div>
                 <div role="columnheader">STT</div>
-                <div role="columnheader">Khách hàng</div>
                 <div role="columnheader">Sản phẩm</div>
+                <div role="columnheader">Khách hàng</div>
                 <div role="columnheader" className="orders-col-gmv">GMV</div>
                 <div role="columnheader">Thanh toán</div>
                 <div role="columnheader">Thời gian</div>
@@ -442,17 +444,19 @@ const AdminOrders = () => {
                     />
                   </div>
                   <div role="cell" className="admin-bold">{(page - 1) * 6 + index + 1}</div>
-                  <div role="cell" className="customer-info-cell">
-                    <img src={order.avatar} alt={order.customer} className="customer-avatar" />
+                  <div role="cell" className="order-product-cell">
+                    <img src={order.productImage} alt={order.productName} className="order-product-thumb" />
+                    <div className="order-product-copy">
+                      <p className="admin-bold order-product-name">{order.productName}</p>
+                      <p className="admin-muted order-product-meta">{order.productMeta}</p>
+                      {order.productExtra ? <p className="order-product-extra">{order.productExtra}</p> : null}
+                    </div>
+                  </div>
+                  <div role="cell" className="customer-info-cell order-customer-cell">
                     <div className="customer-text">
                       <p className="admin-bold customer-name">{order.customer}</p>
                       <p className="admin-muted customer-email">{order.email}</p>
                     </div>
-                  </div>
-                  <div role="cell" className="order-product-cell">
-                    <p className="admin-bold order-product-name">{order.productName}</p>
-                    <p className="admin-muted order-product-meta">{order.productMeta}</p>
-                    {order.productExtra ? <p className="order-product-extra">{order.productExtra}</p> : null}
                   </div>
                   <div role="cell" className="admin-bold order-total">{order.total}</div>
                   <div role="cell">

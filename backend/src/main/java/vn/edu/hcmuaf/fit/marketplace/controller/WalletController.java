@@ -171,12 +171,14 @@ public class WalletController {
         Store store = storeRepository.findById(wallet.getStoreId()).orElse(null);
         String storeName = store != null ? store.getName() : "Unknown Store";
         String storeSlug = store != null ? store.getSlug() : null;
+        String storeLogo = store != null ? store.getLogo() : null;
 
         return WalletResponse.builder()
                 .id(wallet.getId())
                 .storeId(wallet.getStoreId())
                 .storeName(storeName)
                 .storeSlug(storeSlug)
+                .storeLogo(storeLogo)
                 .availableBalance(wallet.getAvailableBalance())
                 .frozenBalance(wallet.getFrozenBalance())
                 .reservedBalance(wallet.getReservedBalance())
