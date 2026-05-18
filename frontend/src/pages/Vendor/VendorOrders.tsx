@@ -521,8 +521,8 @@ const VendorOrders = () => {
         && order.status !== 'confirmed'
         && order.status !== 'processing'
         && order.status !== 'shipped' && (
-        <span className="vendor-order-action-slot" aria-hidden="true" />
-      )}
+          <span className="vendor-order-action-slot" aria-hidden="true" />
+        )}
       {(order.status === 'pending' || order.status === 'confirmed' || order.status === 'processing') ? (
         <button
           className="admin-icon-btn subtle danger-icon"
@@ -601,8 +601,8 @@ const VendorOrders = () => {
           ) : null}
         </div>
         <div className="admin-panel">
-          
-         
+
+
           <div className="admin-panel-head">
             <h2>Danh sách đơn hàng</h2>
           </div>
@@ -632,7 +632,7 @@ const VendorOrders = () => {
             <>
               <div className="admin-table vendor-table vendor-orders-table">
                 <div className="admin-table-head admin-table-row vendor-orders">
-<div>
+                  <div>
                     <input
                       type="checkbox"
                       checked={allSelected}
@@ -640,8 +640,8 @@ const VendorOrders = () => {
                     />
                   </div>
                   <div>STT</div>
-                  <div>Khách hàng</div>
                   <div>Sản phẩm</div>
+                  <div>Khách hàng</div>
                   <div>Giá trị</div>
                   <div>Trạng thái</div>
                   <div>Thời gian</div>
@@ -674,10 +674,6 @@ const VendorOrders = () => {
                         />
                       </div>
                       <div className="admin-bold">{startIndex + index}</div>
-                      <div>
-                        <div className="admin-bold">{order.customer}</div>
-                        <div className="admin-muted small">{order.email}</div>
-                      </div>
                       <div className="order-product-cell">
                         <img
                           src={order.productImage || order.thumb}
@@ -696,6 +692,10 @@ const VendorOrders = () => {
                             </p>
                           ) : null}
                         </div>
+                      </div>
+                      <div>
+                        <div className="admin-bold">{order.customer}</div>
+                        <div className="admin-muted small">{order.email}</div>
                       </div>
                       <div className="admin-bold">{formatCurrency(order.total)}</div>
                       <div>

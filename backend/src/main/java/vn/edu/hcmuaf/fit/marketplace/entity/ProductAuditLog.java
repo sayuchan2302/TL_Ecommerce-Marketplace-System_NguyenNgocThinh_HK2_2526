@@ -43,6 +43,8 @@ public class ProductAuditLog extends BaseEntity {
         APPROVED,
         BANNED,
         REJECTED,
-        BULK_APPROVED
+        BULK_APPROVED,
+        REPORT_CONFIRMED,
+        REPORT_DISMISSED
     }
 }

@@ -17,6 +17,7 @@ import {
 import { getUiErrorMessage } from '../../utils/errorMessage';
 import { ADMIN_VIEW_KEYS } from './adminListView';
 import { useAdminViewState } from './useAdminViewState';
+import AdminProductGovernanceTabs from './AdminProductGovernanceTabs';
 
 type StatusFilter = ProductApprovalStatus | 'ALL';
 type PriceFilter = 'all' | 'under100k' | '100to500k' | 'over500k';
@@ -215,7 +216,9 @@ const AdminProductGovernance = () => {
   };
 
   return (
-    <AdminLayout title="Quản lý sản phẩm" breadcrumbs={['Gian hàng', 'Quản lý sản phẩm']}>
+    <AdminLayout title="Kiểm duyệt sản phẩm" breadcrumbs={['Gian hàng', 'Kiểm duyệt sản phẩm']}>
+      <AdminProductGovernanceTabs activeKey="products" />
+
       <PanelStatsGrid
         items={[
           {

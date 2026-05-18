@@ -22,6 +22,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import jakarta.validation.Valid;
+
+import vn.edu.hcmuaf.fit.marketplace.dto.request.ProductReportRequest;
+import vn.edu.hcmuaf.fit.marketplace.dto.response.ProductReportResponse;
+import vn.edu.hcmuaf.fit.marketplace.service.ProductReportService;
 
 @RestController
 @RequestMapping("/api/products")
@@ -30,15 +35,17 @@ public class ProductController {
     private final ProductService productService;
     private final AuthContext authContext;
     private final ProductImageStorageService productImageStorageService;
+    private final ProductReportService productReportService;
 
     public ProductController(
             ProductService productService,
             AuthContext authContext,
-            ProductImageStorageService productImageStorageService
-    ) {
+            ProductImageStorageService productImageStorageService,
+            ProductReportService productReportService) {
         this.productService = productService;
         this.authContext = authContext;
         this.productImageStorageService = productImageStorageService;
+        this.productReportService = productReportService;
     }
 
     @GetMapping
@@ -94,9 +101,7 @@ public class ProductController {
                         keyword,
                         categoryId,
                         parsedInventory,
-                        pageable
-                )
-        );
+                        pageable));
     }
 
     @PostMapping
@@ -111,8 +116,7 @@ public class ProductController {
     @PostMapping("/upload-image")
     public ResponseEntity<Map<String, String>> uploadProductImage(
             @RequestHeader("Authorization") String authHeader,
-            @RequestParam("file") MultipartFile file
-    ) {
+            @RequestParam("file") MultipartFile file) {
         authContext.requireVendor(authHeader);
         String imageUrl = productImageStorageService.storeProductImage(file);
         return ResponseEntity.ok(Map.of("url", imageUrl));
@@ -190,5 +194,15 @@ public class ProductController {
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported inventory filter: " + rawInventory);
         }
+    }
+
+    @PostMapping("/{id}/report")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<ProductReportResponse> reportProduct(
+            @RequestHeader("Authorization") String authHeader,
+            @PathVariable UUID id,
+            @RequestBody @Valid ProductReportRequest request) {
+        UserContext ctx = authContext.requireCustomer(authHeader);
+        return ResponseEntity.ok(productReportService.submitReport(id, ctx.getUserId(), request));
     }
 }

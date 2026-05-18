@@ -3,7 +3,7 @@
 export const adminPanelNav: PanelNavItem[] = [
   { label: 'Dashboard', to: '/admin/dashboard', exact: true },
   { label: 'Danh mục', to: '/admin/categories' },
-  { label: 'Quản lý sản phẩm', to: '/admin/product-governance' },
+  { label: 'Kiểm duyệt sản phẩm', to: '/admin/product-governance' },
   { label: 'Gian hàng', to: '/admin/stores' },
   { label: 'Khách hàng', to: '/admin/users' },
   { label: 'Đơn hàng', to: '/admin/orders' },

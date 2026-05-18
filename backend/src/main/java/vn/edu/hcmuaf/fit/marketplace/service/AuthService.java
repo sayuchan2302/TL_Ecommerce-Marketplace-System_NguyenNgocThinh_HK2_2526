@@ -203,7 +203,7 @@ public class AuthService {
                 .googleSubject(googleUser.subject())
                 .password(generateRandomPasswordHash())
                 .name(defaultGoogleName(googleUser))
-                .avatar(null)
+                .avatar(googleUser.picture())
                 .role(User.Role.CUSTOMER)
                 .gender(User.Gender.OTHER)
                 .loyaltyPoints(0L)
@@ -219,9 +219,12 @@ public class AuthService {
     }
 
     private User applyGoogleProfileIfNeeded(User user, GoogleUserInfo googleUser, boolean changed) {
-        // Avatar is displayed as initials, no need to update from Google
         if (!hasText(user.getName()) && hasText(googleUser.name())) {
             user.setName(googleUser.name());
+            changed = true;
+        }
+        if (!hasText(user.getAvatar()) && hasText(googleUser.picture())) {
+            user.setAvatar(googleUser.picture());
             changed = true;
         }
         return changed ? userRepository.save(user) : user;

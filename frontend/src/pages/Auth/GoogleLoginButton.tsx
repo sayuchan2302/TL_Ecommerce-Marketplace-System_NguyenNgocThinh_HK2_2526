@@ -4,6 +4,7 @@ const GOOGLE_SCRIPT_ID = 'google-identity-services';
 const GOOGLE_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 const GOOGLE_CLIENT_ID = (import.meta.env.VITE_GOOGLE_CLIENT_ID || '').trim();
 
+// Module-level promise: shared across all component instances
 let scriptPromise: Promise<void> | null = null;
 let warnedMissingClientId = false;
 
@@ -47,39 +48,50 @@ interface GoogleLoginButtonProps {
   onCredential: (credential: string) => Promise<void> | void;
 }
 
-const loadGoogleScript = () => {
+const loadGoogleScript = (): Promise<void> => {
+  // Already fully loaded
   if (window.google?.accounts?.id) {
     return Promise.resolve();
   }
+  // In-flight load — reuse the same promise
   if (scriptPromise) {
     return scriptPromise;
   }
 
   scriptPromise = new Promise<void>((resolve, reject) => {
-    const existingScript = document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement | null;
-    const script = existingScript || document.createElement('script');
+    const existing = document.getElementById(GOOGLE_SCRIPT_ID) as HTMLScriptElement | null;
 
-    const handleLoad = () => {
+    if (existing) {
+      // Script tag already in DOM — mark handled and resolve
+      existing.dataset.loaded === 'true' ? resolve() : existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener('error', () => { scriptPromise = null; reject(new Error('Cannot load Google Identity Services.')); }, { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = GOOGLE_SCRIPT_ID;
+    script.src = GOOGLE_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    // NOTE: Do NOT set a random nonce here — nonce must match CSP header or be omitted.
+
+    script.addEventListener('load', () => {
       script.dataset.loaded = 'true';
+      if (import.meta.env.DEV) {
+        console.log('[GSI] Google Identity Services script loaded', {
+          apiAvailable: !!window.google?.accounts?.id,
+          timestamp: new Date().toISOString(),
+        });
+      }
       resolve();
-    };
-    const handleError = () => {
+    }, { once: true });
+
+    script.addEventListener('error', () => {
       scriptPromise = null;
       reject(new Error('Cannot load Google Identity Services.'));
-    };
+    }, { once: true });
 
-    script.addEventListener('load', handleLoad, { once: true });
-    script.addEventListener('error', handleError, { once: true });
-
-    if (!existingScript) {
-      script.id = GOOGLE_SCRIPT_ID;
-      script.src = GOOGLE_SCRIPT_SRC;
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-    } else if (existingScript.dataset.loaded === 'true') {
-      handleLoad();
-    }
+    document.head.appendChild(script);
   });
 
   return scriptPromise;
@@ -87,6 +99,7 @@ const loadGoogleScript = () => {
 
 const GoogleLoginButton = ({ disabled = false, onCredential }: GoogleLoginButtonProps) => {
   const buttonRef = useRef<HTMLDivElement>(null);
+  // Keep a stable ref to the callback so the closure inside useEffect is always fresh
   const onCredentialRef = useRef(onCredential);
 
   useEffect(() => {
@@ -102,19 +115,38 @@ const GoogleLoginButton = ({ disabled = false, onCredential }: GoogleLoginButton
       return;
     }
 
+    // Cancellation flag — set to true when the effect is cleaned up (unmount / StrictMode re-run)
     let cancelled = false;
-    let renderedContainer: HTMLDivElement | null = null;
 
     loadGoogleScript()
       .then(() => {
-        if (cancelled || !buttonRef.current || !window.google?.accounts?.id) {
+        // Guard: effect was cleaned up while the script was loading
+        if (cancelled) return;
+
+        const api = window.google?.accounts?.id;
+        const container = buttonRef.current;
+
+        if (!api || !container) {
+          if (import.meta.env.DEV) {
+            console.warn('[GSI] API or container not available after script load', {
+              api: !!api,
+              container: !!container,
+            });
+          }
           return;
         }
 
-        const container = buttonRef.current;
-        renderedContainer = container;
         container.innerHTML = '';
-        window.google.accounts.id.initialize({
+
+        if (import.meta.env.DEV) {
+          console.log('[GSI] Initializing with config:', {
+            clientId: GOOGLE_CLIENT_ID,
+            origin: window.location.origin,
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        api.initialize({
           client_id: GOOGLE_CLIENT_ID,
           ux_mode: 'popup',
           callback: (response) => {
@@ -123,7 +155,11 @@ const GoogleLoginButton = ({ disabled = false, onCredential }: GoogleLoginButton
             }
           },
         });
-        window.google.accounts.id.renderButton(container, {
+
+        // Guard again — effect may have been cleaned up during async microtask
+        if (cancelled) return;
+
+        api.renderButton(container, {
           theme: 'outline',
           size: 'large',
           type: 'standard',
@@ -132,19 +168,30 @@ const GoogleLoginButton = ({ disabled = false, onCredential }: GoogleLoginButton
           width: Math.min(container.clientWidth || 360, 400),
           locale: 'vi',
         });
+
+        if (import.meta.env.DEV) {
+          console.log('[GSI] Button rendered successfully');
+        }
       })
       .catch((error: unknown) => {
         if (import.meta.env.DEV) {
-          console.warn('[auth] Google login button failed to load.', error);
+          console.error('[GSI] Initialization failed', {
+            error,
+            origin: window.location.origin,
+            clientId: GOOGLE_CLIENT_ID,
+            hint: 'Ensure this origin is in Google Cloud Console → Authorized JavaScript origins',
+          });
         }
       });
 
     return () => {
       cancelled = true;
-      if (renderedContainer) {
-        renderedContainer.innerHTML = '';
+      // Clear the rendered button on cleanup so the next mount starts fresh
+      if (buttonRef.current) {
+        buttonRef.current.innerHTML = '';
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!GOOGLE_CLIENT_ID) {

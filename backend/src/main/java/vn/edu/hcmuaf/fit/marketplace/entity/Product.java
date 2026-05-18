@@ -111,7 +111,7 @@ public class Product extends BaseEntity {
     }
 
     public enum ApprovalStatus {
-        PENDING, APPROVED, REJECTED, BANNED
+        PENDING, APPROVED, REJECTED, BANNED, UNDER_REVIEW
     }
 
     public BigDecimal getEffectivePrice() {

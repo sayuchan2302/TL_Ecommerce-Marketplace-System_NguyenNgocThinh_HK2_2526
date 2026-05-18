@@ -11,6 +11,9 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react/jsx-runtime'],
   },
+  server: {
+    host: true,
+  },
   build: {
     rollupOptions: {
       output: {

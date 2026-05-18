@@ -1401,8 +1401,8 @@
   grid-template-columns:
     38px
     44px
-    minmax(180px, 1.25fr)
     minmax(300px, 2.15fr)
+    minmax(180px, 1.25fr)
     minmax(116px, 0.8fr)
     minmax(112px, 0.78fr)
     minmax(118px, 0.82fr)

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { ChevronRight, Star, MessageSquare, X } from 'lucide-react';
+import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
+import { ChevronRight, Star, MessageSquare, X, Flag } from 'lucide-react';
 import ProductGallery from '../../components/ProductGallery/ProductGallery';
 import ProductInfo from '../../components/ProductInfo/ProductInfo';
 import ProductActions from '../../components/ProductActions/ProductActions';
@@ -14,6 +14,9 @@ import { CLIENT_DICTIONARY } from '../../utils/clientDictionary';
 import type { Product } from '../../types';
 import { normalizeStoreSlug } from '../../utils/storeIdentity';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import ReportProductModal from '../../components/ReportProductModal/ReportProductModal';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import './ProductDetail.css';
 
 const t = CLIENT_TEXT.productDetail;
@@ -87,6 +90,12 @@ const formatPurchasedVariant = (variantName?: string): string => {
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { isAuthenticated, user } = useAuth();
+  const { addToast } = useToast();
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [hasReportedLocally, setHasReportedLocally] = useState(false);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -97,6 +106,11 @@ const ProductDetail = () => {
   const productId = id || '';
   const storeSlug = normalizeStoreSlug(product?.storeSlug);
   usePageTitle(product?.name || 'Sản phẩm');
+
+  useEffect(() => {
+    setIsReportModalOpen(false);
+    setHasReportedLocally(false);
+  }, [productId]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -175,6 +189,27 @@ const ProductDetail = () => {
       ratio: entry.count / reviews.length,
     }));
   }, [reviews]);
+
+  const handleOpenReportModal = () => {
+    if (!product?.backendId) {
+      addToast('Sản phẩm chưa đồng bộ backend, chưa thể gửi tố cáo.', 'error');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      addToast('Vui lòng đăng nhập để tố cáo sản phẩm.', 'info');
+      const redirect = `${location.pathname}${location.search}`;
+      navigate(`/login?reason=${encodeURIComponent('auth-required')}&redirect=${encodeURIComponent(redirect)}`);
+      return;
+    }
+
+    if (user?.role !== 'CUSTOMER') {
+      addToast('Chỉ tài khoản khách hàng mới có thể tố cáo sản phẩm.', 'info');
+      return;
+    }
+
+    setIsReportModalOpen(true);
+  };
 
   if (isLoading || !product) {
     return (
@@ -265,6 +300,16 @@ const ProductDetail = () => {
                 <Link to="/contact" className="pd-size-link">
                   {t.sizeHelp.consult}
                 </Link>
+                <button
+                  type="button"
+                  className={`pd-size-link pd-report-link ${hasReportedLocally ? 'reported' : ''}`}
+                  onClick={handleOpenReportModal}
+                  disabled={hasReportedLocally}
+                  aria-label={hasReportedLocally ? 'Đã tố cáo sản phẩm' : 'Tố cáo sản phẩm'}
+                >
+                  <Flag size={14} />
+                  {hasReportedLocally ? 'Đã tố cáo' : 'Tố cáo sản phẩm'}
+                </button>
               </div>
             </div>
           </div>
@@ -414,6 +459,18 @@ const ProductDetail = () => {
 
         </div>
       </div>
+
+      {isReportModalOpen && product?.backendId && (
+        <ReportProductModal
+          productId={product.backendId}
+          productName={product.name}
+          onClose={() => setIsReportModalOpen(false)}
+          onSuccess={() => {
+            setIsReportModalOpen(false);
+            setHasReportedLocally(true);
+          }}
+        />
+      )}
     </div>
   );
 };
