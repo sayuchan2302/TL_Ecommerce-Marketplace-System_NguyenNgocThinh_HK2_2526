@@ -5635,8 +5635,16 @@ textarea:focus-visible {
   color: #0f766e;
 }
 
+.moderation-icon-approve:hover:not(:disabled) {
+  background: #d1fae5;
+}
+
 .moderation-icon-ban {
   color: #dc2626;
+}
+
+.moderation-icon-ban:hover:not(:disabled) {
+  background: #fee2e2;
 }
 
 .moderation-review-drawer {
