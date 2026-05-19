@@ -66,6 +66,7 @@ export interface StoreProduct {
   statusType: 'active' | 'low' | 'out';
   soldCount?: number;
   createdAt?: string;
+  categoryId?: string;
   categoryName?: string;
   categorySlug?: string;
   storeId?: string;
@@ -79,6 +80,16 @@ interface StoreProductsResponse {
   total: number;
   page: number;
   totalPages: number;
+}
+
+export type StoreProductSort = 'newest' | 'price_asc' | 'price_desc';
+
+export interface StoreProductFilters {
+  q?: string;
+  categoryId?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sort?: StoreProductSort;
 }
 
 export interface StoreRegistrationRequest {
@@ -204,7 +215,7 @@ interface BackendProduct {
   basePrice?: number;
   salePrice?: number;
   status?: string;
-  category?: { name?: string; slug?: string };
+  category?: { id?: string; name?: string; slug?: string };
   images?: Array<{ url?: string }>;
   variants?: Array<{ id?: string; sku?: string; color?: string; colorHex?: string; size?: string; stockQuantity?: number }>;
 }
@@ -342,6 +353,7 @@ const mapBackendProduct = (product: BackendProduct, store?: StoreProfile): Store
     statusType: stock === 0 ? 'out' : stock < 10 ? 'low' : 'active',
     soldCount: Math.max(0, Number(product.soldCount ?? product.viewCount ?? 0)),
     createdAt: product.createdAt,
+    categoryId: product.category?.id || undefined,
     categoryName: product.category?.name || undefined,
     categorySlug: product.category?.slug || undefined,
     storeId: store?.id,
@@ -357,10 +369,26 @@ export const storeService = {
     return mapBackendStore(store);
   },
 
-  async getStoreProducts(storeId: string, page = 1, limit = 12): Promise<StoreProductsResponse> {
+  async getStoreProducts(
+    storeId: string,
+    page = 1,
+    limit = 12,
+    filters: StoreProductFilters = {},
+  ): Promise<StoreProductsResponse> {
+    const params = new URLSearchParams({
+      page: String(Math.max(page - 1, 0)),
+      size: String(limit),
+    });
+    const keyword = String(filters.q || '').trim();
+    if (keyword) params.set('q', keyword);
+    if (filters.categoryId) params.set('categoryId', filters.categoryId);
+    if (Number.isFinite(filters.minPrice)) params.set('minPrice', String(Math.max(0, Number(filters.minPrice))));
+    if (Number.isFinite(filters.maxPrice)) params.set('maxPrice', String(Math.max(0, Number(filters.maxPrice))));
+    if (filters.sort) params.set('sort', filters.sort);
+
     const [store, productPage] = await Promise.all([
       this.getStoreById(storeId),
-      apiRequest<BackendProductPage<BackendProduct>>(`/api/products/store/${storeId}?page=${Math.max(page - 1, 0)}&size=${limit}`),
+      apiRequest<BackendProductPage<BackendProduct>>(`/api/products/store/${storeId}?${params.toString()}`),
     ]);
 
     const products = (productPage.content || []).map((product) => mapBackendProduct(product, store || undefined));

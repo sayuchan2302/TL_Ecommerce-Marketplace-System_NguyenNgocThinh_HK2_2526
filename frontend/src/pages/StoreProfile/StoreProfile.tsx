@@ -9,7 +9,13 @@ import {
 } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BadgeCheck, ChevronLeft, Mail, MapPin, MessageCircle, Phone, ShoppingBag, Star, Users } from 'lucide-react';
-import { storeService, type StoreProduct, type StoreProfile } from '../../services/storeService';
+import {
+  storeService,
+  type StoreProduct,
+  type StoreProductFilters,
+  type StoreProductSort,
+  type StoreProfile,
+} from '../../services/storeService';
 import { couponService, type Coupon } from '../../services/couponService';
 import { customerVoucherService } from '../../services/customerVoucherService';
 import { reviewService, type Review } from '../../services/reviewService';
@@ -29,6 +35,7 @@ import './StoreProfile.css';
 
 type StoreTab = 'browse' | 'products' | 'categories' | 'reviews';
 type PanelHeightMap = Record<StoreTab, number>;
+type ProductCategoryFilter = { id: string; name: string; count: number };
 type IdleCapableWindow = Window & typeof globalThis & {
   requestIdleCallback?: (callback: IdleRequestCallback) => number;
   cancelIdleCallback?: (handle: number) => void;
@@ -53,6 +60,15 @@ const PLACEHOLDER_BANNER =
 const PRODUCTS_PAGE_SIZE = 25;
 const MAX_PRODUCT_SNAPSHOT_PAGES = 5;
 const CATEGORY_PREFETCH_DELAY_MS = 180;
+const PRODUCT_SEARCH_DEBOUNCE_MS = 300;
+const DEFAULT_PRODUCT_SORT: StoreProductSort = 'newest';
+
+const parsePriceInput = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const price = Number(trimmed);
+  return Number.isFinite(price) ? Math.max(0, price) : undefined;
+};
 
 const formatPercent = (value?: number) => `${Math.max(0, Math.min(100, Math.round(Number(value || 0))))}%`;
 
@@ -122,6 +138,13 @@ const StoreProfilePage = () => {
   const [productTotal, setProductTotal] = useState(0);
   const [productTotalPages, setProductTotalPages] = useState(1);
   const [productPageLoading, setProductPageLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [debouncedProductSearch, setDebouncedProductSearch] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [productSort, setProductSort] = useState<StoreProductSort>(DEFAULT_PRODUCT_SORT);
+  const [isProductFilterPanelOpen, setIsProductFilterPanelOpen] = useState(false);
   const [categoryProducts, setCategoryProducts] = useState<StoreProduct[] | null>(null);
   const [categoryLoading, setCategoryLoading] = useState(false);
   const [vouchers, setVouchers] = useState<Coupon[]>([]);
@@ -138,6 +161,8 @@ const StoreProfilePage = () => {
   const [stageMinHeight, setStageMinHeight] = useState(0);
   const storeRequestRef = useRef(0);
   const paginationRequestRef = useRef(0);
+  const pendingProductPageScrollRef = useRef(false);
+  const previousProductFiltersKeyRef = useRef('');
   const categoryRequestRef = useRef(0);
   const categoryFetchInFlightRef = useRef(false);
   const idleCategoryPrefetchRef = useRef<number | null>(null);
@@ -155,12 +180,48 @@ const StoreProfilePage = () => {
     panelNodesRef.current[tab] = node;
   }, []);
 
+  const productMinPrice = useMemo(() => parsePriceInput(minPrice), [minPrice]);
+  const productMaxPrice = useMemo(() => parsePriceInput(maxPrice), [maxPrice]);
+  const productFilters = useMemo<StoreProductFilters>(() => ({
+    q: debouncedProductSearch,
+    categoryId: selectedCategoryId || undefined,
+    minPrice: productMinPrice,
+    maxPrice: productMaxPrice,
+    sort: productSort,
+  }), [debouncedProductSearch, productMaxPrice, productMinPrice, productSort, selectedCategoryId]);
+  const productFiltersKey = useMemo(
+    () => [
+      productFilters.q || '',
+      productFilters.categoryId || '',
+      productFilters.minPrice ?? '',
+      productFilters.maxPrice ?? '',
+      productFilters.sort || DEFAULT_PRODUCT_SORT,
+    ].join('|'),
+    [productFilters],
+  );
+  const hasActiveProductFilters = Boolean(
+    productSearch.trim()
+      || selectedCategoryId
+      || minPrice.trim()
+      || maxPrice.trim()
+      || productSort !== DEFAULT_PRODUCT_SORT,
+  );
+
   const resetStorefrontUiState = useCallback(() => {
+    pendingProductPageScrollRef.current = false;
+    previousProductFiltersKeyRef.current = '';
     setActiveTab('browse');
     setProductPage(1);
     setProductTotal(0);
     setProductTotalPages(1);
     setProductPageLoading(false);
+    setProductSearch('');
+    setDebouncedProductSearch('');
+    setSelectedCategoryId('');
+    setMinPrice('');
+    setMaxPrice('');
+    setProductSort(DEFAULT_PRODUCT_SORT);
+    setIsProductFilterPanelOpen(false);
     setFeaturedProducts([]);
     setProductPageItems([]);
     setCategoryProducts(null);
@@ -179,6 +240,16 @@ const StoreProfilePage = () => {
     setFollowerCount(0);
     setIsFollowing(false);
   }, []);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedProductSearch(productSearch.trim());
+    }, PRODUCT_SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(handle);
+    };
+  }, [productSearch]);
 
   useEffect(() => {
     if (!slug) return;
@@ -322,7 +393,7 @@ const StoreProfilePage = () => {
   }, [categoryProducts, ensureCategorySnapshot, loading, store?.id]);
 
   useEffect(() => {
-    if (activeTab !== 'categories' || categoryProducts !== null || categoryLoading) return;
+    if ((activeTab !== 'categories' && activeTab !== 'products') || categoryProducts !== null || categoryLoading) return;
     void ensureCategorySnapshot();
   }, [activeTab, categoryLoading, categoryProducts, ensureCategorySnapshot]);
 
@@ -474,23 +545,41 @@ const StoreProfilePage = () => {
     const scrollingElement = document.scrollingElement as HTMLElement | null;
     const appContainer = document.querySelector<HTMLElement>('.app-container');
     const panelRect = productsPanel.getBoundingClientRect();
-    const viewportTargetTop = panelRect.top + window.scrollY - headerOffset;
+    const viewportScrollTop = scrollingElement?.scrollTop
+      ?? window.scrollY
+      ?? document.documentElement.scrollTop
+      ?? document.body.scrollTop
+      ?? 0;
+    const viewportTargetTop = Math.max(0, panelRect.top + viewportScrollTop - headerOffset);
 
-    window.scrollTo({ top: Math.max(0, viewportTargetTop), left: 0, behavior: 'auto' });
-    document.documentElement.scrollTo({ top: Math.max(0, viewportTargetTop), left: 0, behavior: 'auto' });
-    document.body.scrollTo({ top: Math.max(0, viewportTargetTop), left: 0, behavior: 'auto' });
-    scrollingElement?.scrollTo({ top: Math.max(0, viewportTargetTop), left: 0, behavior: 'auto' });
+    const scrollViewport = () => {
+      window.scrollTo({ top: viewportTargetTop, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTo({ top: viewportTargetTop, left: 0, behavior: 'auto' });
+      document.body.scrollTo({ top: viewportTargetTop, left: 0, behavior: 'auto' });
+      scrollingElement?.scrollTo({ top: viewportTargetTop, left: 0, behavior: 'auto' });
+    };
+
+    scrollViewport();
 
     if (appContainer) {
       const containerRect = appContainer.getBoundingClientRect();
-      const containerTargetTop = panelRect.top - containerRect.top + appContainer.scrollTop - headerOffset;
-      appContainer.scrollTo({ top: Math.max(0, containerTargetTop), left: 0, behavior: 'auto' });
+      const containerTargetTop = Math.max(0, panelRect.top - containerRect.top + appContainer.scrollTop - headerOffset);
+      appContainer.scrollTo({ top: containerTargetTop, left: 0, behavior: 'auto' });
 
       window.requestAnimationFrame(() => {
-        appContainer.scrollTo({ top: Math.max(0, containerTargetTop), left: 0, behavior: 'auto' });
+        scrollViewport();
+        appContainer.scrollTo({ top: containerTargetTop, left: 0, behavior: 'auto' });
       });
+    } else {
+      window.requestAnimationFrame(scrollViewport);
     }
   }, []);
+
+  useLayoutEffect(() => {
+    if (!pendingProductPageScrollRef.current || activeTab !== 'products') return;
+    pendingProductPageScrollRef.current = false;
+    scrollToProductsPanelTop();
+  }, [activeTab, productPage, productPageItems, scrollToProductsPanelTop]);
 
   const handleProductPageChange = useCallback(async (nextPage: number) => {
     if (!store?.id || productPageLoading || nextPage === productPage) return;
@@ -501,22 +590,76 @@ const StoreProfilePage = () => {
     paginationRequestRef.current = requestId;
 
     setProductPageLoading(true);
+    pendingProductPageScrollRef.current = true;
     scrollToProductsPanelTop();
     try {
-      const response = await storeService.getStoreProducts(storeId, nextPage, PRODUCTS_PAGE_SIZE);
+      const response = await storeService.getStoreProducts(storeId, nextPage, PRODUCTS_PAGE_SIZE, productFilters);
       if (storeRequestRef.current !== storeRequestId || paginationRequestRef.current !== requestId) return;
       setProductPageItems(response.products || []);
       setProductPage(Math.max(Number(response.page || nextPage), 1));
       setProductTotal(Math.max(Number(response.total || 0), 0));
       setProductTotalPages(Math.max(Number(response.totalPages || 1), 1));
     } catch {
+      if (storeRequestRef.current === storeRequestId && paginationRequestRef.current === requestId) {
+        pendingProductPageScrollRef.current = false;
+      }
       // keep current page data if pagination request fails
     } finally {
       if (storeRequestRef.current === storeRequestId && paginationRequestRef.current === requestId) {
         setProductPageLoading(false);
       }
     }
-  }, [productPage, productPageLoading, scrollToProductsPanelTop, store?.id]);
+  }, [productFilters, productPage, productPageLoading, scrollToProductsPanelTop, store?.id]);
+
+  const handleProductFiltersChange = useCallback(async () => {
+    if (!store?.id) return;
+
+    const storeId = store.id;
+    const storeRequestId = storeRequestRef.current;
+    const requestId = paginationRequestRef.current + 1;
+    paginationRequestRef.current = requestId;
+
+    setProductPageLoading(true);
+    pendingProductPageScrollRef.current = true;
+    scrollToProductsPanelTop();
+    try {
+      const response = await storeService.getStoreProducts(storeId, 1, PRODUCTS_PAGE_SIZE, productFilters);
+      if (storeRequestRef.current !== storeRequestId || paginationRequestRef.current !== requestId) return;
+      setProductPageItems(response.products || []);
+      setProductPage(Math.max(Number(response.page || 1), 1));
+      setProductTotal(Math.max(Number(response.total || 0), 0));
+      setProductTotalPages(Math.max(Number(response.totalPages || 1), 1));
+    } catch {
+      if (storeRequestRef.current === storeRequestId && paginationRequestRef.current === requestId) {
+        pendingProductPageScrollRef.current = false;
+      }
+    } finally {
+      if (storeRequestRef.current === storeRequestId && paginationRequestRef.current === requestId) {
+        setProductPageLoading(false);
+      }
+    }
+  }, [productFilters, scrollToProductsPanelTop, store?.id]);
+
+  useEffect(() => {
+    if (!store?.id || loading) return;
+    if (!previousProductFiltersKeyRef.current) {
+      previousProductFiltersKeyRef.current = productFiltersKey;
+      return;
+    }
+    if (previousProductFiltersKeyRef.current === productFiltersKey) return;
+
+    previousProductFiltersKeyRef.current = productFiltersKey;
+    void handleProductFiltersChange();
+  }, [handleProductFiltersChange, loading, productFiltersKey, store?.id]);
+
+  const handleClearProductFilters = useCallback(() => {
+    setProductSearch('');
+    setDebouncedProductSearch('');
+    setSelectedCategoryId('');
+    setMinPrice('');
+    setMaxPrice('');
+    setProductSort(DEFAULT_PRODUCT_SORT);
+  }, []);
 
   const onlineLabel = store?.status === 'ACTIVE' ? '\u0110ang online' : 'T\u1EA1m offline';
 
@@ -536,6 +679,23 @@ const StoreProfilePage = () => {
     return Array.from(groups.entries()).map(([name, rows]) => ({ name, rows }));
   }, [categoryProducts]);
 
+  const productCategoryOptions = useMemo<ProductCategoryFilter[]>(() => {
+    const sourceRows = categoryProducts || productPageItems;
+    const groups = new Map<string, ProductCategoryFilter>();
+
+    for (const product of sourceRows) {
+      if (!product.categoryId || !product.categoryName) continue;
+      const current = groups.get(product.categoryId);
+      groups.set(product.categoryId, {
+        id: product.categoryId,
+        name: product.categoryName,
+        count: (current?.count || 0) + 1,
+      });
+    }
+
+    return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+  }, [categoryProducts, productPageItems]);
+
   const paginationTokens = useMemo(
     () => buildPaginationTokens(productPage, productTotalPages),
     [productPage, productTotalPages],
@@ -545,7 +705,7 @@ const StoreProfilePage = () => {
     return (
       <div className="storefront-state-page">
         <div className="storefront-loader" />
-        <p>\u0110ang t\u1EA3i th\u00F4ng tin c\u1EEDa h\u00E0ng...</p>
+        <p>Đang tải thông tin cửa hàng...</p>
       </div>
     );
   }
@@ -554,11 +714,11 @@ const StoreProfilePage = () => {
     return (
       <div className="storefront-state-page">
         <div className="storefront-not-found">
-          <h2>C\u1EEDa h\u00E0ng kh\u00F4ng t\u1ED3n t\u1EA1i</h2>
-          <p>Li\u00EAn k\u1EBFt c\u00F3 th\u1EC3 \u0111\u00E3 h\u1EBFt hi\u1EC7u l\u1EF1c ho\u1EB7c c\u1EEDa h\u00E0ng ch\u01B0a \u0111\u01B0\u1EE3c c\u00F4ng khai.</p>
+          <h2>Cửa hàng không tồn tại</h2>
+          <p>Liên kết có thể đã hết hiệu lực hoặc cửa hàng chưa được công khai.</p>
           <Link to="/" className="storefront-primary-btn">
             <ChevronLeft size={16} />
-            Quay v\u1EC1 trang ch\u1EE7
+            Quay về trang chủ
           </Link>
         </div>
       </div>
@@ -647,28 +807,28 @@ const StoreProfilePage = () => {
                 <article className="storefront-metric-card">
                   <p>
                     <Star size={14} />
-                    Rating
+                    Đánh giá
                   </p>
                   <strong>{store.rating.toFixed(1)}</strong>
                 </article>
                 <article className="storefront-metric-card">
                   <p>
                     <MessageCircle size={14} />
-                    T\u1EF7 l\u1EC7 ph\u1EA3n h\u1ED3i
+                    Tỷ lệ phản hồi
                   </p>
                   <strong>{formatPercent(store.responseRate)}</strong>
                 </article>
                 <article className="storefront-metric-card">
                   <p>
                     <Users size={14} />
-                    Ng\u01B0\u1EDDi theo d\u00F5i
+                    Người theo dõi
                   </p>
                   <strong>{formatShortNumber(followerCount)}</strong>
                 </article>
                 <article className="storefront-metric-card">
                   <p>
                     <ShoppingBag size={14} />
-                    \u0110\u01A1n h\u00E0ng
+                    Đơn hàng
                   </p>
                   <strong>{formatShortNumber(Number(store.totalOrders || 0))}</strong>
                 </article>
@@ -716,6 +876,22 @@ const StoreProfilePage = () => {
                 productPageLoading={productPageLoading}
                 paginationTokens={paginationTokens}
                 storeName={store.name}
+                productSearch={productSearch}
+                categoryOptions={productCategoryOptions}
+                selectedCategoryId={selectedCategoryId}
+                categoryLoading={categoryLoading}
+                minPrice={minPrice}
+                maxPrice={maxPrice}
+                productSort={productSort}
+                isFilterPanelOpen={isProductFilterPanelOpen}
+                hasActiveFilters={hasActiveProductFilters}
+                onProductSearchChange={setProductSearch}
+                onCategoryChange={setSelectedCategoryId}
+                onMinPriceChange={setMinPrice}
+                onMaxPriceChange={setMaxPrice}
+                onProductSortChange={setProductSort}
+                onFilterPanelOpenChange={setIsProductFilterPanelOpen}
+                onClearFilters={handleClearProductFilters}
                 onPageChange={(nextPage) => {
                   void handleProductPageChange(nextPage);
                 }}

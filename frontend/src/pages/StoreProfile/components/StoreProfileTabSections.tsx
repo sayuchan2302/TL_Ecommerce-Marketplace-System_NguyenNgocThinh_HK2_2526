@@ -1,9 +1,9 @@
 ﻿import { memo, type ReactNode } from 'react';
-import { Star, TicketPercent } from 'lucide-react';
+import { Search, SlidersHorizontal, Star, TicketPercent, X } from 'lucide-react';
 import ProductCardGrid from '../../../components/ProductCardGrid/ProductCardGrid';
 import type { Coupon } from '../../../services/couponService';
 import type { Review } from '../../../services/reviewService';
-import type { StoreProduct } from '../../../services/storeService';
+import type { StoreProduct, StoreProductSort } from '../../../services/storeService';
 
 export type PaginationToken = number | 'ellipsis-left' | 'ellipsis-right';
 
@@ -36,6 +36,22 @@ export interface ProductsTabContentProps {
   productPageLoading: boolean;
   paginationTokens: PaginationToken[];
   storeName: string;
+  productSearch: string;
+  categoryOptions: Array<{ id: string; name: string; count: number }>;
+  selectedCategoryId: string;
+  categoryLoading: boolean;
+  minPrice: string;
+  maxPrice: string;
+  productSort: StoreProductSort;
+  isFilterPanelOpen: boolean;
+  hasActiveFilters: boolean;
+  onProductSearchChange: (value: string) => void;
+  onCategoryChange: (value: string) => void;
+  onMinPriceChange: (value: string) => void;
+  onMaxPriceChange: (value: string) => void;
+  onProductSortChange: (value: StoreProductSort) => void;
+  onFilterPanelOpenChange: (open: boolean) => void;
+  onClearFilters: () => void;
   onPageChange: (nextPage: number) => void;
 }
 
@@ -190,60 +206,164 @@ export const ProductsTabContent = memo(({
   productPageLoading,
   paginationTokens,
   storeName,
+  productSearch,
+  categoryOptions,
+  selectedCategoryId,
+  categoryLoading,
+  minPrice,
+  maxPrice,
+  productSort,
+  isFilterPanelOpen,
+  hasActiveFilters,
+  onProductSearchChange,
+  onCategoryChange,
+  onMinPriceChange,
+  onMaxPriceChange,
+  onProductSortChange,
+  onFilterPanelOpenChange,
+  onClearFilters,
   onPageChange,
-}: ProductsTabContentProps) => (
-  <div className="storefront-panel">
-    <div className="storefront-panel-head">
-      <h2>Tất cả sản phẩm</h2>
-      <span>{productTotal} sản phẩm</span>
-    </div>
-    <StorefrontProductGrid rows={productPageItems} storeName={storeName} />
-    <p className="storefront-page-summary">
-      Trang {productPage}/{productTotalPages} - {productTotal} sản phẩm
-      {productPageLoading ? ' - Đang tải...' : ''}
-    </p>
-    {productTotalPages > 1 ? (
-      <div className="storefront-pagination">
-        <button
-          type="button"
-          className="storefront-page-btn"
-          onClick={() => onPageChange(Math.max(1, productPage - 1))}
-          disabled={productPageLoading || productPage === 1}
-        >
-          Trước
-        </button>
-        <div className="storefront-page-list" aria-label="Pagination">
-          {paginationTokens.map((token) => (
-            typeof token === 'number' ? (
-              <button
-                key={token}
-                type="button"
-                className={`storefront-page-btn ${productPage === token ? 'is-active' : ''}`}
-                onClick={() => onPageChange(token)}
-                disabled={productPageLoading}
-                aria-current={productPage === token ? 'page' : undefined}
-              >
-                {token}
-              </button>
-            ) : (
-              <span key={token} className="storefront-page-ellipsis" aria-hidden="true">
-                ...
-              </span>
-            )
-          ))}
-        </div>
-        <button
-          type="button"
-          className="storefront-page-btn"
-          onClick={() => onPageChange(Math.min(productTotalPages, productPage + 1))}
-          disabled={productPageLoading || productPage === productTotalPages}
-        >
-          Sau
-        </button>
+}: ProductsTabContentProps) => {
+  const emptyMessage = hasActiveFilters
+    ? 'Không tìm thấy sản phẩm phù hợp.'
+    : 'Hiện chưa có sản phẩm công khai.';
+
+  return (
+    <div className="storefront-panel">
+      <div className="storefront-panel-head">
+        <h2>Tất cả sản phẩm</h2>
+        <span>{productTotal} sản phẩm</span>
       </div>
-    ) : null}
-  </div>
-));
+
+      <div className="storefront-products-toolbar">
+        <label className="storefront-product-search">
+          <Search size={16} />
+          <input
+            type="search"
+            value={productSearch}
+            placeholder={`Tìm sản phẩm trong ${storeName}`}
+            onChange={(event) => onProductSearchChange(event.target.value)}
+          />
+        </label>
+
+        <div className="storefront-product-controls">
+          <select
+            value={selectedCategoryId}
+            onChange={(event) => onCategoryChange(event.target.value)}
+            disabled={categoryLoading && categoryOptions.length === 0}
+            aria-label="Lọc danh mục"
+          >
+            <option value="">{categoryLoading ? 'Đang tải danh mục...' : 'Tất cả danh mục'}</option>
+            {categoryOptions.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name} ({category.count})
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={productSort}
+            onChange={(event) => onProductSortChange(event.target.value as StoreProductSort)}
+            aria-label="Sắp xếp sản phẩm"
+          >
+            <option value="newest">Mới nhất</option>
+            <option value="price_asc">Giá thấp đến cao</option>
+            <option value="price_desc">Giá cao đến thấp</option>
+          </select>
+
+          <button
+            type="button"
+            className={`storefront-filter-toggle ${isFilterPanelOpen ? 'is-active' : ''}`}
+            onClick={() => onFilterPanelOpenChange(!isFilterPanelOpen)}
+          >
+            <SlidersHorizontal size={15} />
+            Bộ lọc
+          </button>
+
+          {hasActiveFilters ? (
+            <button type="button" className="storefront-filter-clear" onClick={onClearFilters}>
+              <X size={14} />
+              Xóa lọc
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {isFilterPanelOpen ? (
+        <div className="storefront-filter-panel">
+          <label>
+            Giá từ
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={minPrice}
+              placeholder="0"
+              onChange={(event) => onMinPriceChange(event.target.value)}
+            />
+          </label>
+          <label>
+            Giá đến
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={maxPrice}
+              placeholder="1.000.000"
+              onChange={(event) => onMaxPriceChange(event.target.value)}
+            />
+          </label>
+        </div>
+      ) : null}
+
+      <StorefrontProductGrid rows={productPageItems} storeName={storeName} emptyMessage={emptyMessage} />
+      <p className="storefront-page-summary">
+        Trang {productPage}/{productTotalPages} - {productTotal} sản phẩm
+        {productPageLoading ? ' - Đang tải...' : ''}
+      </p>
+      {productTotalPages > 1 ? (
+        <div className="storefront-pagination">
+          <button
+            type="button"
+            className="storefront-page-btn"
+            onClick={() => onPageChange(Math.max(1, productPage - 1))}
+            disabled={productPageLoading || productPage === 1}
+          >
+            Trước
+          </button>
+          <div className="storefront-page-list" aria-label="Pagination">
+            {paginationTokens.map((token) => (
+              typeof token === 'number' ? (
+                <button
+                  key={token}
+                  type="button"
+                  className={`storefront-page-btn ${productPage === token ? 'is-active' : ''}`}
+                  onClick={() => onPageChange(token)}
+                  disabled={productPageLoading}
+                  aria-current={productPage === token ? 'page' : undefined}
+                >
+                  {token}
+                </button>
+              ) : (
+                <span key={token} className="storefront-page-ellipsis" aria-hidden="true">
+                  ...
+                </span>
+              )
+            ))}
+          </div>
+          <button
+            type="button"
+            className="storefront-page-btn"
+            onClick={() => onPageChange(Math.min(productTotalPages, productPage + 1))}
+            disabled={productPageLoading || productPage === productTotalPages}
+          >
+            Sau
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+});
 ProductsTabContent.displayName = 'ProductsTabContent';
 
 export const CategoriesTabContent = memo(({

@@ -18,6 +18,7 @@ import vn.edu.hcmuaf.fit.marketplace.security.AuthContext.UserContext;
 import vn.edu.hcmuaf.fit.marketplace.service.ProductImageStorageService;
 import vn.edu.hcmuaf.fit.marketplace.service.ProductService;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -72,9 +73,20 @@ public class ProductController {
     public ResponseEntity<Page<Product>> getByStore(
             @PathVariable String storeId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false, name = "q") String keyword,
+            @RequestParam(required = false) UUID categoryId,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(defaultValue = "newest") String sort) {
         Pageable pageable = PageRequest.of(page, size);
-        return ResponseEntity.ok(productService.findActiveByStoreIdentifier(storeId, pageable));
+        ProductService.StorefrontProductFilters filters = new ProductService.StorefrontProductFilters(
+                keyword,
+                categoryId,
+                minPrice,
+                maxPrice,
+                ProductService.StorefrontProductSort.from(sort));
+        return ResponseEntity.ok(productService.findActiveByStoreIdentifier(storeId, filters, pageable));
     }
 
     @GetMapping("/my-store")

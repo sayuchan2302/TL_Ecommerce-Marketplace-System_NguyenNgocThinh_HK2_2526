@@ -2,10 +2,15 @@ package vn.edu.hcmuaf.fit.marketplace.service;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.ProductRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.VendorProductPageResponse;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.VendorProductSummaryResponse;
@@ -50,6 +55,48 @@ public class ProductService {
     public enum InventoryState {
         LOW,
         OUT
+    }
+
+    public enum StorefrontProductSort {
+        NEWEST,
+        PRICE_ASC,
+        PRICE_DESC;
+
+        public static StorefrontProductSort from(String value) {
+            if (value == null || value.isBlank()) {
+                return NEWEST;
+            }
+
+            try {
+                return StorefrontProductSort.valueOf(value.trim().toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                return NEWEST;
+            }
+        }
+    }
+
+    public record StorefrontProductFilters(
+            String keyword,
+            UUID categoryId,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            StorefrontProductSort sort) {
+
+        String normalizedKeyword() {
+            return keyword == null ? "" : keyword.trim();
+        }
+
+        BigDecimal normalizedMinPrice() {
+            return normalizePrice(minPrice);
+        }
+
+        BigDecimal normalizedMaxPrice() {
+            return normalizePrice(maxPrice);
+        }
+
+        StorefrontProductSort normalizedSort() {
+            return sort == null ? StorefrontProductSort.NEWEST : sort;
+        }
     }
 
     private record ProductSalesSnapshot(long soldCount, BigDecimal grossRevenue) {}
@@ -146,20 +193,47 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public Page<Product> findActiveByStoreIdentifier(String identifier, Pageable pageable) {
+        return findActiveByStoreIdentifier(
+                identifier,
+                new StorefrontProductFilters(null, null, null, null, StorefrontProductSort.NEWEST),
+                pageable);
+    }
+
+    /**
+     * Find active products by store identifier (UUID or slug) with public storefront filters.
+     */
+    @Transactional(readOnly = true)
+    public Page<Product> findActiveByStoreIdentifier(
+            String identifier,
+            StorefrontProductFilters filters,
+            Pageable pageable) {
+        Optional<UUID> storeId = resolvePublicStoreId(identifier);
+        if (storeId.isEmpty()) {
+            return Page.empty(pageable);
+        }
+
+        Page<Product> page = productRepository.findAll(buildPublicStorefrontSpec(storeId.get(), filters), pageable);
+        page.getContent().forEach(this::initializeForSerialization);
+        attachDeliveredSales(page.getContent());
+        return page;
+    }
+
+    private Optional<UUID> resolvePublicStoreId(String identifier) {
         try {
             UUID storeId = UUID.fromString(identifier);
-            Page<Product> page = productRepository.findActiveByStoreId(storeId, pageable);
-            page.getContent().forEach(this::initializeForSerialization);
-            attachDeliveredSales(page.getContent());
-            return page;
+            return storeRepository.findById(storeId)
+                    .filter(this::isPublicStore)
+                    .map(Store::getId);
         } catch (IllegalArgumentException ex) {
             Store store = storeRepository.findBySlug(identifier)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Store not found"));
-            Page<Product> page = productRepository.findActiveByStoreId(store.getId(), pageable);
-            page.getContent().forEach(this::initializeForSerialization);
-            attachDeliveredSales(page.getContent());
-            return page;
+            return isPublicStore(store) ? Optional.of(store.getId()) : Optional.empty();
         }
+    }
+
+    private boolean isPublicStore(Store store) {
+        return store.getStatus() == Store.StoreStatus.ACTIVE
+                && store.getApprovalStatus() == Store.ApprovalStatus.APPROVED;
     }
 
     /**
@@ -179,6 +253,83 @@ public class ProductService {
         page.getContent().forEach(this::initializeForSerialization);
         attachDeliveredSales(page.getContent());
         return page;
+    }
+
+    private Specification<Product> buildPublicStorefrontSpec(UUID storeId, StorefrontProductFilters filters) {
+        StorefrontProductFilters activeFilters = filters == null
+                ? new StorefrontProductFilters(null, null, null, null, StorefrontProductSort.NEWEST)
+                : filters;
+
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("storeId"), storeId));
+            predicates.add(cb.equal(root.get("status"), ProductStatus.ACTIVE));
+            predicates.add(cb.or(
+                    cb.equal(root.get("approvalStatus"), Product.ApprovalStatus.APPROVED),
+                    cb.isNull(root.get("approvalStatus"))));
+
+            String keyword = activeFilters.normalizedKeyword().toLowerCase(Locale.ROOT);
+            if (!keyword.isBlank()) {
+                String pattern = "%" + keyword + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("name")), pattern),
+                        cb.like(cb.lower(root.get("description")), pattern)));
+            }
+
+            if (activeFilters.categoryId() != null) {
+                predicates.add(cb.equal(root.get("category").get("id"), activeFilters.categoryId()));
+            }
+
+            Expression<BigDecimal> effectivePrice = getEffectivePriceExpression(root, cb);
+            BigDecimal minPrice = activeFilters.normalizedMinPrice();
+            BigDecimal maxPrice = activeFilters.normalizedMaxPrice();
+            if (minPrice != null) {
+                predicates.add(cb.greaterThanOrEqualTo(effectivePrice, minPrice));
+            }
+            if (maxPrice != null) {
+                predicates.add(cb.lessThanOrEqualTo(effectivePrice, maxPrice));
+            }
+
+            if (query != null && !Long.class.equals(query.getResultType()) && !long.class.equals(query.getResultType())) {
+                applyStorefrontSort(root, query, cb, activeFilters.normalizedSort(), effectivePrice);
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private Expression<BigDecimal> getEffectivePriceExpression(Root<Product> root, CriteriaBuilder cb) {
+        Expression<BigDecimal> salePrice = root.get("salePrice");
+        Expression<BigDecimal> basePrice = cb.coalesce(root.get("basePrice"), BigDecimal.ZERO);
+        return cb.<BigDecimal>selectCase()
+                .when(cb.and(cb.isNotNull(salePrice), cb.greaterThan(salePrice, BigDecimal.ZERO)), salePrice)
+                .otherwise(basePrice);
+    }
+
+    private void applyStorefrontSort(
+            Root<Product> root,
+            jakarta.persistence.criteria.CriteriaQuery<?> query,
+            CriteriaBuilder cb,
+            StorefrontProductSort sort,
+            Expression<BigDecimal> effectivePrice) {
+        if (sort == StorefrontProductSort.PRICE_ASC) {
+            query.orderBy(cb.asc(effectivePrice), cb.desc(root.get("createdAt")));
+            return;
+        }
+
+        if (sort == StorefrontProductSort.PRICE_DESC) {
+            query.orderBy(cb.desc(effectivePrice), cb.desc(root.get("createdAt")));
+            return;
+        }
+
+        query.orderBy(cb.desc(root.get("createdAt")));
+    }
+
+    private static BigDecimal normalizePrice(BigDecimal value) {
+        if (value == null) {
+            return null;
+        }
+        return value.max(BigDecimal.ZERO);
     }
 
     private void initializeForSerialization(Product product) {
