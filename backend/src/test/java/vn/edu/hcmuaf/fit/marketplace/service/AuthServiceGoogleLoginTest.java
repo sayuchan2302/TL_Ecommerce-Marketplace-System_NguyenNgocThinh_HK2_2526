@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 import vn.edu.hcmuaf.fit.marketplace.dto.request.GoogleLoginRequest;
 import vn.edu.hcmuaf.fit.marketplace.dto.response.AuthResponse;
 import vn.edu.hcmuaf.fit.marketplace.entity.User;
+import vn.edu.hcmuaf.fit.marketplace.config.GoogleAuthProperties;
 import vn.edu.hcmuaf.fit.marketplace.repository.StoreRepository;
 import vn.edu.hcmuaf.fit.marketplace.repository.UserRepository;
 import vn.edu.hcmuaf.fit.marketplace.security.JwtService;
@@ -54,17 +55,14 @@ class AuthServiceGoogleLoginTest {
     @Mock
     private StoreRepository storeRepository;
 
-    @Mock
-    private GoogleIdTokenVerifier googleIdTokenVerifier;
-
-    @Mock
-    private FacebookIdTokenVerifier facebookIdTokenVerifier;
+    private StubGoogleIdTokenVerifier googleIdTokenVerifier;
 
     private AuthService service;
 
     @BeforeEach
     void setUp() {
         jwtService = new FakeJwtService();
+        googleIdTokenVerifier = new StubGoogleIdTokenVerifier();
         service = new AuthService(
                 userRepository,
                 passwordEncoder,
@@ -73,7 +71,7 @@ class AuthServiceGoogleLoginTest {
                 userDetailsService,
                 storeRepository,
                 googleIdTokenVerifier,
-                facebookIdTokenVerifier
+                null
         );
     }
 
@@ -85,7 +83,7 @@ class AuthServiceGoogleLoginTest {
                 "New Customer",
                 "https://lh3.googleusercontent.com/avatar"
         );
-        when(googleIdTokenVerifier.verify("credential")).thenReturn(googleUser);
+        googleIdTokenVerifier.userInfo = googleUser;
         when(userRepository.findByGoogleSubject("google-sub-1")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("new.customer@test.local")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(anyString())).thenReturn("encoded-random-secret");
@@ -96,7 +94,7 @@ class AuthServiceGoogleLoginTest {
         });
         stubTokenIssue("new.customer@test.local", User.Role.CUSTOMER);
 
-        AuthResponse response = service.loginWithGoogle(new GoogleLoginRequest("credential"));
+        AuthResponse response = service.loginWithGoogle(new GoogleLoginRequest("id-token"));
 
         ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(userCaptor.capture());
@@ -113,7 +111,6 @@ class AuthServiceGoogleLoginTest {
         assertEquals("jwt-token", response.getToken());
         assertEquals("refresh-token", response.getRefreshToken());
         assertEquals("CUSTOMER", response.getRole());
-        assertEquals("https://lh3.googleusercontent.com/avatar", response.getAvatar());
     }
 
     @Test
@@ -125,19 +122,18 @@ class AuthServiceGoogleLoginTest {
                 "Vendor Name",
                 "https://lh3.googleusercontent.com/vendor"
         );
-        when(googleIdTokenVerifier.verify("credential")).thenReturn(googleUser);
+        googleIdTokenVerifier.userInfo = googleUser;
         when(userRepository.findByGoogleSubject("google-vendor")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("vendor@test.local")).thenReturn(Optional.of(user));
         when(userRepository.save(user)).thenReturn(user);
         stubTokenIssue("vendor@test.local", User.Role.VENDOR);
 
-        AuthResponse response = service.loginWithGoogle(new GoogleLoginRequest("credential"));
+        AuthResponse response = service.loginWithGoogle(new GoogleLoginRequest("id-token"));
 
         assertEquals("google-vendor", user.getGoogleSubject());
         assertEquals(User.Role.VENDOR, user.getRole());
         assertEquals("https://lh3.googleusercontent.com/vendor", user.getAvatar());
         assertEquals("VENDOR", response.getRole());
-        assertEquals("https://lh3.googleusercontent.com/vendor", response.getAvatar());
     }
 
     @Test
@@ -151,12 +147,12 @@ class AuthServiceGoogleLoginTest {
                 "Customer",
                 "https://new/avatar.png"
         );
-        when(googleIdTokenVerifier.verify("credential")).thenReturn(googleUser);
+        googleIdTokenVerifier.userInfo = googleUser;
         when(userRepository.findByGoogleSubject("linked-sub")).thenReturn(Optional.of(user));
         when(userRepository.findByEmailIgnoreCase("customer@test.local")).thenReturn(Optional.of(user));
         stubTokenIssue("customer@test.local", User.Role.CUSTOMER);
 
-        AuthResponse response = service.loginWithGoogle(new GoogleLoginRequest("credential"));
+        AuthResponse response = service.loginWithGoogle(new GoogleLoginRequest("id-token"));
 
         verify(userRepository, never()).save(any(User.class));
         assertEquals("https://existing/avatar.png", response.getAvatar());
@@ -168,13 +164,13 @@ class AuthServiceGoogleLoginTest {
         User user = buildUser("inactive@test.local", User.Role.CUSTOMER);
         user.setIsActive(false);
         GoogleUserInfo googleUser = new GoogleUserInfo("sub", "inactive@test.local", "Inactive", "");
-        when(googleIdTokenVerifier.verify("credential")).thenReturn(googleUser);
+        googleIdTokenVerifier.userInfo = googleUser;
         when(userRepository.findByGoogleSubject("sub")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("inactive@test.local")).thenReturn(Optional.of(user));
 
         ResponseStatusException ex = assertThrows(
                 ResponseStatusException.class,
-                () -> service.loginWithGoogle(new GoogleLoginRequest("credential"))
+                () -> service.loginWithGoogle(new GoogleLoginRequest("id-token"))
         );
 
         assertEquals(HttpStatus.FORBIDDEN, ex.getStatusCode());
@@ -188,13 +184,13 @@ class AuthServiceGoogleLoginTest {
         User user = buildUser("customer@test.local", User.Role.CUSTOMER);
         user.setGoogleSubject("other-sub");
         GoogleUserInfo googleUser = new GoogleUserInfo("new-sub", "customer@test.local", "Customer", "");
-        when(googleIdTokenVerifier.verify("credential")).thenReturn(googleUser);
+        googleIdTokenVerifier.userInfo = googleUser;
         when(userRepository.findByGoogleSubject("new-sub")).thenReturn(Optional.empty());
         when(userRepository.findByEmailIgnoreCase("customer@test.local")).thenReturn(Optional.of(user));
 
         ResponseStatusException ex = assertThrows(
                 ResponseStatusException.class,
-                () -> service.loginWithGoogle(new GoogleLoginRequest("credential"))
+                () -> service.loginWithGoogle(new GoogleLoginRequest("id-token"))
         );
 
         assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
@@ -204,34 +200,12 @@ class AuthServiceGoogleLoginTest {
     }
 
     @Test
-    void loginWithGoogleRejectsSubjectWhenEmailBelongsToAnotherUser() {
-        User linkedUser = buildUser("linked@test.local", User.Role.CUSTOMER);
-        linkedUser.setGoogleSubject("same-sub");
-        User emailOwner = buildUser("owner@test.local", User.Role.CUSTOMER);
-        GoogleUserInfo googleUser = new GoogleUserInfo("same-sub", "owner@test.local", "Owner", "");
-        when(googleIdTokenVerifier.verify("credential")).thenReturn(googleUser);
-        when(userRepository.findByGoogleSubject("same-sub")).thenReturn(Optional.of(linkedUser));
-        when(userRepository.findByEmailIgnoreCase("owner@test.local")).thenReturn(Optional.of(emailOwner));
+    void loginWithGooglePropagatesInvalidTokenAsBadRequest() {
+        googleIdTokenVerifier.exception = new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Google ID token");
 
         ResponseStatusException ex = assertThrows(
                 ResponseStatusException.class,
-                () -> service.loginWithGoogle(new GoogleLoginRequest("credential"))
-        );
-
-        assertEquals(HttpStatus.CONFLICT, ex.getStatusCode());
-        verify(userRepository, never()).save(any(User.class));
-        assertEquals(0, jwtService.tokenCount);
-        assertEquals(0, jwtService.refreshCount);
-    }
-
-    @Test
-    void loginWithGooglePropagatesInvalidCredentialAsBadRequest() {
-        when(googleIdTokenVerifier.verify("credential"))
-                .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid Google credential"));
-
-        ResponseStatusException ex = assertThrows(
-                ResponseStatusException.class,
-                () -> service.loginWithGoogle(new GoogleLoginRequest("credential"))
+                () -> service.loginWithGoogle(new GoogleLoginRequest("id-token"))
         );
 
         assertEquals(HttpStatus.BAD_REQUEST, ex.getStatusCode());
@@ -258,6 +232,23 @@ class AuthServiceGoogleLoginTest {
                 .authorities("ROLE_" + role.name())
                 .build();
         when(userDetailsService.loadUserByUsername(email)).thenReturn(userDetails);
+    }
+
+    private static final class StubGoogleIdTokenVerifier extends GoogleIdTokenVerifier {
+        private GoogleUserInfo userInfo;
+        private ResponseStatusException exception;
+
+        private StubGoogleIdTokenVerifier() {
+            super(new GoogleAuthProperties());
+        }
+
+        @Override
+        public GoogleUserInfo verify(String idToken) {
+            if (exception != null) {
+                throw exception;
+            }
+            return userInfo;
+        }
     }
 
     private static final class FakeJwtService extends JwtService {

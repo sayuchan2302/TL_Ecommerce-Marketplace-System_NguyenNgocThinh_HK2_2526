@@ -1,15 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Loader2, Sparkles } from 'lucide-react';
 import './Auth.css';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { getUiErrorMessage } from '../../utils/errorMessage';
+import GoogleLoginButton from './GoogleLoginButton';
+import FacebookLoginButton from './FacebookLoginButton';
 
 const Register = () => {
-  const { register } = useAuth();
+  const { register, isAuthenticated, loginWithGoogle, loginWithFacebook } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -17,6 +25,8 @@ const Register = () => {
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string; confirm?: string }>({});
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [facebookLoading, setFacebookLoading] = useState(false);
 
   const validate = () => {
     const next: typeof errors = {};
@@ -43,6 +53,32 @@ const Register = () => {
       addToast(getUiErrorMessage(error, 'Đăng ký thất bại'), 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleIdToken = async (idToken: string) => {
+    try {
+      setGoogleLoading(true);
+      await loginWithGoogle(idToken);
+      addToast('Dang ky Google thanh cong', 'success');
+      navigate('/', { replace: true });
+    } catch (error: unknown) {
+      addToast(getUiErrorMessage(error, 'Dang ky Google that bai'), 'error');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleFacebookAccessToken = async (accessToken: string) => {
+    try {
+      setFacebookLoading(true);
+      await loginWithFacebook(accessToken);
+      addToast('Đăng ký Facebook thành công', 'success');
+      navigate('/', { replace: true });
+    } catch (error: unknown) {
+      addToast(getUiErrorMessage(error, 'Đăng ký Facebook thất bại'), 'error');
+    } finally {
+      setFacebookLoading(false);
     }
   };
 
@@ -104,6 +140,13 @@ const Register = () => {
             <button type="submit" className="auth-btn" disabled={loading}>
               {loading ? <><Loader2 size={18} className="auth-spinner" /> Đang tạo tài khoản...</> : <><Sparkles size={18} /> Đăng ký</>}
             </button>
+            <div className="auth-divider">
+              <span>Hoặc tiếp tục với</span>
+            </div>
+            <div className="social-row">
+              <GoogleLoginButton disabled={loading || googleLoading || facebookLoading} onIdToken={handleGoogleIdToken} text="signup_with" />
+              <FacebookLoginButton disabled={loading || googleLoading || facebookLoading} onAccessToken={handleFacebookAccessToken} />
+            </div>
             <div className="auth-secondary">
               Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
             </div>

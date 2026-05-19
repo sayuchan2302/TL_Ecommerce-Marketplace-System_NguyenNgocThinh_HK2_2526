@@ -134,7 +134,7 @@ const loginWithBackend = async (email: string, password: string): Promise<AuthRe
   }
 };
 
-const loginWithGoogleBackend = async (credential: string): Promise<AuthResponse | null> => {
+const loginWithGoogleBackend = async (idToken: string): Promise<AuthResponse | null> => {
   if (!API_BASE) {
     throw new Error('VITE_API_URL is empty. Please configure backend API URL.');
   }
@@ -143,7 +143,7 @@ const loginWithGoogleBackend = async (credential: string): Promise<AuthResponse 
     const response = await fetch(buildApiUrl('/api/auth/google'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential }),
+      body: JSON.stringify({ idToken }),
     });
 
     if (!response.ok) {
@@ -157,7 +157,7 @@ const loginWithGoogleBackend = async (credential: string): Promise<AuthResponse 
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error('Đăng nhập Google thất bại');
+    throw new Error('Dang nhap Google that bai');
   }
 };
 
@@ -346,14 +346,14 @@ export const authService = {
     return backendSession;
   },
 
-  async loginWithGoogle(credential: string): Promise<AuthResponse> {
-    if (!credential) {
-      throw new Error('Thiếu mã xác thực Google');
+  async loginWithGoogle(idToken: string): Promise<AuthResponse> {
+    if (!idToken) {
+      throw new Error('Thieu ma xac thuc Google');
     }
 
-    const backendSession = await loginWithGoogleBackend(credential);
+    const backendSession = await loginWithGoogleBackend(idToken);
     if (!backendSession) {
-      throw new Error('Đăng nhập Google thất bại. Vui lòng thử lại.');
+      throw new Error('Dang nhap Google that bai. Vui long thu lai.');
     }
     persist(backendSession);
     if (backendSession.user.role === 'VENDOR' || backendSession.user.role === 'SUPER_ADMIN') {

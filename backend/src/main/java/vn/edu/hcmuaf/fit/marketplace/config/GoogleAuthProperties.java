@@ -13,6 +13,6 @@ import java.util.List;
 @ConfigurationProperties(prefix = "app.google")
 public class GoogleAuthProperties {
     private String clientId = "";
-    private String jwkSetUri = "https://www.googleapis.com/oauth2/v3/certs";
+    private String tokenInfoUrl = "https://oauth2.googleapis.com/tokeninfo";
     private List<String> issuers = List.of("https://accounts.google.com", "accounts.google.com");
 }

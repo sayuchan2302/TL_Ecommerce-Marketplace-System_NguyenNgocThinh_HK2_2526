@@ -103,7 +103,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse loginWithGoogle(GoogleLoginRequest request) {
-        GoogleUserInfo googleUser = googleIdTokenVerifier.verify(request.getCredential());
+        GoogleUserInfo googleUser = googleIdTokenVerifier.verify(request.getIdToken());
         User user = resolveGoogleUser(googleUser);
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
@@ -180,11 +180,11 @@ public class AuthService {
 
     private User resolveByGoogleEmail(GoogleUserInfo googleUser) {
         return userRepository.findByEmailIgnoreCase(googleUser.email())
-                .map(user -> linkExistingUser(user, googleUser))
+                .map(user -> linkExistingGoogleUser(user, googleUser))
                 .orElseGet(() -> createGoogleUser(googleUser));
     }
 
-    private User linkExistingUser(User user, GoogleUserInfo googleUser) {
+    private User linkExistingGoogleUser(User user, GoogleUserInfo googleUser) {
         if (!Boolean.TRUE.equals(user.getIsActive())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account is inactive");
         }
@@ -203,7 +203,7 @@ public class AuthService {
                 .googleSubject(googleUser.subject())
                 .password(generateRandomPasswordHash())
                 .name(defaultGoogleName(googleUser))
-                .avatar(googleUser.picture())
+                .avatar(hasText(googleUser.picture()) ? googleUser.picture() : null)
                 .role(User.Role.CUSTOMER)
                 .gender(User.Gender.OTHER)
                 .loyaltyPoints(0L)

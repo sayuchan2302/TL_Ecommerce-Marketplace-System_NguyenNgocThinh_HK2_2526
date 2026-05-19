@@ -25,7 +25,7 @@ public class User extends BaseEntity {
     @Column(unique = true, nullable = false)
     private String email;
 
-@Column(name = "google_subject", unique = true, length = 64)
+    @Column(name = "google_subject", unique = true, length = 64)
     private String googleSubject;
 
     @Column(name = "facebook_subject", unique = true, length = 64)

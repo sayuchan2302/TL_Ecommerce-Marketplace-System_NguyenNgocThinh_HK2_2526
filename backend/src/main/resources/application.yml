@@ -71,7 +71,7 @@ app:
     max-requests-per-hour: ${APP_PASSWORD_RESET_MAX_REQUESTS_PER_HOUR:5}
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
-    jwk-set-uri: ${GOOGLE_JWK_SET_URI:https://www.googleapis.com/oauth2/v3/certs}
+    token-info-url: ${GOOGLE_TOKEN_INFO_URL:https://oauth2.googleapis.com/tokeninfo}
   upload:
     base-dir: ${APP_UPLOAD_BASE_DIR:backend/upload}
     max-avatar-size-bytes: ${APP_UPLOAD_MAX_AVATAR_SIZE_BYTES:3145728}
